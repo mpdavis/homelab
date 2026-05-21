@@ -1,0 +1,11 @@
+argo-cd:
+  global:
+    domain: argocd.mpdavis.com
+
+  configs:
+    params:
+      server.insecure: true
+
+  server:
+    service:
+      type: NodePort

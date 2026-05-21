@@ -1,0 +1,74 @@
+---
+- name: Bootstrap ArgoCD
+  hosts: k3s_server
+  become: true
+  vars:
+    repo_url: https://github.com/mpdavis/homelab.git
+  tasks:
+    - name: Install Helm
+      ansible.builtin.shell: curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Add ArgoCD Helm repo
+      ansible.builtin.command: helm repo add argo https://argoproj.github.io/argo-helm
+      register: helm_repo
+      changed_when: "'has been added' in helm_repo.stdout"
+      failed_when: helm_repo.rc != 0 and 'already exists' not in helm_repo.stderr
+
+    - name: Update Helm repos
+      ansible.builtin.command: helm repo update
+      changed_when: false
+
+    - name: Install ArgoCD
+      ansible.builtin.shell: |
+        helm upgrade --install argocd argo/argo-cd \
+          --namespace argocd --create-namespace \
+          --set 'configs.params.server\.insecure=true' \
+          --set server.service.type=NodePort \
+          --wait --timeout 5m
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    - name: Wait for ArgoCD server to be ready
+      ansible.builtin.command: k3s kubectl rollout status deployment/argocd-server -n argocd --timeout=120s
+      changed_when: false
+
+    - name: Apply root Application for cluster config
+      ansible.builtin.shell: |
+        cat <<'EOF' | k3s kubectl apply -f -
+        apiVersion: argoproj.io/v1alpha1
+        kind: Application
+        metadata:
+          name: cluster-config
+          namespace: argocd
+        spec:
+          project: default
+          source:
+            repoURL: {{ repo_url }}
+            targetRevision: HEAD
+            path: clusters/homelab
+          destination:
+            server: https://kubernetes.default.svc
+            namespace: argocd
+          syncPolicy:
+            automated:
+              prune: true
+              selfHeal: true
+        EOF
+      changed_when: true
+
+    - name: Get ArgoCD admin password
+      ansible.builtin.shell: |
+        k3s kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+      register: argocd_password
+      changed_when: false
+
+    - name: Print ArgoCD access info
+      ansible.builtin.debug:
+        msg:
+          - "ArgoCD is running!"
+          - "Username: admin"
+          - "Password: {{ argocd_password.stdout }}"
+          - "Access via: kubectl port-forward svc/argocd-server -n argocd 8080:443"
+          - "Then open: https://localhost:8080"
