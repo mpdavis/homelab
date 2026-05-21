@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-world
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-world
+  template:
+    metadata:
+      labels:
+        app: hello-world
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: html
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: html
+          configMap:
+            name: hello-world-html
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hello-world-html
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head><title>Hello Homelab</title></head>
+    <body>
+      <h1>Hello from k3s!</h1>
+      <p>If you can see this page with a valid TLS cert, the following are working:</p>
+      <ul>
+        <li>ArgoCD auto-discovery (apps/*)</li>
+        <li>Traefik ingress</li>
+        <li>Let's Encrypt wildcard TLS via cert-manager</li>
+        <li>MetalLB LoadBalancer</li>
+      </ul>
+    </body>
+    </html>
