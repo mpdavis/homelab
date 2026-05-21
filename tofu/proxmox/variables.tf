@@ -69,7 +69,7 @@ variable "vms" {
     k3s-agent = {
       vmid      = 201
       cores     = 4
-      memory    = 10240
+      memory    = 32768
       disk_size = 64
       ip        = "10.0.1.51"
     }
