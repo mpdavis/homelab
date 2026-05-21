@@ -1,0 +1,28 @@
+traefik:
+  ingressClass:
+    enabled: true
+    isDefaultClass: true
+
+  providers:
+    kubernetesCRD:
+      enabled: true
+      allowCrossNamespace: true
+    kubernetesIngress:
+      enabled: true
+      publishedService:
+        enabled: true
+
+  service:
+    type: LoadBalancer
+
+  ports:
+    web:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+    websecure:
+      tls:
+        enabled: true
+
+  globalArguments: []
