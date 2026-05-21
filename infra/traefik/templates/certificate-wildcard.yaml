@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-mpdavis-com
+spec:
+  secretName: wildcard-mpdavis-com-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.mpdavis.com"
+    - "mpdavis.com"

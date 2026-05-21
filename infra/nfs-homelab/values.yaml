@@ -1,0 +1,10 @@
+nfs-subdir-external-provisioner:
+  nfs:
+    server: 10.0.1.6
+    path: /var/nfs/shared/homelab
+  storageClass:
+    name: nfs-homelab
+    defaultClass: false
+    reclaimPolicy: Retain
+    archiveOnDelete: true
+    accessModes: ReadWriteMany

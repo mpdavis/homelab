@@ -1,0 +1,7 @@
+apiVersion: v2
+name: nfs-homelab
+version: 1.0.0
+dependencies:
+  - name: nfs-subdir-external-provisioner
+    version: "~4.0"
+    repository: https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner
