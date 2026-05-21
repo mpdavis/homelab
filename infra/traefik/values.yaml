@@ -17,12 +17,9 @@ traefik:
 
   ports:
     web:
-      redirections:
-        entryPoint:
-          to: websecure
-          scheme: https
-    websecure:
-      tls:
-        enabled: true
-
-  globalArguments: []
+      http:
+        redirections:
+          entryPoint:
+            to: websecure
+            scheme: https
+            permanent: true
