@@ -1,0 +1,14 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: hello-world
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`hello.mpdavis.com`)
+      kind: Rule
+      services:
+        - name: hello-world
+          port: 80
+  tls: {}
