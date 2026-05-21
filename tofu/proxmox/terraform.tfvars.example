@@ -1,0 +1,12 @@
+proxmox_endpoint = "https://10.0.1.42:8006"
+proxmox_host     = "10.0.1.42"
+proxmox_node     = "pve"
+
+ssh_public_keys = [
+  "ssh-ed25519 AAAA... user@host",
+]
+
+# vm_user         = "michael"
+# network_gateway = "10.0.0.1"
+# network_cidr    = "/16"
+# dns_servers     = ["1.1.1.1"]
