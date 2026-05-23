@@ -4,6 +4,12 @@ kube-prometheus-stack:
       existingSecret: grafana-admin
       userKey: admin-user
       passwordKey: admin-password
+    initChownData:
+      enabled: false
+    securityContext:
+      runAsUser: 472
+      runAsGroup: 472
+      fsGroup: 472
     persistence:
       enabled: true
       storageClassName: local-path
