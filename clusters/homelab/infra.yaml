@@ -7,14 +7,32 @@ spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
-    - git:
-        repoURL: https://github.com/mpdavis/homelab.git
-        revision: HEAD
-        directories:
-          - path: infra/*
+    - matrix:
+        generators:
+          - git:
+              repoURL: https://github.com/mpdavis/homelab.git
+              revision: HEAD
+              directories:
+                - path: infra/*
+          - list:
+              elementsYaml: |
+                {{ if eq .path.basename "monitoring" "loki" }}
+                - category: monitoring
+                {{ else if eq .path.basename "traefik" "metallb" "cert-manager" }}
+                - category: networking
+                {{ else if eq .path.basename "nfs-data" "nfs-homelab" }}
+                - category: storage
+                {{ else if eq .path.basename "external-secrets" }}
+                - category: secrets
+                {{ else }}
+                - category: platform
+                {{ end }}
   template:
     metadata:
       name: "{{.path.basename}}"
+      labels:
+        tier: infra
+        category: "{{.category}}"
     spec:
       project: default
       source:
