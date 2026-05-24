@@ -10,11 +10,14 @@ spec:
     - git:
         repoURL: https://github.com/mpdavis/homelab.git
         revision: HEAD
-        directories:
-          - path: apps/*
+        files:
+          - path: apps/*/argocd.json
   template:
     metadata:
       name: "{{.path.basename}}"
+      labels:
+        tier: apps
+        category: "{{.category}}"
     spec:
       project: default
       source:
