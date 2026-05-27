@@ -56,25 +56,10 @@
   notify: restart gitea
 
 - name: Create Gitea systemd service
-  ansible.builtin.copy:
+  ansible.builtin.template:
+    src: gitea.service.j2
     dest: /etc/systemd/system/gitea.service
     mode: "0644"
-    content: |
-      [Unit]
-      Description=Gitea (Git with a cup of tea)
-      After=network.target
-
-      [Service]
-      Type=simple
-      User=gitea
-      Group=gitea
-      WorkingDirectory=/var/lib/gitea
-      ExecStart=/usr/local/bin/gitea web --config /etc/gitea/app.ini
-      Restart=always
-      Environment=USER=gitea HOME=/home/gitea GITEA_WORK_DIR=/var/lib/gitea
-
-      [Install]
-      WantedBy=multi-user.target
   notify: restart gitea
 
 - name: Enable and start Gitea

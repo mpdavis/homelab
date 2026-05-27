@@ -1,6 +1,3 @@
 ---
 gitea_version: "1.23.7"
-gitea_admin_user: michael
-gitea_admin_password: "changeme"
-gitea_admin_email: michael@mpdavis.com
 gitea_mirror_source: "https://github.com/mpdavis/homelab.git"
