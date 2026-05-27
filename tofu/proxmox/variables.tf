@@ -3,10 +3,11 @@ variable "proxmox_endpoint" {
   type        = string
 }
 
-variable "proxmox_api_token" {
-  description = "API token in format: user@realm!tokenid=uuid"
+variable "proxmox_password" {
+  description = "Password for root@pam (or set PROXMOX_VE_PASSWORD env var)"
   type        = string
   sensitive   = true
+  default     = null
 }
 
 variable "pve_nodes" {
@@ -23,7 +24,7 @@ variable "pve_nodes" {
 variable "vm_user" {
   description = "Default user created on VMs/containers via cloud-init"
   type        = string
-  default     = "michael"
+  default     = "root"
 }
 
 variable "ssh_public_keys" {
@@ -111,7 +112,7 @@ variable "vms" {
     k3s-agent-gpu = {
       vmid        = 202
       node        = "pve2"
-      cores       = 8
+      cores       = 6
       memory      = 49152
       disk_size   = 64
       ip          = "10.0.1.52"

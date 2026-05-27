@@ -1,5 +1,6 @@
 proxmox_endpoint  = "https://10.0.1.1:8006"
-proxmox_api_token = "root@pam!tofu=<uuid>"
+# Set password here or use PROXMOX_VE_PASSWORD env var
+proxmox_password = "your-root-password"
 
 ssh_public_keys = [
   "ssh-ed25519 AAAA... user@host",
