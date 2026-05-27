@@ -4,7 +4,7 @@ terraform {
   required_providers {
     proxmox = {
       source  = "bpg/proxmox"
-      version = "~> 0.78"
+      version = "~> 0.106"
     }
   }
 }
@@ -16,9 +16,13 @@ provider "proxmox" {
 
   ssh {
     agent = true
-    node {
-      name    = var.proxmox_node
-      address = var.proxmox_host
+
+    dynamic "node" {
+      for_each = var.pve_nodes
+      content {
+        name    = node.key
+        address = node.value.address
+      }
     }
   }
 }
