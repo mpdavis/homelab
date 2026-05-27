@@ -5,6 +5,9 @@
 - name: Remove subscription nag
   ansible.builtin.import_tasks: subscription-nag.yml
 
+- name: Disable HA services
+  ansible.builtin.import_tasks: disable-ha.yml
+
 - name: Fix NIC offloading for Intel e1000e/e1000
   ansible.builtin.import_tasks: nic-offloading.yml
 
