@@ -6,8 +6,7 @@ GitOps repository for a multi-node homelab running **k3s** on **Proxmox VE**, ma
 
 - **Proxmox VE** hypervisor across two SFF Lenovo nodes (pve1 + pve2)
 - **k3s** for Kubernetes — LXC containers for control plane + general workloads, VM for GPU node
-- **FluxCD** (via FluxOperator) watches this repo and reconciles cluster state
-- **Gitea** local git mirror — Flux pulls from Gitea, not GitHub directly
+- **FluxCD** (via FluxOperator) watches this repo on GitHub and reconciles cluster state
 - **External Secrets Operator** syncs secrets from Bitwarden Secrets Manager
 
 See [docs/design.md](docs/design.md) for the full design document, hardware details, storage strategy, and deploy sequence.
@@ -47,7 +46,6 @@ tofu apply
 
 ```bash
 cd ansible
-ansible-playbook playbooks/setup-gitea.yml    # configure Gitea mirror
 ansible-playbook playbooks/site.yml           # install k3s on all nodes
 ```
 

@@ -3,7 +3,7 @@
   hosts: k3s_server
   become: true
   vars:
-    gitea_url: "http://10.0.1.53:3000/michael/homelab.git"
+    git_url: "https://github.com/mpdavis/homelab.git"
   tasks:
     - name: Install Helm
       ansible.builtin.shell: curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
@@ -46,4 +46,4 @@
         msg:
           - "FluxCD is running!"
           - "Check status: kubectl get kustomizations,helmreleases -A"
-          - "Flux pulls from: {{ gitea_url }}"
+          - "Flux pulls from: {{ git_url }}"
