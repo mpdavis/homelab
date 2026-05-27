@@ -16,7 +16,7 @@ Multi-node homelab running k3s on Proxmox VE with FluxCD-driven GitOps.
 
 ### Node 1 — pve1
 
-SFF Lenovo, no GPU, 32 GB RAM.
+SFF Lenovo, integrated GPU only, 32 GB RAM.
 
 - Hostname: `pve1`
 - IP: `10.0.1.1`
@@ -42,30 +42,26 @@ Existing network-attached storage at `10.0.1.6`. Exports via NFS to all cluster 
 
 ```
                      ┌─────────────────────────────────────────┐
-                     │             LAN (10.0.0.0/16)           │
-                     │         Gateway: 10.0.0.1               │
-                     │         DNS: 1.1.1.1 (Cloudflare)       │
+                     │                  LAN                     │
+                     │         DNS: Cloudflare                  │
                      └────────┬──────────────┬─────────────────┘
                               │              │
           ┌───────────────────▼──┐    ┌──────▼───────────────────┐
-          │  pve1 (10.0.1.1)     │    │  pve2 (10.0.1.2)        │
-          │  Proxmox VE · 32GB   │    │  Proxmox VE · 64GB      │
-          │  No GPU              │    │  RTX 3050 6GB            │
-          │                      │    │                          │
-          │  ┌────────────────┐  │    │  ┌────────────────────┐  │
-          │  │ k3s-server     │  │    │  │ k3s-agent-gpu      │  │
-          │  │ LXC · 10.0.1.50│ │    │  │ VM · 10.0.1.52     │  │
-          │  │ 4c/8GB/32GB   │  │    │  │ 8c/48GB/64GB       │  │
-          │  │ Control plane  │  │    │  │ VFIO GPU pass-thru │  │
-          │  │ + workloads    │  │    │  │ AI inference        │  │
-          │  └────────────────┘  │    │  └────────────────────┘  │
-          │                      │    │                          │
-          │  ┌────────────────┐  │    │  ┌────────────────────┐  │
-          │  │ k3s-agent-1    │  │    │  │ gitea              │  │
-          │  │ LXC · 10.0.1.51│ │    │  │ LXC · 10.0.1.53   │  │
-          │  │ 4c/16GB/64GB  │  │    │  │ 1c/1GB/8GB         │  │
-          │  │ General        │  │    │  │ Local git mirror   │  │
-          │  │ workloads      │  │    │  │ (GitHub → Gitea)   │  │
+          │  pve1                │    │  pve2                    │
+          │  Proxmox VE         │    │  Proxmox VE              │
+          │                      │    │  RTX 3050                │
+          │  ┌────────────────┐  │    │                          │
+          │  │ k3s-server     │  │    │  ┌────────────────────┐  │
+          │  │ LXC            │  │    │  │ k3s-agent-gpu      │  │
+          │  │ Control plane  │  │    │  │ VM                  │  │
+          │  │ + workloads    │  │    │  │ VFIO GPU pass-thru │  │
+          │  └────────────────┘  │    │  │ AI inference        │  │
+          │                      │    │  └────────────────────┘  │
+          │  ┌────────────────┐  │    │                          │
+          │  │ k3s-agent-1    │  │    │  ┌────────────────────┐  │
+          │  │ LXC            │  │    │  │ gitea              │  │
+          │  │ General        │  │    │  │ LXC                │  │
+          │  │ workloads      │  │    │  │ Local git mirror   │  │
           │  └────────────────┘  │    │  └────────────────────┘  │
           │                      │    │                          │
           └──────────┬───────────┘    └──────────┬───────────────┘
@@ -74,8 +70,6 @@ Existing network-attached storage at `10.0.1.6`. Exports via NFS to all cluster 
                                │ NFS
                      ┌─────────▼─────────┐
                      │   Unifi NAS        │
-                     │   10.0.1.6         │
-                     │   /var/nfs/shared/ │
                      └───────────────────┘
 ```
 
@@ -215,8 +209,6 @@ the MetalLB VIP.
 
 Bitwarden Secrets Manager as the source of truth. ESO syncs BWSM secrets into
 Kubernetes Secrets automatically.
-
-Same BWSM UUIDs from the previous setup carry over directly.
 
 ## GPU Setup
 
