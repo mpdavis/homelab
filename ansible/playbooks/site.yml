@@ -5,6 +5,26 @@
   roles:
     - common
 
+- name: VM-specific setup
+  hosts: k3s_cluster
+  become: true
+  roles:
+    - role: vm
+      when: node_type == 'vm'
+
+- name: LXC-specific setup
+  hosts: k3s_cluster
+  become: true
+  roles:
+    - role: lxc
+      when: node_type == 'lxc'
+
+- name: GPU setup
+  hosts: k3s-agent-gpu
+  become: true
+  roles:
+    - gpu
+
 - name: Install k3s server
   hosts: k3s_server
   become: true

@@ -13,15 +13,9 @@
 - name: Install base packages
   ansible.builtin.apt:
     name:
-      - qemu-guest-agent
       - curl
       - gnupg
       - open-iscsi
       - nfs-common
     state: present
 
-- name: Enable qemu-guest-agent
-  ansible.builtin.systemd:
-    name: qemu-guest-agent
-    enabled: true
-    state: started
