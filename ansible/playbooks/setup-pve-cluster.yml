@@ -72,5 +72,5 @@
       failed_when: false
 
     - name: Join cluster
-      ansible.builtin.command: pvecm add {{ pve_seed_ip }}
+      ansible.builtin.command: pvecm add {{ pve_seed_ip }} --use_ssh
       when: cluster_status.rc != 0
