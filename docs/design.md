@@ -1,110 +1,129 @@
-# Homelab Infrastructure Redesign
+# Homelab Infrastructure Design
 
-Ground-up redesign of the homelab infrastructure. Moving from single-host
-Docker Compose (deployed via doco-cd) to a multi-node Proxmox + k3s cluster
-with ArgoCD-driven GitOps.
+Multi-node homelab running k3s on Proxmox VE with FluxCD-driven GitOps.
 
 ## Goals
 
 - Multi-node cluster with central hardware visibility (Proxmox)
 - Kubernetes (k3s) for orchestration and service discovery
-- GitOps via ArgoCD — push manifests, cluster converges
+- GitOps via FluxCD — push manifests, cluster converges
 - GPU-accelerated local AI inference
 - Easy to experiment with new services (deploy a Helm chart, done)
 - Proper storage tiering: fast local disks for databases, NAS for bulk media
+- Anything the cluster depends on to exist lives outside the cluster (git mirror, DNS)
 
 ## Hardware
 
-### Node 1 (existing host)
+### Node 1 — pve1
 
-Current bare-metal Debian server running all Docker workloads. Will be
-reimaged with Proxmox after workloads are migrated to Node 2.
+SFF Lenovo, integrated GPU only, 32 GB RAM.
 
-- Role during migration: runs docker-legacy VM (all current stacks via doco-cd)
-- Role post-migration: k3s agent, general workloads
+- Hostname: `pve1`
+- IP: `10.0.1.1`
+- Role: Proxmox host for k3s control plane + general workload LXC containers
 
-### Node 2 (new host)
+### Node 2 — pve2
 
-New server with NVIDIA GPU for inference workloads.
+SFF Lenovo, NVIDIA RTX 3050 6GB, 64 GB RAM.
 
-- Role: k3s server (control plane) + k3s agent with GPU passthrough
-- GPU: NVIDIA (targeting 24GB VRAM — RTX 3090, A4000, or A5000)
+- Hostname: `pve2`
+- IP: `10.0.1.2`
+- Role: Proxmox host for GPU VM + Gitea LXC
 
 ### Unifi NAS
 
-Existing network-attached storage. Holds all media, bulk appdata, and backups.
-Exports via NFS to all cluster nodes.
+Existing network-attached storage at `10.0.1.6`. Exports via NFS to all cluster nodes.
 
-- Path: `/mnt/nas/data` (current mount convention)
-- Media: `/mnt/nas/data/media`
-- Appdata: `/mnt/nas/data/appdata`
-- Docker legacy: `/mnt/nas/homelab/docker`
+- Path: `/var/nfs/shared/`
+- Data: `/var/nfs/shared/data/`
+- Homelab: `/var/nfs/shared/homelab/`
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────┐    ┌─────────────────────────────────────┐
-│  Node 1 (existing)                  │    │  Node 2 (new, GPU)                  │
-│  Proxmox VE                         │    │  Proxmox VE                         │
-│                                     │    │                                     │
-│  ┌───────────────────────────────┐  │    │  ┌───────────────────────────────┐  │
-│  │ VM: docker-legacy             │  │    │  │ VM: k3s-server                │  │
-│  │ Debian · Docker · doco-cd     │  │    │  │ k3s control plane + agent     │  │
-│  │ (runs during migration only)  │  │    │  │ ArgoCD                        │  │
-│  └───────────────────────────────┘  │    │  └───────────────────────────────┘  │
-│                                     │    │                                     │
-│  ┌───────────────────────────────┐  │    │  ┌───────────────────────────────┐  │
-│  │ VM: k3s-agent-1               │  │    │  │ VM: k3s-agent-gpu             │  │
-│  │ k3s agent                     │  │    │  │ k3s agent                     │  │
-│  │ General workloads             │  │    │  │ NVIDIA GPU passthrough         │  │
-│  └───────────────────────────────┘  │    │  │ AI inference pods             │  │
-│                                     │    │  └───────────────────────────────┘  │
-└─────────────────────────────────────┘    └─────────────────────────────────────┘
-                         │                                      │
-                         └──────────────┬───────────────────────┘
-                                        │ NFS
-                              ┌─────────▼─────────┐
-                              │    Unifi NAS       │
-                              │    NFS exports     │
-                              └───────────────────┘
+                     ┌─────────────────────────────────────────┐
+                     │                  LAN                     │
+                     │         DNS: Cloudflare                  │
+                     └────────┬──────────────┬─────────────────┘
+                              │              │
+          ┌───────────────────▼──┐    ┌──────▼───────────────────┐
+          │  pve1                │    │  pve2                    │
+          │  Proxmox VE         │    │  Proxmox VE              │
+          │                      │    │  RTX 3050                │
+          │  ┌────────────────┐  │    │                          │
+          │  │ k3s-server     │  │    │  ┌────────────────────┐  │
+          │  │ LXC            │  │    │  │ k3s-agent-gpu      │  │
+          │  │ Control plane  │  │    │  │ VM                  │  │
+          │  │ + workloads    │  │    │  │ VFIO GPU pass-thru │  │
+          │  └────────────────┘  │    │  │ AI inference        │  │
+          │                      │    │  └────────────────────┘  │
+          │  ┌────────────────┐  │    │                          │
+          │  │ k3s-agent-1    │  │    │  ┌────────────────────┐  │
+          │  │ LXC            │  │    │  │ gitea              │  │
+          │  │ General        │  │    │  │ LXC                │  │
+          │  │ workloads      │  │    │  │ Local git mirror   │  │
+          │  └────────────────┘  │    │  └────────────────────┘  │
+          │                      │    │                          │
+          └──────────┬───────────┘    └──────────┬───────────────┘
+                     │                           │
+                     └─────────┬─────────────────┘
+                               │ NFS
+                     ┌─────────▼─────────┐
+                     │   Unifi NAS        │
+                     └───────────────────┘
 ```
 
 ## Kubernetes Distribution: k3s
 
 - Lightweight, single-binary Kubernetes
 - Built-in: CoreDNS, Traefik ingress controller, local-path-provisioner, metrics-server
-- Easy multi-node: `k3s server` on one VM, `k3s agent --server` on others
+- Easy multi-node: `k3s server` on one node, `k3s agent --server` on others
 - Supports HA control plane via embedded etcd (can promote later if needed)
+- k3s server and general agents run in privileged LXC containers (lower overhead than VMs)
+- GPU agent runs in a full VM (VFIO passthrough requires it)
 
 ### Cluster Topology
 
-| VM | Host | Role | Notes |
-|----|------|------|-------|
-| k3s-server | Node 2 | server (control plane + agent) | Runs ArgoCD, cluster infra |
-| k3s-agent-gpu | Node 2 | agent | GPU passthrough, AI workloads |
-| k3s-agent-1 | Node 1 | agent | General workloads (added after migration) |
+| Node | Host | Type | IP | Role |
+|------|------|------|----|------|
+| k3s-server | pve1 | LXC | 10.0.1.50 | server (control plane + workloads) |
+| k3s-agent-1 | pve1 | LXC | 10.0.1.51 | agent, general workloads |
+| k3s-agent-gpu | pve2 | VM | 10.0.1.52 | agent, GPU passthrough, AI workloads |
 
-Starting with a single server node is fine for a homelab. Can promote to HA
-etcd later by adding more server nodes.
+### LXC Requirements for k3s
 
-## GitOps: ArgoCD
+Privileged containers with: `nesting=true`, `keyctl=true`, AppArmor unconfined,
+`/dev/kmsg` symlink, `mount --make-rshared /`.
 
-ArgoCD watches this repository and reconciles cluster state from manifests
-committed here.
+## GitOps: FluxCD
 
-### Why ArgoCD over Flux
+FluxCD watches this repository (via a local Gitea mirror) and reconciles cluster
+state from committed manifests.
 
-- Rich web UI for visualizing deployments, diffs, and sync status
-- App-of-apps pattern makes it easy to onboard new services
-- Good for experimentation: can manually sync, pause auto-sync, rollback
-- Larger community, more Helm chart integrations out of the box
+### Why FluxCD
+
+- Declarative, pull-based GitOps — no UI to maintain or secure
+- FluxOperator manages Flux lifecycle via Helm; FluxInstance CR bootstraps the sync
+- HelmRelease CRDs for individual Helm charts (no umbrella chart boilerplate)
+- Kustomization CRDs with `dependsOn` chains for ordering
+- Lightweight — just controllers, no web server or database
 
 ### How It Works
 
-1. Push manifests/Helm values to this repo
-2. ArgoCD detects the change (webhook or polling)
-3. ArgoCD renders the manifests and diffs against live cluster state
-4. Auto-sync applies the change (or manual sync if preferred per-app)
+1. Push manifests to GitHub
+2. Gitea mirror syncs from GitHub (every 10 minutes)
+3. Flux source-controller detects the change
+4. kustomize-controller / helm-controller reconcile the desired state
+5. Dependency chain: `infrastructure-sources` → `infrastructure` → `apps`
+
+### Local Git Mirror
+
+Flux pulls from a local Gitea instance (`http://10.0.1.53:3000/michael/homelab.git`)
+running as a standalone LXC container on pve2. This ensures the cluster can reconcile
+even if GitHub is unreachable. Gitea mirrors the GitHub repo with a 10-minute sync
+interval.
+
+Push workflow: `git push origin` → GitHub → Gitea mirror sync → Flux reconciles.
 
 ## Storage Strategy
 
@@ -116,41 +135,24 @@ For bulk data that doesn't need low-latency random I/O.
 
 - **What**: Media files, large appdata directories, backups, model weights
 - **Where**: Unifi NAS, exported via NFS
-- **K8s mechanism**: NFS CSI driver (e.g., `nfs-subdir-external-provisioner`) or static PVs
+- **K8s mechanism**: NFS CSI driver (`nfs-subdir-external-provisioner`)
 - **Access mode**: ReadWriteMany (multiple pods can mount simultaneously)
 - **StorageClass name**: `nfs-nas`
 
-Workloads using this tier:
-- Jellyfin / Emby (media library)
-- Sonarr / Radarr (downloads, media management)
-- qBittorrent (download directory)
-- Grafana (dashboard storage — low write volume)
-- AI model weights (read-heavy, large files)
-
 ### Tier 2: Local SSD
 
-For latency-sensitive, random-I/O workloads. Data lives on the VM's local
+For latency-sensitive, random-I/O workloads. Data lives on the node's local
 disk. Not replicated — rely on backups.
 
 - **What**: SQL databases, SQLite files, Prometheus TSDB, Loki WAL/index
-- **Where**: Local SSD on the Proxmox host, passed through to VM disk
+- **Where**: Local SSD on the Proxmox host, passed through to container/VM disk
 - **K8s mechanism**: `local-path-provisioner` (bundled with k3s)
 - **Access mode**: ReadWriteOnce (pinned to the node where the PV lives)
 - **StorageClass name**: `local-path`
 
-Workloads using this tier:
-- PostgreSQL (any service that needs a relational DB)
-- Sonarr / Radarr SQLite databases (suffer badly on NFS)
-- Prometheus TSDB (high write throughput)
-- Loki WAL and index (latency-sensitive writes)
-- Open WebUI data (SQLite backend)
-
-**Backup strategy**: Scheduled CronJobs that dump databases and copy to NAS.
-
 ### Tier 3: Replicated (future, optional)
 
-For workloads where you want data to survive a node failure without manual
-restore. Not needed at first — add when you have a reason.
+For workloads where you want data to survive a node failure without manual restore.
 
 - **What**: Anything requiring HA storage
 - **Where**: Replicated across nodes via Longhorn or Rook-Ceph
@@ -162,71 +164,65 @@ restore. Not needed at first — add when you have a reason.
 
 ### Ingress
 
-Replace the current Traefik-on-Docker setup with Traefik running as the k3s
-ingress controller (it's bundled by default). Alternatively, swap to
-ingress-nginx or Cilium's Gateway API implementation.
+```
+Internet → Cloudflare DNS (*.mpdavis.com)
+         → Router port-forward 443 → MetalLB VIP (10.0.1.60)
+         → Traefik (k8s IngressRoute)
+         → k8s Services  OR  ExternalName/Endpoints → non-k8s services
+```
 
-Key requirements:
-- TLS termination with Let's Encrypt (DNS-01 via Cloudflare, same as today)
-- Wildcard cert for `*.mpdavis.com`
-- Stable ingress IP on the LAN (MetalLB or `hostNetwork: true` on a known node)
+Traefik inside k8s handles ALL HTTP/HTTPS routing, including services running
+outside the cluster. For non-k8s services (e.g., Gitea on 10.0.1.53), a
+Service+Endpoints pair routes through Traefik with the same wildcard cert and
+TLS termination as everything else.
 
-### Service discovery
+### Service Discovery
 
 K8s native: services find each other via DNS (`<service>.<namespace>.svc.cluster.local`).
-No more `HOST_IP` variable or hardcoded IPs in compose files.
 
-### External access
+### External Access
 
-- MetalLB assigns real LAN IPs to `LoadBalancer`-type services
-- Or: single ingress IP handles all HTTP(S), TCP services get NodePort or dedicated LB IP
+MetalLB assigns a VIP (10.0.1.60) to the Traefik LoadBalancer service. All
+HTTP(S) traffic routes through this single ingress point.
 
 ### DNS
 
-Keep Cloudflare as the authoritative DNS for `mpdavis.com`. Point `*.mpdavis.com`
-at the ingress IP (MetalLB VIP or node IP). Same as today, just a different target IP.
+Cloudflare as authoritative DNS for `mpdavis.com`. `*.mpdavis.com` points at
+the MetalLB VIP.
+
+### IP Address Plan
+
+| IP | Host | Type | Purpose |
+|----|------|------|---------|
+| 10.0.1.1 | pve1 | Proxmox host | Hypervisor management |
+| 10.0.1.2 | pve2 | Proxmox host | Hypervisor management |
+| 10.0.1.6 | NAS | Unifi NAS | NFS storage |
+| 10.0.1.50 | k3s-server | LXC on pve1 | k3s control plane + workloads |
+| 10.0.1.51 | k3s-agent-1 | LXC on pve1 | k3s general workloads |
+| 10.0.1.52 | k3s-agent-gpu | VM on pve2 | k3s GPU workloads |
+| 10.0.1.53 | gitea | LXC on pve2 | Local git mirror |
+| 10.0.1.60 | (MetalLB VIP) | Virtual | Traefik LoadBalancer ingress |
 
 ## Secrets Management
 
 ### External Secrets Operator (ESO)
 
-Continue using Bitwarden Secrets Manager as the source of truth. ESO syncs
-BWSM secrets into Kubernetes Secrets automatically.
-
-```yaml
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: grafana-admin
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: bitwarden
-    kind: ClusterSecretStore
-  target:
-    name: grafana-admin
-  data:
-    - secretKey: password
-      remoteRef:
-        key: 84b2fe83-0a83-4b84-8f5d-b3e001210112
-```
-
-Same BWSM UUIDs from `.doco-cd.yaml` carry over directly — no secret rotation
-needed during migration (unless you want to).
+Bitwarden Secrets Manager as the source of truth. ESO syncs BWSM secrets into
+Kubernetes Secrets automatically.
 
 ## GPU Setup
 
 ### Proxmox GPU Passthrough
 
-1. Enable IOMMU in BIOS and Proxmox kernel params (`intel_iommu=on` or `amd_iommu=on`)
-2. Blacklist nouveau/nvidia on the Proxmox host (GPU is for the VM, not the hypervisor)
-3. Add GPU PCI device to the `k3s-agent-gpu` VM configuration
-4. VM sees the GPU as a native device
+1. Enable IOMMU in BIOS and Proxmox kernel params
+2. Blacklist nouveau on the Proxmox host
+3. Add VFIO modules (`vfio`, `vfio_iommu_type1`, `vfio_pci`)
+4. Pass GPU PCI device to the `k3s-agent-gpu` VM
 
 ### Kubernetes GPU Scheduling
 
-1. Install NVIDIA drivers + `nvidia-container-toolkit` in the GPU VM
-2. Deploy `nvidia-device-plugin` DaemonSet — advertises `nvidia.com/gpu` resource
+1. NVIDIA drivers (560) + `nvidia-container-toolkit` installed in the GPU VM via Ansible
+2. `nvidia-device-plugin` DaemonSet advertises `nvidia.com/gpu` resource
 3. Pods request GPU via resource limits:
 
 ```yaml
@@ -237,75 +233,10 @@ resources:
 
 ### AI Inference Stack
 
-- **Ollama**: Easy model management, OpenAI-compatible API, runs llama.cpp under the hood
-- **Open WebUI**: Chat interface (already running, just needs to point at Ollama)
-- **vLLM** (optional): Higher throughput for serving, PagedAttention, continuous batching
+- **Ollama**: Model management, OpenAI-compatible API
+- **Open WebUI**: Chat interface pointing at Ollama
 
-Model storage goes on NAS (Tier 1) — models are large but read-sequentially at
-load time. Inference scratch/KV cache uses local memory/GPU VRAM.
-
-## Migration Plan
-
-Parallel migration: existing Docker host stays running while k3s cluster is
-built up on the new hardware. Services move one at a time.
-
-### Phase 0: Foundation
-
-- [ ] Purchase and rack Node 2
-- [ ] Install Proxmox VE on Node 2
-- [ ] Create VMs: `k3s-server`, `k3s-agent-gpu`
-- [ ] Install k3s (server + agent)
-- [ ] Deploy ArgoCD (self-managing from this repo)
-- [ ] Set up NFS mounts from Unifi NAS to k3s nodes
-- [ ] Install NFS CSI provisioner
-- [ ] Set up External Secrets Operator + Bitwarden SecretStore
-- [ ] Install NVIDIA drivers + device plugin on GPU node
-- [ ] Configure MetalLB or decide on ingress IP strategy
-
-### Phase 1: First Services (low-risk, validate pipeline)
-
-- [ ] Migrate `homepage` — stateless, fast validation of full GitOps flow
-- [ ] Migrate `ai` (Open WebUI + Ollama) — gets it onto GPU, biggest benefit
-- [ ] Migrate `devbox` — low-stakes, good test of persistent storage
-
-### Phase 2: Observability
-
-- [ ] Deploy Prometheus + Grafana + Loki on k3s
-- [ ] Prometheus TSDB on local-path storage
-- [ ] Loki on local-path storage (WAL/index) + NFS (chunks)
-- [ ] Grafana dashboards on NFS
-- [ ] Promtail replaced by k8s-native log collection (Promtail DaemonSet or Alloy)
-- [ ] Validate dashboards work, then decommission Docker observability stack
-
-### Phase 3: Ingress Cutover
-
-- [ ] Deploy Traefik (or alternative) as k3s ingress
-- [ ] Configure cert-manager with Cloudflare DNS-01 (replaces Traefik's built-in ACME)
-- [ ] Migrate `*.mpdavis.com` DNS to point at k3s ingress IP
-- [ ] Verify all IngressRoute/Ingress resources are working
-- [ ] Decommission Docker Traefik
-
-### Phase 4: Media Stack
-
-- [ ] Migrate `starr` (Sonarr, Radarr, Prowlarr, Seerr, Unpackerr)
-  - SQLite databases → local-path PVs (copy from NAS appdata)
-  - Media mounts → NFS PVs (same paths, just mounted differently)
-- [ ] Migrate `streaming` (Jellyfin, Emby)
-  - Config → local-path PV
-  - Media → NFS PV (ReadOnly where possible)
-- [ ] Migrate `torrent` (Gluetun + qBittorrent)
-  - Gluetun as a sidecar container in the qBittorrent pod
-  - Downloads directory → NFS PV
-- [ ] Migrate `iptv` (Dispatcharr, ECM, Teamarr)
-
-### Phase 5: Consolidation
-
-- [ ] Install Proxmox on Node 1 (wipe bare-metal Debian)
-- [ ] Create `k3s-agent-1` VM on Node 1
-- [ ] Join Node 1 to the cluster
-- [ ] Rebalance workloads across both nodes
-- [ ] Archive `homelab-compose` repo (or keep for reference)
-- [ ] Final DNS/networking cleanup
+Model storage on NAS (Tier 1). Inference scratch/KV cache uses local memory/GPU VRAM.
 
 ## Repository Structure
 
@@ -314,59 +245,79 @@ homelab/
 ├── docs/
 │   └── design.md              ← this file
 ├── apps/
-│   ├── homepage/
-│   │   ├── kustomization.yaml
+│   ├── kustomization.yaml     # Lists all app subdirectories
+│   └── hello-world/
+│       ├── kustomization.yaml
+│       ├── deployment.yaml
+│       ├── service.yaml
+│       └── ingressroute.yaml
+├── infrastructure/
+│   ├── kustomization.yaml     # Lists all infra subdirectories
+│   ├── sources/               # HelmRepository definitions
+│   │   ├── jetstack.yaml
+│   │   ├── metallb.yaml
 │   │   └── ...
-│   ├── open-webui/
-│   ├── ollama/
-│   ├── grafana/
-│   ├── prometheus/
-│   ├── loki/
-│   ├── jellyfin/
-│   ├── sonarr/
-│   ├── radarr/
-│   ├── prowlarr/
-│   ├── qbittorrent/
-│   ├── traefik/
-│   └── ...
-├── infra/
-│   ├── argocd/
 │   ├── cert-manager/
+│   │   ├── helmrelease.yaml
+│   │   ├── clusterissuer-letsencrypt.yaml
+│   │   └── external-secret-cloudflare.yaml
 │   ├── external-secrets/
 │   ├── metallb/
-│   ├── nfs-provisioner/
-│   ├── nvidia-device-plugin/
-│   └── ...
+│   ├── traefik/
+│   ├── monitoring/
+│   ├── loki/
+│   ├── nfs-data/
+│   └── nfs-homelab/
 ├── clusters/
 │   └── homelab/
-│       ├── apps.yaml          # ArgoCD ApplicationSet → apps/
-│       └── infra.yaml         # ArgoCD ApplicationSet → infra/
+│       ├── flux-system/
+│       │   ├── kustomization.yaml
+│       │   └── flux-instance.yaml    # FluxInstance CR
+│       ├── infra.yaml                # Flux Kustomization → infrastructure/
+│       └── apps.yaml                 # Flux Kustomization → apps/
+├── tofu/                             # OpenTofu — LXC/VM provisioning
+├── ansible/                          # Ansible — node config, k3s install, Flux bootstrap
 └── README.md
 ```
 
 ### Manifest Strategy
 
-- **Helm charts** for third-party software with official charts (Grafana, Prometheus, Traefik, ArgoCD, cert-manager)
-- **Kustomize** for custom deployments or apps without good charts (starr apps, IPTV stack)
-- Each app directory is self-contained: ArgoCD ApplicationSet auto-discovers new directories
+- **HelmRelease** for third-party software with official Helm charts (one per component)
+- **Kustomize** for custom deployments or apps without good charts
+- Each infrastructure component is a self-contained directory with a kustomization.yaml
 
 ## Decisions Log
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-05-16 | k3s over kubeadm/Talos | Lightweight, batteries-included, great for homelab scale |
-| 2026-05-16 | ArgoCD over Flux | Web UI for experimentation, app-of-apps pattern |
-| 2026-05-16 | Separate repo from homelab-compose | Clean break, no legacy baggage in the fleet repo |
-| 2026-05-16 | Parallel migration (not hard cutover) | Lower risk, can validate each service before decommissioning Docker |
-| 2026-05-16 | External Secrets Operator + BWSM | Continuity with existing secret management, same UUIDs |
-| 2026-05-16 | NVIDIA GPU for inference | Local LLM serving (Ollama), 24GB VRAM class |
-| 2026-05-16 | Local-path for databases, NFS for media | SQLite/Postgres need low-latency I/O; media is bulk sequential reads |
+| 2025-05-16 | k3s over kubeadm/Talos | Lightweight, batteries-included, great for homelab scale |
+| 2025-05-16 | Separate repo from homelab-compose | Clean break, no legacy baggage |
+| 2025-05-16 | External Secrets Operator + BWSM | Continuity with existing secret management |
+| 2025-05-16 | NVIDIA GPU for inference | Local LLM serving via Ollama |
+| 2025-05-16 | Local-path for databases, NFS for media | SQLite/Postgres need low-latency I/O; media is bulk reads |
+| 2025-05-27 | FluxCD over ArgoCD | Declarative, no UI to maintain, HelmRelease per component |
+| 2025-05-27 | LXC containers over VMs | Lower overhead; VM only for GPU node (VFIO requires it) |
+| 2025-05-27 | Local Gitea mirror | Cluster self-sufficiency — reconciles without internet |
+| 2025-05-27 | Traefik as single ingress for all services | Routes to both k8s and external services via Service+Endpoints |
 
-## Open Questions
+## Deploy Sequence
 
-- [ ] Exact hardware spec for Node 2 (CPU, RAM, case, PSU for GPU)
-- [ ] Which NVIDIA card specifically (3090 vs A4000 vs A5000 — price/noise/reliability tradeoff)
-- [ ] Single k3s server node or HA (3 servers) from the start?
-- [ ] Keep Traefik as ingress or switch to ingress-nginx / Cilium Gateway API?
-- [ ] Longhorn from day one or add it later when there's a real HA need?
-- [ ] How to handle the VPN/Gluetun requirement for torrent in K8s (sidecar vs gateway pod)
+```bash
+# Phase 0: Manual Proxmox reinstall on both nodes
+#   pve1 at 10.0.1.1 (no GPU, 32GB)
+#   pve2 at 10.0.1.2 (RTX 3050, 64GB)
+#   Create API tokens, enable IOMMU on pve2
+
+# Phase 1: Provision infrastructure
+tofu apply                                        # create LXC containers + GPU VM
+
+# Phase 2: Configure nodes
+ansible-playbook playbooks/setup-gitea.yml         # configure Gitea mirror
+ansible-playbook playbooks/site.yml                # install k3s on all 3 nodes
+
+# Phase 3: Bootstrap cluster services
+ansible-playbook playbooks/bootstrap-secrets.yml   # BWSM access token
+ansible-playbook playbooks/bootstrap-flux.yml      # install FluxOperator + FluxInstance
+
+# Flux pulls from local Gitea mirror and auto-reconciles everything
+```
