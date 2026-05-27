@@ -1,0 +1,49 @@
+---
+- name: Bootstrap FluxCD via FluxOperator
+  hosts: k3s_server
+  become: true
+  vars:
+    gitea_url: "http://10.0.1.53:3000/michael/homelab.git"
+  tasks:
+    - name: Install Helm
+      ansible.builtin.shell: curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Install Flux Operator via Helm OCI
+      ansible.builtin.shell: |
+        helm upgrade --install flux-operator \
+          oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator \
+          --namespace flux-system --create-namespace \
+          --wait --timeout 5m
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    - name: Wait for Flux Operator to be ready
+      ansible.builtin.command: >
+        k3s kubectl rollout status deployment/flux-operator
+        -n flux-system --timeout=120s
+      changed_when: false
+
+    - name: Template FluxInstance CR
+      ansible.builtin.template:
+        src: flux-instance.yaml.j2
+        dest: /tmp/flux-instance.yaml
+        mode: "0644"
+
+    - name: Apply FluxInstance CR
+      ansible.builtin.command: k3s kubectl apply -f /tmp/flux-instance.yaml
+      changed_when: true
+
+    - name: Wait for Flux controllers to be ready
+      ansible.builtin.shell: |
+        k3s kubectl wait --for=condition=Ready fluxinstance/flux \
+          -n flux-system --timeout=300s
+      changed_when: false
+
+    - name: Print Flux status
+      ansible.builtin.debug:
+        msg:
+          - "FluxCD is running!"
+          - "Check status: kubectl get kustomizations,helmreleases -A"
+          - "Flux pulls from: {{ gitea_url }}"

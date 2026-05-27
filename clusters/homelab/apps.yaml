@@ -1,35 +1,14 @@
-apiVersion: argoproj.io/v1alpha1
-kind: ApplicationSet
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
 metadata:
   name: apps
-  namespace: argocd
+  namespace: flux-system
 spec:
-  goTemplate: true
-  goTemplateOptions: ["missingkey=error"]
-  generators:
-    - git:
-        repoURL: https://github.com/mpdavis/homelab.git
-        revision: HEAD
-        files:
-          - path: apps/*/argocd.json
-  template:
-    metadata:
-      name: "{{.path.basename}}"
-      labels:
-        tier: apps
-        category: "{{.category}}"
-    spec:
-      project: default
-      source:
-        repoURL: https://github.com/mpdavis/homelab.git
-        targetRevision: HEAD
-        path: "{{.path.path}}"
-      destination:
-        server: https://kubernetes.default.svc
-        namespace: "{{.path.basename}}"
-      syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
-        syncOptions:
-          - CreateNamespace=true
+  interval: 10m
+  dependsOn:
+    - name: infrastructure
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./apps
+  prune: true
