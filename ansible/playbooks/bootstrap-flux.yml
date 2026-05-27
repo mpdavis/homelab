@@ -25,34 +25,14 @@
         -n flux-system --timeout=120s
       changed_when: false
 
+    - name: Template FluxInstance CR
+      ansible.builtin.template:
+        src: flux-instance.yaml.j2
+        dest: /tmp/flux-instance.yaml
+        mode: "0644"
+
     - name: Apply FluxInstance CR
-      ansible.builtin.shell: |
-        cat <<'EOF' | k3s kubectl apply -f -
-        apiVersion: fluxcd.controlplane.io/v1
-        kind: FluxInstance
-        metadata:
-          name: flux
-          namespace: flux-system
-        spec:
-          distribution:
-            version: "2.x"
-            registry: "ghcr.io/fluxcd"
-          components:
-            - source-controller
-            - kustomize-controller
-            - helm-controller
-            - notification-controller
-          cluster:
-            type: kubernetes
-            multitenant: false
-            networkPolicy: true
-            domain: "cluster.local"
-          sync:
-            kind: GitRepository
-            url: "{{ gitea_url }}"
-            ref: "refs/heads/main"
-            path: "clusters/homelab"
-        EOF
+      ansible.builtin.command: k3s kubectl apply -f /tmp/flux-instance.yaml
       changed_when: true
 
     - name: Wait for Flux controllers to be ready
