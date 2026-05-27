@@ -5,6 +5,12 @@
   roles:
     - common
 
+- name: GPU setup
+  hosts: k3s-agent-gpu
+  become: true
+  roles:
+    - gpu
+
 - name: Install k3s server
   hosts: k3s_server
   become: true

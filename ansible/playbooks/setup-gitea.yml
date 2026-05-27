@@ -1,0 +1,6 @@
+---
+- name: Setup Gitea git mirror
+  hosts: git_mirror
+  become: true
+  roles:
+    - gitea

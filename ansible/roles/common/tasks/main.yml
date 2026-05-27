@@ -13,15 +13,45 @@
 - name: Install base packages
   ansible.builtin.apt:
     name:
-      - qemu-guest-agent
       - curl
       - gnupg
       - open-iscsi
       - nfs-common
     state: present
 
-- name: Enable qemu-guest-agent
+- name: Install qemu-guest-agent (VM only)
+  ansible.builtin.apt:
+    name: qemu-guest-agent
+    state: present
+  when: node_type == 'vm'
+
+- name: Enable qemu-guest-agent (VM only)
   ansible.builtin.systemd:
     name: qemu-guest-agent
     enabled: true
     state: started
+  when: node_type == 'vm'
+
+- name: Create /dev/kmsg symlink (LXC only)
+  ansible.builtin.file:
+    src: /dev/console
+    dest: /dev/kmsg
+    state: link
+    force: true
+  when: node_type == 'lxc'
+
+- name: Persist /dev/kmsg symlink across reboots (LXC only)
+  ansible.builtin.copy:
+    dest: /etc/rc.local
+    mode: "0755"
+    content: |
+      #!/bin/sh
+      [ ! -e /dev/kmsg ] && ln -s /dev/console /dev/kmsg
+      mount --make-rshared /
+      exit 0
+  when: node_type == 'lxc'
+
+- name: Make mount shared (LXC only)
+  ansible.builtin.command: mount --make-rshared /
+  changed_when: false
+  when: node_type == 'lxc'
