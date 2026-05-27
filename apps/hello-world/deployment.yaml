@@ -38,7 +38,7 @@ data:
       <h1>Hello from k3s!</h1>
       <p>If you can see this page with a valid TLS cert, the following are working:</p>
       <ul>
-        <li>ArgoCD auto-discovery (apps/*)</li>
+        <li>FluxCD GitOps reconciliation</li>
         <li>Traefik ingress</li>
         <li>Let's Encrypt wildcard TLS via cert-manager</li>
         <li>MetalLB LoadBalancer</li>
