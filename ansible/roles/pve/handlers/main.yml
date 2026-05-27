@@ -1,0 +1,8 @@
+---
+- name: update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true

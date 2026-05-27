@@ -1,0 +1,21 @@
+---
+- name: Disable pve-ha-lrm
+  ansible.builtin.systemd:
+    name: pve-ha-lrm
+    enabled: false
+    state: stopped
+  failed_when: false
+
+- name: Disable pve-ha-crm
+  ansible.builtin.systemd:
+    name: pve-ha-crm
+    enabled: false
+    state: stopped
+  failed_when: false
+
+- name: Disable corosync
+  ansible.builtin.systemd:
+    name: corosync
+    enabled: false
+    state: stopped
+  failed_when: false
