@@ -1,0 +1,37 @@
+---
+- name: Install ethtool
+  ansible.builtin.apt:
+    name: ethtool
+    state: present
+
+- name: Find Intel e1000e/e1000 interfaces
+  ansible.builtin.shell: |
+    for device in /sys/class/net/*; do
+      iface=$(basename "$device")
+      [ "$iface" = "lo" ] && continue
+      echo "$iface" | grep -qE '^(tap|fwbr|veth|vmbr|bonding_masters)' && continue
+      driver=$(basename "$(readlink -f /sys/class/net/$iface/device/driver 2>/dev/null)" 2>/dev/null)
+      if [ "$driver" = "e1000e" ] || [ "$driver" = "e1000" ]; then
+        echo "$iface"
+      fi
+    done
+  register: intel_nics
+  changed_when: false
+
+- name: Create NIC offloading disable service
+  ansible.builtin.template:
+    src: disable-nic-offload.service.j2
+    dest: "/etc/systemd/system/disable-nic-offload-{{ item }}.service"
+    mode: "0644"
+  loop: "{{ intel_nics.stdout_lines }}"
+  when: intel_nics.stdout_lines | length > 0
+  notify: reload systemd
+
+- name: Enable and start NIC offloading services
+  ansible.builtin.systemd:
+    name: "disable-nic-offload-{{ item }}.service"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop: "{{ intel_nics.stdout_lines }}"
+  when: intel_nics.stdout_lines | length > 0

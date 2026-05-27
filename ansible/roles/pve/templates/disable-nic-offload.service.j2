@@ -1,0 +1,11 @@
+[Unit]
+Description=Disable NIC offloading for {{ item }}
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/ethtool -K {{ item }} gso off gro off tso off tx off rx off rxvlan off txvlan off sg off
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
