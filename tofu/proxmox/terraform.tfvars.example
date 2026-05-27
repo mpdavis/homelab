@@ -1,10 +1,14 @@
-proxmox_endpoint = "https://10.0.1.42:8006"
-proxmox_host     = "10.0.1.42"
-proxmox_node     = "pve"
+proxmox_endpoint  = "https://10.0.1.1:8006"
+proxmox_api_token = "root@pam!tofu=<uuid>"
 
 ssh_public_keys = [
   "ssh-ed25519 AAAA... user@host",
 ]
+
+# pve_nodes = {
+#   pve1 = { address = "10.0.1.1" }
+#   pve2 = { address = "10.0.1.2" }
+# }
 
 # vm_user         = "michael"
 # network_gateway = "10.0.0.1"

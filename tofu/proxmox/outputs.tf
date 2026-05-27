@@ -1,6 +1,13 @@
+output "container_ips" {
+  description = "IP addresses of provisioned LXC containers"
+  value = {
+    for name, c in var.containers : name => c.ip
+  }
+}
+
 output "vm_ips" {
   description = "IP addresses of provisioned VMs"
   value = {
-    for name, vm in proxmox_virtual_environment_vm.k3s : name => var.vms[name].ip
+    for name, v in var.vms : name => v.ip
   }
 }
