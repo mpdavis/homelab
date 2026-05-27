@@ -12,10 +12,3 @@
     enabled: false
     state: stopped
   failed_when: false
-
-- name: Disable corosync
-  ansible.builtin.systemd:
-    name: corosync
-    enabled: false
-    state: stopped
-  failed_when: false
