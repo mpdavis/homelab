@@ -10,9 +10,8 @@ GitOps repository for a homelab k3s cluster managed by FluxCD (via FluxOperator)
 
 - **Proxmox VE** on two physical nodes (pve1 + pve2)
 - **k3s** for Kubernetes — control plane + general workloads in LXC containers, GPU workloads in a VM
-- **FluxCD** watches this repo (via a local Gitea mirror) and reconciles cluster state
+- **FluxCD** watches this repo on GitHub and reconciles cluster state
 - **GPU node** (pve2) with NVIDIA RTX 3050 passthrough for AI inference (Ollama, Open WebUI)
-- **Gitea** local git mirror on pve2 — Flux pulls from here, not GitHub directly
 - **Unifi NAS** provides NFS storage for media and bulk data
 
 ## Repository Layout

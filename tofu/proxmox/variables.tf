@@ -91,19 +91,7 @@ variable "containers" {
       start_order = 2
       tags       = ["k3s", "agent"]
     }
-    gitea = {
-      vmid       = 300
-      node       = "pve2"
-      cores      = 1
-      memory     = 1024
-      disk_size  = 8
-      ip         = "10.0.1.53"
-      privileged = false
-      nesting    = true
-      keyctl     = false
-      start_order = 1
-      tags       = ["gitea"]
-    }
+
   }
 }
 

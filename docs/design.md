@@ -10,7 +10,7 @@ Multi-node homelab running k3s on Proxmox VE with FluxCD-driven GitOps.
 - GPU-accelerated local AI inference
 - Easy to experiment with new services (deploy a Helm chart, done)
 - Proper storage tiering: fast local disks for databases, NAS for bulk media
-- Anything the cluster depends on to exist lives outside the cluster (git mirror, DNS)
+- Anything the cluster depends on to exist lives outside the cluster (DNS)
 
 ## Hardware
 
@@ -28,7 +28,7 @@ SFF Lenovo, NVIDIA RTX 3050 6GB, 64 GB RAM.
 
 - Hostname: `pve2`
 - IP: `10.0.1.2`
-- Role: Proxmox host for GPU VM + Gitea LXC
+- Role: Proxmox host for GPU VM
 
 ### Unifi NAS
 
@@ -58,12 +58,12 @@ Existing network-attached storage at `10.0.1.6`. Exports via NFS to all cluster 
           │  └────────────────┘  │    │  │ AI inference        │  │
           │                      │    │  └────────────────────┘  │
           │  ┌────────────────┐  │    │                          │
-          │  │ k3s-agent-1    │  │    │  ┌────────────────────┐  │
-          │  │ LXC            │  │    │  │ gitea              │  │
-          │  │ General        │  │    │  │ LXC                │  │
-          │  │ workloads      │  │    │  │ Local git mirror   │  │
-          │  └────────────────┘  │    │  └────────────────────┘  │
-          │                      │    │                          │
+          │  ┌────────────────┐  │    │                          │
+          │  │ k3s-agent-1    │  │    │                          │
+          │  │ LXC            │  │    │                          │
+          │  │ General        │  │    │                          │
+          │  │ workloads      │  │    │                          │
+          │  └────────────────┘  │    │                          │
           └──────────┬───────────┘    └──────────┬───────────────┘
                      │                           │
                      └─────────┬─────────────────┘
@@ -97,8 +97,8 @@ Privileged containers with: `nesting=true`, `keyctl=true`, AppArmor unconfined,
 
 ## GitOps: FluxCD
 
-FluxCD watches this repository (via a local Gitea mirror) and reconciles cluster
-state from committed manifests.
+FluxCD watches this repository on GitHub and reconciles cluster state from
+committed manifests.
 
 ### Why FluxCD
 
@@ -111,19 +111,9 @@ state from committed manifests.
 ### How It Works
 
 1. Push manifests to GitHub
-2. Gitea mirror syncs from GitHub (every 10 minutes)
-3. Flux source-controller detects the change
-4. kustomize-controller / helm-controller reconcile the desired state
-5. Dependency chain: `infrastructure-sources` → `infrastructure` → `apps`
-
-### Local Git Mirror
-
-Flux pulls from a local Gitea instance (`http://10.0.1.53:3000/michael/homelab.git`)
-running as a standalone LXC container on pve2. This ensures the cluster can reconcile
-even if GitHub is unreachable. Gitea mirrors the GitHub repo with a 10-minute sync
-interval.
-
-Push workflow: `git push origin` → GitHub → Gitea mirror sync → Flux reconciles.
+2. Flux source-controller detects the change
+3. kustomize-controller / helm-controller reconcile the desired state
+4. Dependency chain: `infrastructure-sources` → `infrastructure` → `apps`
 
 ## Storage Strategy
 
@@ -172,9 +162,9 @@ Internet → Cloudflare DNS (*.mpdavis.com)
 ```
 
 Traefik inside k8s handles ALL HTTP/HTTPS routing, including services running
-outside the cluster. For non-k8s services (e.g., Gitea on 10.0.1.53), a
-Service+Endpoints pair routes through Traefik with the same wildcard cert and
-TLS termination as everything else.
+outside the cluster. For non-k8s services, a Service+Endpoints pair routes
+through Traefik with the same wildcard cert and TLS termination as everything
+else.
 
 ### Service Discovery
 
@@ -200,7 +190,6 @@ the MetalLB VIP.
 | 10.0.1.50 | k3s-server | LXC on pve1 | k3s control plane + workloads |
 | 10.0.1.51 | k3s-agent-1 | LXC on pve1 | k3s general workloads |
 | 10.0.1.52 | k3s-agent-gpu | VM on pve2 | k3s GPU workloads |
-| 10.0.1.53 | gitea | LXC on pve2 | Local git mirror |
 | 10.0.1.60 | (MetalLB VIP) | Virtual | Traefik LoadBalancer ingress |
 
 ## Secrets Management
@@ -297,7 +286,6 @@ homelab/
 | 2025-05-16 | Local-path for databases, NFS for media | SQLite/Postgres need low-latency I/O; media is bulk reads |
 | 2025-05-27 | FluxCD over ArgoCD | Declarative, no UI to maintain, HelmRelease per component |
 | 2025-05-27 | LXC containers over VMs | Lower overhead; VM only for GPU node (VFIO requires it) |
-| 2025-05-27 | Local Gitea mirror | Cluster self-sufficiency — reconciles without internet |
 | 2025-05-27 | Traefik as single ingress for all services | Routes to both k8s and external services via Service+Endpoints |
 
 ## Deploy Sequence
@@ -312,12 +300,11 @@ homelab/
 tofu apply                                        # create LXC containers + GPU VM
 
 # Phase 2: Configure nodes
-ansible-playbook playbooks/setup-gitea.yml         # configure Gitea mirror
 ansible-playbook playbooks/site.yml                # install k3s on all 3 nodes
 
 # Phase 3: Bootstrap cluster services
 ansible-playbook playbooks/bootstrap-secrets.yml   # BWSM access token
 ansible-playbook playbooks/bootstrap-flux.yml      # install FluxOperator + FluxInstance
 
-# Flux pulls from local Gitea mirror and auto-reconciles everything
+# Flux pulls from GitHub and auto-reconciles everything
 ```
