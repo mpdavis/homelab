@@ -103,10 +103,17 @@ resource "proxmox_virtual_environment_vm" "vm" {
 
   stop_on_destroy = true
   started         = true
+  machine         = "q35"
+  bios            = "ovmf"
 
   cpu {
     cores = each.value.cores
     type  = "host"
+  }
+
+  efi_disk {
+    datastore_id = "local-lvm"
+    type         = "4m"
   }
 
   memory {
