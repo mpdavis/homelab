@@ -35,7 +35,7 @@ Use stable APIs only — no beta versions:
 
 - Set `prune: true` on application Kustomizations for garbage collection
 - Never set `prune: true` on CRD-only Kustomizations (deleting a CRD removes all its instances)
-- Use `dependsOn` for ordering between Kustomizations: `infrastructure-sources` → `infrastructure` → `apps`
+- Use `dependsOn` for ordering between Kustomizations: `infrastructure-sources` → `infrastructure-controllers` → `infrastructure` → `apps`
 - Set `interval` to `30m` or longer — frequent reconciliation is unnecessary for a homelab
 
 ## HelmRepository Sources

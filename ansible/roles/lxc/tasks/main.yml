@@ -1,4 +1,16 @@
 ---
+- name: Remove apparmor
+  ansible.builtin.apt:
+    name: apparmor
+    state: absent
+    purge: true
+
+- name: Remove DNS search domain
+  ansible.builtin.lineinfile:
+    path: /etc/resolv.conf
+    regexp: '^search '
+    state: absent
+
 - name: Create /dev/kmsg symlink
   ansible.builtin.file:
     src: /dev/console
