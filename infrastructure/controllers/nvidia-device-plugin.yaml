@@ -23,6 +23,9 @@ spec:
       strategy: rollback
   values:
     runtimeClassName: nvidia
+    nodeSelector:
+      nvidia.com/gpu: present
+    affinity: {}
     tolerations:
       - key: nvidia.com/gpu
         operator: Exists
