@@ -5,6 +5,13 @@ metadata:
   namespace: loki
 spec:
   interval: 30m
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
   chart:
     spec:
       chart: promtail
