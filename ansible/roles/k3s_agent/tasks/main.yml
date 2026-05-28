@@ -10,7 +10,8 @@
 
 - name: Install k3s agent
   ansible.builtin.shell: |
-    curl -sfL https://get.k3s.io | K3S_URL=https://{{ k3s_server_ip }}:6443 K3S_TOKEN={{ k3s_token }} sh -
+    curl -sfL https://get.k3s.io | K3S_URL=https://{{ k3s_server_ip }}:6443 K3S_TOKEN={{ k3s_token }} sh -s - \
+      --kubelet-arg=protect-kernel-defaults=true  # LXC: /proc/sys is read-only
   when: not k3s_agent_installed.stat.exists
 
 - name: Ensure k3s-agent is running

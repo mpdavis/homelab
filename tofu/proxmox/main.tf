@@ -116,8 +116,10 @@ resource "proxmox_virtual_environment_vm" "vm" {
     type         = "4m"
   }
 
+  # floating = dedicated keeps the balloon device for memory stats but prevents reclaim — AI inference (Ollama) needs stable memory
   memory {
     dedicated = each.value.memory
+    floating  = each.value.memory
   }
 
   agent {

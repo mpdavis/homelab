@@ -28,14 +28,13 @@
 - name: Install NVIDIA drivers and container toolkit
   ansible.builtin.apt:
     name:
-      - nvidia-driver-560
+      - nvidia-driver-570
       - nvidia-container-toolkit
     state: present
 
 - name: Configure containerd for NVIDIA runtime
   ansible.builtin.command: nvidia-ctk runtime configure --runtime=containerd
   changed_when: true
-  notify: restart k3s-agent
 
 - name: Verify GPU is visible
   ansible.builtin.command: nvidia-smi
