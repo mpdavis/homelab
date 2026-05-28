@@ -1,0 +1,15 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: flux-web
+  namespace: flux-system
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`flux.mpdavis.com`)
+      kind: Rule
+      services:
+        - name: flux-operator
+          port: 9080
+  tls: {}
