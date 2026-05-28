@@ -9,3 +9,4 @@ resources:
   - prometheus-community.yaml
   - grafana.yaml
   - nfs-provisioner.yaml
+  - nvidia.yaml
