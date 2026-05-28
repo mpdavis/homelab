@@ -19,3 +19,15 @@
       - nfs-common
     state: present
 
+- name: Set k3s-required kernel sysctls
+  ansible.builtin.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-k3s.conf
+    reload: true
+  loop:
+    - { key: kernel.panic, value: "10" }
+    - { key: kernel.panic_on_oops, value: "1" }
+    - { key: vm.overcommit_memory, value: "1" }
+  when: node_type == 'vm'
+
