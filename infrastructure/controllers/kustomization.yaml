@@ -11,3 +11,4 @@ resources:
   - promtail.yaml
   - nfs-data.yaml
   - nfs-homelab.yaml
+  - nvidia-device-plugin.yaml
