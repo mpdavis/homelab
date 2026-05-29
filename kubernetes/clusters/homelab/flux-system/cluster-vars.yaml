@@ -7,3 +7,4 @@ data:
   NAS_IP: "10.0.1.6"
   NAS_DATA_PATH: "/var/nfs/shared/data"
   NAS_HOMELAB_PATH: "/var/nfs/shared/homelab"
+  TZ: "America/Chicago"
