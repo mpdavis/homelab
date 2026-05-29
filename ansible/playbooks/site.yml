@@ -41,8 +41,8 @@
   hosts: k3s_server
   become: true
   tasks:
-    - name: Apply nvidia.com/gpu label to GPU node
+    - name: Apply nvidia.com/gpu.present label to GPU node
       ansible.builtin.command: >
         k3s kubectl label node k3s-agent-gpu
-        nvidia.com/gpu=present --overwrite
+        nvidia.com/gpu.present=true --overwrite
       changed_when: true
