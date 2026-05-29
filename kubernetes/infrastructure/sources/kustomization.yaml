@@ -10,3 +10,4 @@ resources:
   - grafana.yaml
   - nfs-provisioner.yaml
   - nvidia.yaml
+  - seerr.yaml
