@@ -4,6 +4,7 @@ resources:
   - emby
   - hello-world
   - prowlarr
-  - seerr
+  - qbittorrent
   - radarr
+  - seerr
   - sonarr
