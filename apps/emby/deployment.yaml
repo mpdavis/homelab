@@ -40,5 +40,5 @@ spec:
             claimName: emby-config
         - name: media
           nfs:
-            server: 10.0.1.6
-            path: /var/nfs/shared/data/media
+            server: ${NAS_IP}
+            path: ${NAS_DATA_PATH}/media

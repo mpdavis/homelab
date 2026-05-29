@@ -23,8 +23,8 @@ spec:
       strategy: rollback
   values:
     nfs:
-      server: 10.0.1.6
-      path: /var/nfs/shared/homelab
+      server: ${NAS_IP}
+      path: ${NAS_HOMELAB_PATH}
     storageClass:
       name: nfs-homelab
       defaultClass: false
