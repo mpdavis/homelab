@@ -8,7 +8,7 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
-  path: ./infrastructure/sources
+  path: ./kubernetes/infrastructure/sources
   prune: true
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
@@ -23,7 +23,7 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
-  path: ./infrastructure/controllers
+  path: ./kubernetes/infrastructure/controllers
   prune: true
   postBuild:
     substituteFrom:
@@ -42,5 +42,5 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
-  path: ./infrastructure
+  path: ./kubernetes/infrastructure
   prune: true

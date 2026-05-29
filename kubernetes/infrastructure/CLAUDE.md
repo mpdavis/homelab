@@ -1,6 +1,6 @@
 # FluxCD Guidelines
 
-These practices apply to all Flux-managed manifests across `infrastructure/`, `apps/`, and `clusters/`.
+These practices apply to all Flux-managed manifests across `kubernetes/infrastructure/`, `kubernetes/apps/`, and `kubernetes/clusters/`.
 
 ## API Versions
 
@@ -40,7 +40,7 @@ Use stable APIs only — no beta versions:
 
 ## HelmRepository Sources
 
-- Centralize all HelmRepository definitions in `infrastructure/sources/`
+- Centralize all HelmRepository definitions in `kubernetes/infrastructure/sources/`
 - Set `interval: 1h` or longer — chart repos change infrequently
 - Prefer OCI registries (`oci://`) where available
 
@@ -48,7 +48,7 @@ Use stable APIs only — no beta versions:
 
 - Each component gets its own directory with a `kustomization.yaml` listing its resources
 - File naming: `kustomization.yaml`, `helmrelease.yaml`, descriptive names for companions (`ipaddresspool.yaml`, `clusterissuer.yaml`)
-- Keep `clusters/homelab/` thin — only Flux Kustomization entrypoints and flux-system bootstrap
+- Keep `kubernetes/clusters/homelab/` thin — only Flux Kustomization entrypoints and flux-system bootstrap
 
 ## Secrets
 

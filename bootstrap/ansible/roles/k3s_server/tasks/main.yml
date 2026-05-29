@@ -34,13 +34,13 @@
 - name: Fetch kubeconfig
   ansible.builtin.fetch:
     src: /etc/rancher/k3s/k3s.yaml
-    dest: "{{ playbook_dir }}/../../kubeconfig.yaml"
+    dest: "{{ playbook_dir }}/../../../kubeconfig.yaml"
     flat: true
 
 - name: Update kubeconfig server address
   delegate_to: localhost
   become: false
   ansible.builtin.replace:
-    path: "{{ playbook_dir }}/../../kubeconfig.yaml"
+    path: "{{ playbook_dir }}/../../../kubeconfig.yaml"
     regexp: 'https://127\.0\.0\.1:6443'
     replace: "https://{{ ansible_host }}:6443"

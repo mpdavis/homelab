@@ -233,39 +233,33 @@ Model storage on NAS (Tier 1). Inference scratch/KV cache uses local memory/GPU 
 homelab/
 ├── docs/
 │   └── design.md              ← this file
-├── apps/
-│   ├── kustomization.yaml     # Lists all app subdirectories
-│   └── hello-world/
-│       ├── kustomization.yaml
-│       ├── deployment.yaml
-│       ├── service.yaml
-│       └── ingressroute.yaml
-├── infrastructure/
-│   ├── kustomization.yaml     # Lists all infra subdirectories
-│   ├── sources/               # HelmRepository definitions
-│   │   ├── jetstack.yaml
-│   │   ├── metallb.yaml
-│   │   └── ...
-│   ├── cert-manager/
-│   │   ├── helmrelease.yaml
-│   │   ├── clusterissuer-letsencrypt.yaml
-│   │   └── external-secret-cloudflare.yaml
-│   ├── external-secrets/
-│   ├── metallb/
-│   ├── traefik/
-│   ├── monitoring/
-│   ├── loki/
-│   ├── nfs-data/
-│   └── nfs-homelab/
-├── clusters/
-│   └── homelab/
-│       ├── flux-system/
-│       │   ├── kustomization.yaml
-│       │   └── flux-instance.yaml    # FluxInstance CR
-│       ├── infra.yaml                # Flux Kustomization → infrastructure/
-│       └── apps.yaml                 # Flux Kustomization → apps/
-├── tofu/                             # OpenTofu — LXC/VM provisioning
-├── ansible/                          # Ansible — node config, k3s install, Flux bootstrap
+├── bootstrap/                 # Pre-Flux provisioning and configuration
+│   ├── tofu/                  # OpenTofu — LXC/VM provisioning
+│   └── ansible/               # Ansible — node config, k3s install, Flux bootstrap
+├── kubernetes/                # Flux-managed cluster state (sync root)
+│   ├── kustomization.yaml     # Entry point — includes only Flux plumbing
+│   ├── apps/
+│   │   ├── kustomization.yaml
+│   │   ├── hello-world/
+│   │   └── emby/
+│   ├── infrastructure/
+│   │   ├── kustomization.yaml
+│   │   ├── sources/           # HelmRepository definitions
+│   │   ├── controllers/       # HelmRelease definitions
+│   │   ├── cert-manager/
+│   │   ├── external-secrets/
+│   │   ├── metallb/
+│   │   ├── traefik/
+│   │   ├── monitoring/
+│   │   └── flux-operator/
+│   └── clusters/
+│       └── homelab/
+│           ├── flux-system/
+│           │   ├── kustomization.yaml
+│           │   ├── flux-instance.yaml
+│           │   └── cluster-vars.yaml
+│           ├── infra.yaml
+│           └── apps.yaml
 └── README.md
 ```
 

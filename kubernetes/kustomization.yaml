@@ -1,0 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - clusters/homelab/flux-system
+  - clusters/homelab/infra.yaml
+  - clusters/homelab/apps.yaml

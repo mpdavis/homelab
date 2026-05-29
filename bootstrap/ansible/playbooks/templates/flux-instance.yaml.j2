@@ -19,6 +19,6 @@ spec:
     domain: "cluster.local"
   sync:
     kind: GitRepository
-    url: "https://github.com/mpdavis/homelab.git"
+    url: "{{ git_url }}"
     ref: "refs/heads/main"
-    path: "clusters/homelab"
+    path: "kubernetes"
