@@ -12,3 +12,7 @@ spec:
     name: flux-system
   path: ./apps
   prune: true
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-vars

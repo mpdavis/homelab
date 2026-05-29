@@ -23,8 +23,8 @@ spec:
       strategy: rollback
   values:
     nfs:
-      server: 10.0.1.6
-      path: /var/nfs/shared/data
+      server: ${NAS_IP}
+      path: ${NAS_DATA_PATH}
     storageClass:
       name: nfs-data
       defaultClass: false

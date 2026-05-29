@@ -39,5 +39,6 @@ spec:
           persistentVolumeClaim:
             claimName: emby-config
         - name: media
-          persistentVolumeClaim:
-            claimName: emby-media
+          nfs:
+            server: ${NAS_IP}
+            path: ${NAS_DATA_PATH}/media
