@@ -21,6 +21,7 @@ spec:
       strategy: rollback
     crds: CreateReplace
   values:
+    fullnameOverride: seerr
     persistence:
       storageClass: local-path
       size: 2Gi
