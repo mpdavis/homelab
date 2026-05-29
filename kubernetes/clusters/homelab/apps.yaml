@@ -10,7 +10,7 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
-  path: ./apps
+  path: ./kubernetes/apps
   prune: true
   postBuild:
     substituteFrom:

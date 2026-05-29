@@ -17,20 +17,21 @@ GitOps repository for a homelab k3s cluster managed by FluxCD (via FluxOperator)
 ## Repository Layout
 
 ```
-apps/               # Per-service manifests (one directory per app)
-infrastructure/     # Cluster infrastructure — HelmReleases, HelmRepositories, companion manifests
-  sources/          # HelmRepository definitions
-  cert-manager/     # HelmRelease + ClusterIssuer + ExternalSecret
-  external-secrets/ # HelmRelease + ClusterSecretStore
-  metallb/          # HelmRelease + IPAddressPool + L2Advertisement
-  traefik/          # HelmRelease + Certificate + TLSStore
-  monitoring/       # HelmRelease (kube-prometheus-stack) + Grafana ingress
-  loki/             # Loki HelmRelease + Promtail HelmRelease
-  nfs-data/         # HelmRelease (nfs-subdir-external-provisioner)
-  nfs-homelab/      # HelmRelease (nfs-subdir-external-provisioner)
-clusters/           # Flux Kustomization entrypoints (infra.yaml, apps.yaml, flux-system/)
-tofu/               # OpenTofu — LXC container + VM provisioning on Proxmox
-ansible/            # Ansible — node configuration, k3s install, Flux bootstrap
+bootstrap/          # Pre-Flux provisioning and configuration
+  ansible/          # Ansible — node configuration, k3s install, Flux bootstrap
+  tofu/             # OpenTofu — LXC container + VM provisioning on Proxmox
+kubernetes/         # Flux-managed cluster state (sync root)
+  apps/             # Per-service manifests (one directory per app)
+  infrastructure/   # Cluster infrastructure — HelmReleases, HelmRepositories, companion manifests
+    sources/        # HelmRepository definitions
+    controllers/    # HelmRelease definitions (install CRDs first)
+    cert-manager/   # ClusterIssuer + ExternalSecret
+    external-secrets/ # ClusterSecretStore + TLS
+    metallb/        # IPAddressPool + L2Advertisement
+    traefik/        # Certificate + TLSStore
+    monitoring/     # Grafana ingress + ExternalSecret
+    flux-operator/  # RBAC + IngressRoute for Flux web UI
+  clusters/         # Flux Kustomization entrypoints (infra.yaml, apps.yaml, flux-system/)
 docs/               # Design documents
 ```
 
@@ -39,7 +40,7 @@ docs/               # Design documents
 - **HelmRelease** for third-party software with official Helm charts (one per component, values inline)
 - **Kustomize** for custom deployments or apps without good charts
 - Each infrastructure component is a self-contained directory with its own `kustomization.yaml`
-- Dependency chain: `infrastructure-sources` → `infrastructure` → `apps` (via Flux Kustomization `dependsOn`)
+- Dependency chain: `infrastructure-sources` → `infrastructure-controllers` → `infrastructure` → `apps` (via Flux Kustomization `dependsOn`)
 
 ## Storage Classes
 
