@@ -3,5 +3,7 @@ kind: Kustomization
 resources:
   - emby
   - hello-world
+  - jellyseerr
+  - prowlarr
   - radarr
   - sonarr
