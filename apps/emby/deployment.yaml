@@ -39,5 +39,6 @@ spec:
           persistentVolumeClaim:
             claimName: emby-config
         - name: media
-          persistentVolumeClaim:
-            claimName: emby-media
+          nfs:
+            server: 10.0.1.6
+            path: /var/nfs/shared/data/media

@@ -9,15 +9,3 @@ spec:
   resources:
     requests:
       storage: 5Gi
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: emby-media
-spec:
-  accessModes:
-    - ReadWriteMany
-  storageClassName: nfs-data
-  resources:
-    requests:
-      storage: 1Gi
