@@ -16,7 +16,7 @@ spec:
     spec:
       # Gluetun requires /dev/net/tun which is only available on VM nodes, not LXC
       nodeSelector:
-        kubernetes.io/hostname: k3s-agent-gpu
+        node-type: vm
       containers:
         - name: gluetun
           image: qmcgaw/gluetun:latest

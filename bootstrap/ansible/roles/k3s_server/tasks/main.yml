@@ -11,6 +11,7 @@
       --disable=servicelb \
       --write-kubeconfig-mode=644 \
       --tls-san={{ ansible_host }} \
+      --node-label=node-type={{ node_type }} \
       --kubelet-arg=protect-kernel-defaults=true  # LXC: /proc/sys is read-only, so kubelet must not try to set kernel params
   when: not k3s_installed.stat.exists
 
