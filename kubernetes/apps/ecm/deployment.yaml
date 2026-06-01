@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecm
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ecm
+  template:
+    metadata:
+      labels:
+        app: ecm
+    spec:
+      containers:
+        - name: ecm
+          image: ghcr.io/motwakorb/enhancedchannelmanager:latest
+          ports:
+            - containerPort: 6100
+              name: http
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: CONFIG_DIR
+              value: /config
+            - name: ECM_PORT
+              value: "6100"
+            - name: TZ
+              value: ${TZ}
+          volumeMounts:
+            - name: config
+              mountPath: /config
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: ecm-config

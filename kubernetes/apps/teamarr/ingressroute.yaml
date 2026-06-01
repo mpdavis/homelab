@@ -1,0 +1,14 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: teamarr
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`teamarr.mpdavis.com`)
+      kind: Rule
+      services:
+        - name: teamarr
+          port: 9195
+  tls: {}
