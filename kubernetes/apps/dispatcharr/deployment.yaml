@@ -14,6 +14,9 @@ spec:
       labels:
         app: dispatcharr
     spec:
+      nodeSelector:
+        node-type: vm
+      runtimeClassName: nvidia
       containers:
         - name: dispatcharr
           image: ghcr.io/dispatcharr/dispatcharr:latest
@@ -21,6 +24,10 @@ spec:
             - containerPort: 9191
               name: http
           env:
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: all
             - name: DISPATCHARR_ENV
               value: aio
             - name: TZ
