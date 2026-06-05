@@ -40,7 +40,6 @@ data:
       cookies:
         - domain: mpdavis.com
           authelia_url: https://auth.mpdavis.com
-          default_redirection_url: https://auth.mpdavis.com
 
     regulation:
       max_retries: 5
