@@ -17,28 +17,6 @@ spec:
       # Gluetun requires /dev/net/tun which is only available on VM nodes, not LXC
       nodeSelector:
         node-type: vm
-      initContainers:
-        - name: disable-auth
-          image: busybox:latest
-          command: ['sh', '-c']
-          args:
-            - |
-              CONF=/config/qBittorrent/qBittorrent.conf
-              if [ -f "$CONF" ]; then
-                if grep -q 'WebUI\\AuthSubnetWhitelistEnabled' "$CONF"; then
-                  sed -i 's|WebUI\\AuthSubnetWhitelistEnabled=.*|WebUI\\AuthSubnetWhitelistEnabled=true|' "$CONF"
-                else
-                  echo 'WebUI\AuthSubnetWhitelistEnabled=true' >> "$CONF"
-                fi
-                if grep -q 'WebUI\\AuthSubnetWhitelist=' "$CONF"; then
-                  sed -i 's|WebUI\\AuthSubnetWhitelist=.*|WebUI\\AuthSubnetWhitelist=0.0.0.0/0|' "$CONF"
-                else
-                  echo 'WebUI\AuthSubnetWhitelist=0.0.0.0/0' >> "$CONF"
-                fi
-              fi
-          volumeMounts:
-            - name: config
-              mountPath: /config
       containers:
         - name: gluetun
           image: qmcgaw/gluetun:latest
