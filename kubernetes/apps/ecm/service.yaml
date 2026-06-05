@@ -9,3 +9,6 @@ spec:
     - port: 6100
       targetPort: http
       name: http
+    - port: 6101
+      targetPort: mcp
+      name: mcp
