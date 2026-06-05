@@ -33,7 +33,7 @@ spec:
           main:
             image:
               repository: ghcr.io/recyclarr/recyclarr
-              tag: 8.6.0
+              tag: edge
             command:
               - recyclarr
               - sync
