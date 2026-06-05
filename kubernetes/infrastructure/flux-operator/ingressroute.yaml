@@ -9,6 +9,9 @@ spec:
   routes:
     - match: Host(`flux.mpdavis.com`)
       kind: Rule
+      middlewares:
+        - name: authelia
+          namespace: authelia
       services:
         - name: flux-operator
           port: 9080
