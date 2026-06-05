@@ -29,6 +29,16 @@ spec:
         existingSecret: grafana-admin
         userKey: admin-user
         passwordKey: admin-password
+      grafana.ini:
+        auth.proxy:
+          enabled: true
+          header_name: Remote-User
+          header_property: username
+          auto_sign_up: true
+          headers: "Name:Remote-Name Email:Remote-Email Groups:Remote-Groups"
+        users:
+          auto_assign_org: true
+          auto_assign_org_role: Admin
       initChownData:
         enabled: false
       securityContext:

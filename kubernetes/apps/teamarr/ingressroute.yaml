@@ -8,6 +8,9 @@ spec:
   routes:
     - match: Host(`teamarr.mpdavis.com`)
       kind: Rule
+      middlewares:
+        - name: authelia
+          namespace: authelia
       services:
         - name: teamarr
           port: 9195
