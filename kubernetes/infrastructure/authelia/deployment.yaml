@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authelia
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: authelia
+  template:
+    metadata:
+      labels:
+        app: authelia
+    spec:
+      containers:
+        - name: authelia
+          image: authelia/authelia:latest
+          ports:
+            - containerPort: 9091
+              name: http
+          env:
+            - name: AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE
+              value: /app/secrets/JWT_SECRET
+            - name: AUTHELIA_SESSION_SECRET_FILE
+              value: /app/secrets/SESSION_SECRET
+            - name: AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE
+              value: /app/secrets/STORAGE_ENCRYPTION_KEY
+            - name: TZ
+              value: ${TZ}
+          volumeMounts:
+            - name: secrets
+              mountPath: /app/secrets
+              readOnly: true
+            - name: config
+              mountPath: /config/configuration.yml
+              subPath: configuration.yml
+            - name: users
+              mountPath: /config/users_database.yml
+              subPath: users_database.yml
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: secrets
+          secret:
+            secretName: authelia-secrets
+            items:
+              - key: JWT_SECRET
+                path: JWT_SECRET
+              - key: SESSION_SECRET
+                path: SESSION_SECRET
+              - key: STORAGE_ENCRYPTION_KEY
+                path: STORAGE_ENCRYPTION_KEY
+        - name: config
+          configMap:
+            name: authelia-config
+        - name: users
+          secret:
+            secretName: authelia-users
+        - name: data
+          persistentVolumeClaim:
+            claimName: authelia-data
