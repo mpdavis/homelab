@@ -8,6 +8,9 @@ spec:
   routes:
     - match: Host(`radarr.mpdavis.com`)
       kind: Rule
+      middlewares:
+        - name: authelia
+          namespace: authelia
       services:
         - name: radarr
           port: 7878
