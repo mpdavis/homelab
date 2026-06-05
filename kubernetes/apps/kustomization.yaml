@@ -5,6 +5,7 @@ resources:
   - ecm
   - emby
   - hello-world
+  - homepage
   - prowlarr
   - qbittorrent
   - radarr
