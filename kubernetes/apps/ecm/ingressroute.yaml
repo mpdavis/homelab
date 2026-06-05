@@ -6,6 +6,11 @@ spec:
   entryPoints:
     - websecure
   routes:
+    - match: Host(`ecm.mpdavis.com`) && PathPrefix(`/mcp`)
+      kind: Rule
+      services:
+        - name: ecm
+          port: 6101
     - match: Host(`ecm.mpdavis.com`)
       kind: Rule
       middlewares:
