@@ -31,6 +31,8 @@ spec:
               value: "6100"
             - name: TZ
               value: ${TZ}
+            - name: MCP_HOST
+              value: localhost
           volumeMounts:
             - name: config
               mountPath: /config
