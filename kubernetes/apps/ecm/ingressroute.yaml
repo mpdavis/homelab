@@ -13,9 +13,6 @@ spec:
           port: 6101
     - match: Host(`ecm.mpdavis.com`)
       kind: Rule
-      middlewares:
-        - name: authelia
-          namespace: authelia
       services:
         - name: ecm
           port: 6100
