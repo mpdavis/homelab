@@ -12,5 +12,34 @@
     "managerFilePatterns": [
       "/kubernetes/.+\\.ya?ml$/"
     ]
-  }
+  },
+  "packageRules": [
+    {
+      "description": "Major version bumps usually require migration steps. Gate them behind manual approval on the dependency dashboard instead of opening PRs automatically.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "CRD apiVersion bumps (kubernetes-api datasource, e.g. ClusterSecretStore -> external-secrets.io/v1) are coupled to operator/CRD upgrades and must never be applied on their own. Require manual approval.",
+      "matchDatasources": [
+        "kubernetes-api"
+      ],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Review all External Secrets changes together in one PR: the Helm chart and the ClusterSecretStore/ExternalSecret/SecretStore apiVersions move in lockstep. The v0.x -> v2.x upgrade needed a coordinated CRD conversion-webhook cleanup and storage migration, so gate this group behind manual approval.",
+      "matchPackageNames": [
+        "external-secrets",
+        "ClusterSecretStore",
+        "ClusterExternalSecret",
+        "ExternalSecret",
+        "SecretStore",
+        "PushSecret"
+      ],
+      "groupName": "external-secrets",
+      "dependencyDashboardApproval": true
+    }
+  ]
 }
