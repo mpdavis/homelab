@@ -1,0 +1,39 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: dcgm-exporter
+  namespace: monitoring
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: dcgm-exporter
+      version: "~4.8"
+      sourceRef:
+        kind: HelmRepository
+        name: dcgm-exporter
+        namespace: flux-system
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+  values:
+    # The exporter talks to the GPU through the NVIDIA container runtime, so it
+    # only works on the GPU node. nodeSelector pins the DaemonSet there (the
+    # node is labelled nvidia.com/gpu.present=true during cluster bootstrap).
+    runtimeClassName: nvidia
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
+    # No nvidia.com/gpu resource request — runtimeClassName already grants device
+    # access, and requesting one would consume one of the 4 time-slicing replicas.
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      # kube-prometheus-stack's Prometheus only selects ServiceMonitors carrying
+      # the release label of the monitoring HelmRelease.
+      additionalLabels:
+        release: monitoring

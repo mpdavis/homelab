@@ -12,4 +12,5 @@ resources:
   - grafana.yaml
   - nfs-provisioner.yaml
   - nvidia.yaml
+  - dcgm-exporter.yaml
   - seerr.yaml
