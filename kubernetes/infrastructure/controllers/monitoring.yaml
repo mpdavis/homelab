@@ -33,14 +33,7 @@ spec:
         server:
           root_url: https://grafana.mpdavis.com
         auth:
-          disable_login_form: true
-        auth.proxy:
-          enabled: true
-          header_name: Remote-User
-          header_property: username
-          auto_sign_up: true
-          enable_login_token: false
-          headers: "Name:Remote-Name Email:Remote-Email Groups:Remote-Groups"
+          disable_login_form: false
         users:
           auto_assign_org: true
           auto_assign_org_role: Admin
