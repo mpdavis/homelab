@@ -17,6 +17,10 @@ spec:
       # Gluetun requires /dev/net/tun which is only available on VM nodes, not LXC
       nodeSelector:
         node-type: vm
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "2"
       containers:
         - name: gluetun
           image: qmcgaw/gluetun:latest
