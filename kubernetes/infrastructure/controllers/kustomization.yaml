@@ -13,3 +13,4 @@ resources:
   - nfs-data.yaml
   - nfs-homelab.yaml
   - nvidia-device-plugin.yaml
+  - dcgm-exporter.yaml

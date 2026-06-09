@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - external-secret-grafana.yaml
   - ingress-grafana.yaml
+  - dashboard-dcgm.yaml
