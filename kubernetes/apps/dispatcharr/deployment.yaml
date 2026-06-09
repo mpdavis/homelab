@@ -15,10 +15,6 @@ spec:
         app: dispatcharr
     spec:
       runtimeClassName: nvidia
-      dnsConfig:
-        options:
-          - name: ndots
-            value: "2"
       containers:
         - name: dispatcharr
           image: ghcr.io/dispatcharr/dispatcharr:latest
