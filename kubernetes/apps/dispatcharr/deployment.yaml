@@ -24,6 +24,8 @@ spec:
           env:
             - name: DISPATCHARR_ENV
               value: aio
+            - name: DISPATCHARR_LOG_LEVEL
+              value: DEBUG
             - name: TZ
               value: ${TZ}
             - name: NVIDIA_VISIBLE_DEVICES
