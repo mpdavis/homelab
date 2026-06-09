@@ -14,7 +14,6 @@ spec:
       labels:
         app: dispatcharr
     spec:
-      runtimeClassName: nvidia
       containers:
         - name: dispatcharr
           image: ghcr.io/dispatcharr/dispatcharr:latest
@@ -26,13 +25,6 @@ spec:
               value: aio
             - name: TZ
               value: ${TZ}
-            - name: NVIDIA_VISIBLE_DEVICES
-              value: all
-            - name: NVIDIA_DRIVER_CAPABILITIES
-              value: all
-          resources:
-            limits:
-              nvidia.com/gpu: "1"
           volumeMounts:
             - name: data
               mountPath: /data
