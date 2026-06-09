@@ -4,6 +4,7 @@ resources:
   - authelia
   - cert-manager
   - external-secrets
+  - external-dns
   - flux-operator
   - metallb
   - traefik
