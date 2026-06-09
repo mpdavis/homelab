@@ -33,13 +33,13 @@ spec:
       - traefik-proxy
     domainFilters:
       - mpdavis.com
-    # IngressRoute CRDs carry no LoadBalancer status, so set the record target
-    # globally. This is the public IP the wildcard *.mpdavis.com used to point
-    # at; external traffic hits it and is forwarded to Traefik's VIP (10.0.1.60).
-    # As of v0.21, --default-targets is only applied to sources that already
-    # provide a target; --force-default-targets is required to inject it into
-    # targetless sources like IngressRoutes (which have no LoadBalancer status).
-    # Without it the traefik source emits zero endpoints and no records are made.
+    # IngressRoute CRDs carry no LoadBalancer status, so the traefik source has
+    # no target for them. Set the record target globally: 46.110.78.19 is the
+    # public IP that forwards external traffic to Traefik's VIP (10.0.1.60).
+    # As of v0.21, --default-targets only applies to sources that already
+    # provide a target, so --force-default-targets is required to inject it into
+    # these targetless IngressRoutes. Without it the traefik source emits zero
+    # endpoints and no records are created.
     extraArgs:
       - --default-targets=46.110.78.19
       - --force-default-targets
