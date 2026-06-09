@@ -33,16 +33,13 @@ spec:
       - traefik-proxy
     domainFilters:
       - mpdavis.com
-    # IngressRoute CRDs carry no LoadBalancer status, so the traefik source has
-    # no target for them. Set the record target globally: 46.110.78.19 is the
-    # public IP that forwards external traffic to Traefik's VIP (10.0.1.60).
-    # As of v0.21, --default-targets only applies to sources that already
-    # provide a target, so --force-default-targets is required to inject it into
-    # these targetless IngressRoutes. Without it the traefik source emits zero
-    # endpoints and no records are created.
-    extraArgs:
-      - --default-targets=46.110.78.19
-      - --force-default-targets
+    # The traefik-proxy source has no LoadBalancer status to derive a target
+    # from, so it only emits a record for an IngressRoute that carries an
+    # explicit external-dns.alpha.kubernetes.io/target annotation. (--default-
+    # targets does NOT cover this — it is only applied to sources that already
+    # provide a target.) That annotation is injected into every IngressRoute via
+    # a kustomize patch in kubernetes/{apps,infrastructure}/kustomization.yaml,
+    # pointing at the public IP that forwards to Traefik's VIP (10.0.1.60).
     # Full GitOps: create and delete records to match IngressRoutes. The TXT
     # registry (txtOwnerId) scopes deletion to records this instance created,
     # so manually-managed records (e.g. the apex) are never touched.
