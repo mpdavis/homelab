@@ -17,7 +17,7 @@ spec:
       runtimeClassName: nvidia
       containers:
         - name: dispatcharr
-          image: ghcr.io/dispatcharr/dispatcharr:latest
+          image: ghcr.io/dispatcharr/dispatcharr:v0.25.1
           ports:
             - containerPort: 9191
               name: http
