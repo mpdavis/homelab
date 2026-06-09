@@ -5,6 +5,7 @@ resources:
   - flux-operator.yaml
   - jetstack.yaml
   - external-secrets.yaml
+  - external-dns.yaml
   - metallb.yaml
   - traefik.yaml
   - prometheus-community.yaml

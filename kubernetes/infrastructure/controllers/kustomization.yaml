@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - cert-manager.yaml
   - external-secrets.yaml
+  - external-dns.yaml
   - flux-operator.yaml
   - metallb.yaml
   - traefik.yaml

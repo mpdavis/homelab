@@ -155,7 +155,7 @@ For workloads where you want data to survive a node failure without manual resto
 ### Ingress
 
 ```
-Internet → Cloudflare DNS (*.mpdavis.com)
+Internet → Cloudflare DNS (per-service A records, e.g. grafana.mpdavis.com)
          → Router port-forward 443 → MetalLB VIP (10.0.1.60)
          → Traefik (k8s IngressRoute)
          → k8s Services  OR  ExternalName/Endpoints → non-k8s services
@@ -177,8 +177,15 @@ HTTP(S) traffic routes through this single ingress point.
 
 ### DNS
 
-Cloudflare as authoritative DNS for `mpdavis.com`. `*.mpdavis.com` points at
-the MetalLB VIP.
+Cloudflare as authoritative DNS for `mpdavis.com`. ExternalDNS (Cloudflare
+provider, Traefik IngressRoute source) auto-provisions an individual A record
+per service from the `Host()` rule on each IngressRoute, all pointing at the
+public ingress IP. A previous wildcard `*.mpdavis.com` record was removed: the
+search-domain interaction (`ndots`) meant any pod's lookup of an external host
+could match the wildcard and resolve to our own ingress, causing TLS
+mismatches. Per-service records resolve only explicitly-defined subdomains.
+The `*.mpdavis.com` TLS certificate (cert-manager DNS-01) is unaffected and
+still used for all routes.
 
 ### IP Address Plan
 
