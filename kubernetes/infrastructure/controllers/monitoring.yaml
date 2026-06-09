@@ -39,6 +39,7 @@ spec:
           header_name: Remote-User
           header_property: username
           auto_sign_up: true
+          enable_login_token: false
           headers: "Name:Remote-Name Email:Remote-Email Groups:Remote-Groups"
         users:
           auto_assign_org: true
