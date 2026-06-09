@@ -38,7 +38,6 @@ spec:
     # at; external traffic hits it and is forwarded to Traefik's VIP (10.0.1.60).
     extraArgs:
       - --default-targets=46.110.78.19
-      - --traefik-disable-legacy
     # Full GitOps: create and delete records to match IngressRoutes. The TXT
     # registry (txtOwnerId) scopes deletion to records this instance created,
     # so manually-managed records (e.g. the apex) are never touched.
