@@ -67,3 +67,26 @@ External Secrets Operator syncs from Bitwarden Secrets Manager into Kubernetes S
 - `helm` for chart templating/debugging
 - `kustomize` (or `kubectl -k`) for kustomize-based apps
 - `flux` CLI for Flux management
+
+## Development Workflow
+
+Every conversation in this repository follows this lifecycle. Follow these steps automatically.
+
+### 1. Session Start — Enter a Fresh Worktree
+At the very start of every new conversation, before doing any other work:
+1. Enter a fresh worktree using the `EnterWorktree` tool (the default `baseRef: fresh` branches from `origin/main`)
+2. Then proceed with the user's request
+
+If you are already in a worktree (the environment indicates "This is a git worktree"), you are resuming a previous session — proceed directly with the user's request.
+
+### 2. Development
+Work normally — make changes, create branches, commits, and PRs as needed.
+
+### 3. PR Monitoring
+After a PR is created, a PostToolUse hook automatically prompts you to start monitoring with `/loop /babysit-pr {number}`. The monitoring loop:
+- Checks CI/build status each iteration
+- Addresses review comments by making code changes and pushing fixes
+- Waits for the PR to merge
+
+### 4. Post-Merge — Worktree Rotation
+Once the PR merges (detected by `/babysit-pr`), the current worktree is cleaned up and a fresh one is created from `origin/main`. You'll see "Ready for next task" when complete.
