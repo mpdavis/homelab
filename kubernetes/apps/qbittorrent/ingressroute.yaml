@@ -8,9 +8,6 @@ spec:
   routes:
     - match: Host(`qbit.mpdavis.com`)
       kind: Rule
-      middlewares:
-        - name: authelia
-          namespace: authelia
       services:
         - name: qbittorrent
           port: 8080
