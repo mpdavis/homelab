@@ -27,3 +27,22 @@ spec:
       - key: nvidia.com/gpu
         operator: Exists
         effect: NoSchedule
+    # Time-slicing lets multiple pods share the single RTX 3050.
+    # The GPU is advertised as `nvidia.com/gpu: 4` (4 time-shared replicas),
+    # so up to 4 pods can schedule onto it concurrently. Replicas share the
+    # GPU in time; VRAM is not partitioned, so co-scheduled workloads must
+    # fit within the 6GB together. Resource name is unchanged (no
+    # renameByDefault), so existing consumers need no modification.
+    # https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-sharing.html
+    config:
+      default: time-slicing
+      map:
+        time-slicing: |-
+          version: v1
+          flags:
+            migStrategy: none
+          sharing:
+            timeSlicing:
+              resources:
+                - name: nvidia.com/gpu
+                  replicas: 4
