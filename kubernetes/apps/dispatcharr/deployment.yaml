@@ -15,17 +15,19 @@ spec:
         app: dispatcharr
     spec:
       runtimeClassName: nvidia
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "2"
       containers:
         - name: dispatcharr
-          image: ghcr.io/dispatcharr/dispatcharr:0.25.1
+          image: ghcr.io/dispatcharr/dispatcharr:latest
           ports:
             - containerPort: 9191
               name: http
           env:
             - name: DISPATCHARR_ENV
               value: aio
-            - name: DISPATCHARR_LOG_LEVEL
-              value: DEBUG
             - name: TZ
               value: ${TZ}
             - name: NVIDIA_VISIBLE_DEVICES
