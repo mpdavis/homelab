@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: teamarr
-          image: ghcr.io/pharaoh-labs/teamarr:v2.6.0
+          image: ghcr.io/pharaoh-labs/teamarr:2.6.0
           ports:
             - containerPort: 9195
               name: http
