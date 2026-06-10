@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: prowlarr
-          image: linuxserver/prowlarr:latest
+          image: linuxserver/prowlarr:2.4.0.5397-ls149
           ports:
             - containerPort: 9696
               name: http
