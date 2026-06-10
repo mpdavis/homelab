@@ -41,7 +41,10 @@ jobs:
           while true; do
             status="$(gh api "repos/$REPO/commits/$head/status")"
             state="$(echo "$status" | jq -r '.state')"
-            # apps is the last Kustomization in the dependsOn chain; its success means
+            # notification-controller formats Kustomization status contexts as
+            # `kustomization/<name>/<digest>` (verified live: e.g.
+            # `kustomization/apps/df50960c` — name is the MIDDLE segment, not the last).
+            # apps is the last Kustomization in the dependsOn chain, so its success means
             # the whole infra→apps reconciliation finished for this revision (guards
             # against a false green when only some statuses have reported yet).
             apps="$(echo "$status" | jq -r '
@@ -49,7 +52,10 @@ jobs:
 
             # A failed/errored Flux status means main's deploy is broken — refuse to
             # stack another merge on top of it (fix main first; admins can bypass).
-            if echo "$status" | jq -e '.statuses[] | select(.state=="failure" or .state=="error")' >/dev/null; then
+            # Scope to kustomization/ contexts: those track the git revision. (HelmReleases
+            # reconcile chart versions, not commits, so they post no commit status here —
+            # but scoping keeps a transient non-Kustomization failure from tripping the gate.)
+            if echo "$status" | jq -e '.statuses[] | select(.context | startswith("kustomization/")) | select(.state=="failure" or .state=="error")' >/dev/null; then
               echo "::error::main ($head) has a failing Flux deploy status — not safe to merge onto."
               echo "$status" | jq -r '.statuses[] | "  \(.context) = \(.state)"'
               exit 1
