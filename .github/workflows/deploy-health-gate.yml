@@ -1,0 +1,112 @@
+name: Deploy Health Gate
+
+# Merge-queue gate: a PR may only merge once the PREVIOUSLY merged commit (current
+# `main`) has been reconciled by Flux and every Kustomization/HelmRelease is healthy.
+# This gives "don't merge the next PR until the previous one deployed successfully".
+#
+# Runs on `merge_group` ONLY. The job uses a self-hosted, in-cluster runner; because
+# a PR can only enter the merge queue when a maintainer adds it, fork PRs can never
+# trigger this workflow. Never add `pull_request`/`pull_request_target` here, and keep
+# all fork-reachable CI on GitHub-hosted runners.
+
+on:
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  # Job name MUST equal the required-status-check context in the merge-queue ruleset.
+  deploy-health-gate:
+    runs-on: homelab-deploy-gate # the ARC scale set (ns arc-runners), read-only Flux SA
+    timeout-minutes: 30
+    env:
+      # The commit `main` currently points at = the previous merge. That is what must
+      # be deployed before we let this queued PR in. NOT head_sha (not on main yet).
+      BASE_SHA: ${{ github.event.merge_group.base_sha }}
+      OVERALL_TIMEOUT_SECONDS: "1200" # 20m; job timeout (30m) is the hard backstop
+    steps:
+      - name: Install kubectl
+        # The default ARC runner image has no kubectl and runs as the non-root
+        # `runner` user, so install into a user-writable dir and add it to PATH
+        # rather than /usr/local/bin (which would need root).
+        run: |
+          set -euo pipefail
+          bindir="${RUNNER_TEMP:-$HOME}/bin"
+          mkdir -p "$bindir"
+          ver="$(curl -fsSL https://dl.k8s.io/release/stable.txt)"
+          curl -fsSLo "$bindir/kubectl" "https://dl.k8s.io/release/${ver}/bin/linux/amd64/kubectl"
+          chmod +x "$bindir/kubectl"
+          echo "$bindir" >> "$GITHUB_PATH"
+          "$bindir/kubectl" version --client
+
+      - name: Wait for main to be reconciled and healthy
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + OVERALL_TIMEOUT_SECONDS ))
+          echo "Gating on main = ${BASE_SHA}"
+
+          # Reasons that mean "still working" (keep waiting) rather than "failed".
+          PENDING_REASONS=" Progressing Reconciling DependencyNotReady ReconciliationAwaitingRetry Unknown "
+
+          # Has Flux's root sync actually applied the BASE_SHA revision yet?
+          # .status.lastAppliedRevision looks like: refs/heads/main@sha1:<full-sha>
+          root_reconciled() {
+            local rev
+            rev="$(kubectl get kustomization flux-system -n flux-system \
+              -o jsonpath='{.status.lastAppliedRevision}' 2>/dev/null || true)"
+            case "$rev" in
+              *"${BASE_SHA}"*) return 0 ;;
+              *) echo "  root sync at '${rev:-<none>}', waiting for ${BASE_SHA}"; return 1 ;;
+            esac
+          }
+
+          # Emit "<ns>/<name> <ReadyStatus> <ReadyReason>" for one Flux kind.
+          ready_lines() {
+            kubectl get "$1" -A -o go-template='
+              {{- range .items -}}
+                {{- $ns := .metadata.namespace -}}{{- $n := .metadata.name -}}
+                {{- range .status.conditions -}}
+                  {{- if eq .type "Ready" -}}
+                    {{ $ns }}/{{ $n }} {{ .status }} {{ .reason }}{{ "\n" }}
+                  {{- end -}}
+                {{- end -}}
+              {{- end -}}' 2>/dev/null
+          }
+
+          while true; do
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for main (${BASE_SHA}) to deploy."
+              kubectl get kustomization,helmrelease -A || true
+              exit 1
+            fi
+
+            if ! root_reconciled; then sleep 15; continue; fi
+
+            pending=""; failed=""
+            for kind in kustomization helmrelease; do
+              while read -r obj status reason; do
+                [ -z "${obj:-}" ] && continue
+                [ "$status" = "True" ] && continue
+                if [[ "$PENDING_REASONS" == *" ${reason:-Unknown} "* ]]; then
+                  pending="${pending} ${kind}/${obj}(${reason})"
+                else
+                  failed="${failed} ${kind}/${obj}(${reason})"
+                fi
+              done < <(ready_lines "$kind")
+            done
+
+            if [ -n "$failed" ]; then
+              echo "::error::Deploy of main (${BASE_SHA}) has failing resources:${failed}"
+              echo "Refusing to merge on top of a broken deploy. Fix main (admin bypass) first."
+              exit 1
+            fi
+            if [ -n "$pending" ]; then
+              echo "  still reconciling:${pending}"
+              sleep 15; continue
+            fi
+
+            echo "main (${BASE_SHA}) is fully reconciled and healthy. Gate passed."
+            kubectl get kustomization,helmrelease -A
+            exit 0
+          done
