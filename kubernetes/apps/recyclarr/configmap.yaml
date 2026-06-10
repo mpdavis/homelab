@@ -35,6 +35,12 @@ data:
             assign_scores_to:
               - name: WEB-1080p
               - name: WEB-1080p (Alternative)
+          - trash_ids:
+              - 3bc5f395426614e155e585a2f056cdf1
+            score: 10
+            assign_scores_to:
+              - name: WEB-1080p
+              - name: WEB-1080p (Alternative)
 
         custom_format_groups:
           add:
