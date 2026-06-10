@@ -14,4 +14,3 @@ resources:
   - nfs-homelab.yaml
   - nvidia-device-plugin.yaml
   - dcgm-exporter.yaml
-  - arc-controller.yaml
