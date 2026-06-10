@@ -1,12 +1,14 @@
 # GitHub Workflows
 
-Automated, Claude-powered PR review for this repo. All three use the official
-[`anthropics/claude-code-action@v1`](https://github.com/anthropics/claude-code-action).
+Automated PR checks for this repo. The Claude-powered reviewers use the official
+[`anthropics/claude-code-action@v1`](https://github.com/anthropics/claude-code-action);
+`image-pin-check.yml` is a deterministic script with no LLM and no secrets.
 
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `renovate-review.yml` | PRs authored by `renovate[bot]` | Reads the release notes / changelog in the PR, judges merge safety, posts a verdict comment, and **approves** clearly-safe bumps. |
 | `k8s-review.yml` | Human PRs touching `kubernetes/**` | Reviews Flux / Helm / Kustomize correctness, storage classes, security context, and repo conventions (per `CLAUDE.md`). Inline + summary comments. |
+| `image-pin-check.yml` | PRs touching `kubernetes/**` | Resolves every newly added `image:` reference against its registry and **fails the check** if any pinned tag/digest does not exist. Guards against typos like `teamarr:v2.6.0` (published tag is `2.6.0`) that would otherwise only surface at runtime as `ImagePullBackOff`. Runs `.github/scripts/verify-image-pins.py`. |
 | `claude.yml` | `@claude` mention in an issue/PR comment | On-demand assistant — explain, review, or make changes when asked. |
 
 ## Required secrets
