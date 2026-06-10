@@ -40,6 +40,16 @@
       ],
       "groupName": "external-secrets",
       "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Loki chart 7.x is repurposed for Grafana Enterprise Logs (GEL) only; this deployment is OSS Loki (SingleBinary, filesystem). Stay on 6.x. See closed PR #125. Revisit if migrating to the community-maintained OSS Loki chart.",
+      "matchDatasources": [
+        "helm"
+      ],
+      "matchPackageNames": [
+        "loki"
+      ],
+      "allowedVersions": "<7.0.0"
     }
   ]
 }
