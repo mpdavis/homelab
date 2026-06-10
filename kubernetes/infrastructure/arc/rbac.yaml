@@ -1,0 +1,40 @@
+# Identity the gate runner pod assumes (template.spec.serviceAccountName in
+# runner-set.yaml). The pod's auto-mounted SA token lets kubectl/flux talk to this
+# same cluster via in-cluster config — no kubeconfig secret needed.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deploy-gate-runner
+  namespace: arc-runners
+---
+# READ-ONLY by design: the deploy-health gate only observes Flux reconciliation; it
+# never reconciles or mutates anything, so a compromised gate run can't touch cluster
+# state. Add verbs here only if the gate ever needs to force a reconcile.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: deploy-gate-flux-reader
+rules:
+  - apiGroups: ["kustomize.toolkit.fluxcd.io"]
+    resources: ["kustomizations"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["helm.toolkit.fluxcd.io"]
+    resources: ["helmreleases"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["source.toolkit.fluxcd.io"]
+    resources:
+      ["gitrepositories", "ocirepositories", "helmrepositories", "helmcharts", "buckets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: deploy-gate-flux-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: deploy-gate-flux-reader
+subjects:
+  - kind: ServiceAccount
+    name: deploy-gate-runner
+    namespace: arc-runners

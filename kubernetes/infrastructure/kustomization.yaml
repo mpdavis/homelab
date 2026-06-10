@@ -9,6 +9,7 @@ resources:
   - metallb
   - traefik
   - monitoring
+  - arc
 
 # ExternalDNS (traefik-proxy source) only provisions a record for an
 # IngressRoute that carries an explicit target annotation — IngressRoute CRDs

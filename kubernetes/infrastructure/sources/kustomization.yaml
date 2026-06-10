@@ -15,3 +15,4 @@ resources:
   - nvidia.yaml
   - dcgm-exporter.yaml
   - seerr.yaml
+  - actions-runner-controller.yaml
