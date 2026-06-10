@@ -48,8 +48,13 @@ spec:
     name: flux-system
   path: ./kubernetes/infrastructure
   prune: true
-  wait: true
-  timeout: 10m
+  # No wait: this path contains External Secrets resources (ClusterSecretStore,
+  # ExternalSecret). Flux's wait health check (kstatus) can't track those CRDs —
+  # its status poller reports them 'NotFound' even when they are Ready, so the
+  # check always times out. Confirmed unaffected by healthCheckExprs or a
+  # controller restart. HelmRelease health gating lives in
+  # infrastructure-controllers; Deployment-level gating here is tracked in an
+  # issue (move Kustomize apps to HelmReleases).
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
