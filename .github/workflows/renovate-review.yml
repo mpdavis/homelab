@@ -1,0 +1,75 @@
+name: Renovate Review
+
+# Focused reviewer for Renovate dependency-bump PRs. Reads the release
+# notes / changelog Renovate puts in the PR body, judges merge safety, posts a
+# verdict comment, and — when clearly safe — submits a GitHub approval review.
+#
+# Setup (see .github/workflows/README.md):
+#   - CLAUDE_CODE_OAUTH_TOKEN  (required) Claude subscription token, `claude setup-token`
+#   - CLAUDE_REVIEW_TOKEN      (optional) fine-grained PAT / App token used ONLY to
+#                              submit the approval. The default GITHUB_TOKEN cannot
+#                              approve PRs; without this secret the workflow still
+#                              posts its advisory comment, it just can't approve.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: renovate-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Only Renovate's dependency-bump PRs.
+    if: github.event.pull_request.user.login == 'renovate[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.CLAUDE_REVIEW_TOKEN || secrets.GITHUB_TOKEN }}
+          prompt: |
+            You are reviewing a Renovate dependency-bump PR in a GitOps homelab repo
+            (k3s + FluxCD, manifests under kubernetes/). Your job is to judge how safe
+            this bump is to merge.
+
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Steps:
+            1. Run `gh pr view <num>` and `gh pr diff <num>` to see exactly which
+               package(s) and version(s) change. Renovate includes a release-notes /
+               changelog summary in the PR body — read it. Fetch the linked changelog
+               with WebFetch if you need detail the body doesn't give you.
+            2. Assess merge safety for the version delta. Weigh:
+               - Breaking changes, removed/renamed flags, schema or CRD apiVersion changes
+               - Deprecations that affect how THIS repo uses the dependency (grep the repo)
+               - Security fixes (these raise the value of merging)
+               - Whether it's a Helm chart, container image, or Flux/k8s resource, and
+                 whether values/manifests in this repo must change to match
+               - Major version crossings: Renovate gates majors behind manual dashboard
+                 approval, so a major slipping through here is itself a red flag
+            3. Post ONE top-level comment with `gh pr comment` containing:
+               - A verdict line: "✅ Safe to merge", "⚠️ Review recommended", or
+                 "❌ Do not merge as-is"
+               - 2–5 bullets of the key findings driving that verdict
+               - Any concrete follow-up the repo needs (e.g. a values change)
+            4. ONLY IF your verdict is "✅ Safe to merge", submit an approval:
+               `gh pr review <num> --approve --body "Automated safety review: safe to merge."`
+               If approval fails because the token lacks permission, note that briefly
+               in your comment and continue — do not treat it as a hard error.
+
+            Be concise and specific. Do not modify any files. Do not merge the PR.
+          claude_args: |
+            --model claude-sonnet-4-6
+            --max-turns 15
+            --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh pr review:*),WebFetch,Read,Grep,Glob"
