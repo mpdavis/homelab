@@ -12,8 +12,10 @@ spec:
     name: flux-system
   path: ./kubernetes/apps
   prune: true
-  wait: true
-  timeout: 10m
+  # No wait: this path contains ExternalSecret resources, which Flux's wait
+  # health check can't track (status poller reports them 'NotFound' even when
+  # Ready, timing the check out). Re-introducing deploy gating for these apps is
+  # tracked separately (candidate: migrate Kustomize apps to HelmReleases).
   postBuild:
     substituteFrom:
       - kind: ConfigMap
