@@ -1,112 +1,72 @@
 name: Deploy Health Gate
 
-# Merge-queue gate: a PR may only merge once the PREVIOUSLY merged commit (current
-# `main`) has been reconciled by Flux and every Kustomization/HelmRelease is healthy.
-# This gives "don't merge the next PR until the previous one deployed successfully".
+# Blocks a PR from merging until the CURRENT `main` (i.e. the previously merged PR)
+# has been reconciled by Flux and is healthy. Combined with the branch ruleset's
+# "require branches up to date before merging", this serializes merges by deploy
+# health: merging moves `main`, every other open PR must update its branch, and its
+# gate then re-runs against the new (deploying) `main` and waits until it is green.
 #
-# Runs on `merge_group` ONLY. The job uses a self-hosted, in-cluster runner; because
-# a PR can only enter the merge queue when a maintainer adds it, fork PRs can never
-# trigger this workflow. Never add `pull_request`/`pull_request_target` here, and keep
-# all fork-reachable CI on GitHub-hosted runners.
+# How it knows main is deployed: Flux's notification-controller posts a GitHub commit
+# status per Kustomization for each reconciled revision (kustomization/flux-system,
+# .../infrastructure, .../apps, ...). GitHub rolls those into a single combined status
+# (success / pending / failure). So this gate just polls main's combined status — no
+# cluster access and no self-hosted runner required. Runs on GitHub-hosted runners.
 
 on:
-  merge_group:
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
+  statuses: read
 
 jobs:
-  # Job name MUST equal the required-status-check context in the merge-queue ruleset.
+  # Job name MUST equal the required-status-check context in the branch ruleset.
   deploy-health-gate:
-    runs-on: homelab-deploy-gate # the ARC scale set (ns arc-runners), read-only Flux SA
-    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
     env:
-      # The commit `main` currently points at = the previous merge. That is what must
-      # be deployed before we let this queued PR in. NOT head_sha (not on main yet).
-      BASE_SHA: ${{ github.event.merge_group.base_sha }}
-      OVERALL_TIMEOUT_SECONDS: "1200" # 20m; job timeout (30m) is the hard backstop
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      TIMEOUT_SECONDS: "1200" # 20m; job timeout (25m) is the hard backstop
     steps:
-      - name: Install kubectl
-        # The default ARC runner image has no kubectl and runs as the non-root
-        # `runner` user, so install into a user-writable dir and add it to PATH
-        # rather than /usr/local/bin (which would need root).
+      - name: Wait for current main to be deployed (Flux commit status green)
         run: |
           set -euo pipefail
-          bindir="${RUNNER_TEMP:-$HOME}/bin"
-          mkdir -p "$bindir"
-          ver="$(curl -fsSL https://dl.k8s.io/release/stable.txt)"
-          curl -fsSLo "$bindir/kubectl" "https://dl.k8s.io/release/${ver}/bin/linux/amd64/kubectl"
-          chmod +x "$bindir/kubectl"
-          echo "$bindir" >> "$GITHUB_PATH"
-          "$bindir/kubectl" version --client
+          deadline=$(( $(date +%s) + TIMEOUT_SECONDS ))
 
-      - name: Wait for main to be reconciled and healthy
-        run: |
-          set -euo pipefail
-          deadline=$(( $(date +%s) + OVERALL_TIMEOUT_SECONDS ))
-          echo "Gating on main = ${BASE_SHA}"
-
-          # Reasons that mean "still working" (keep waiting) rather than "failed".
-          PENDING_REASONS=" Progressing Reconciling DependencyNotReady ReconciliationAwaitingRetry Unknown "
-
-          # Has Flux's root sync actually applied the BASE_SHA revision yet?
-          # .status.lastAppliedRevision looks like: refs/heads/main@sha1:<full-sha>
-          root_reconciled() {
-            local rev
-            rev="$(kubectl get kustomization flux-system -n flux-system \
-              -o jsonpath='{.status.lastAppliedRevision}' 2>/dev/null || true)"
-            case "$rev" in
-              *"${BASE_SHA}"*) return 0 ;;
-              *) echo "  root sync at '${rev:-<none>}', waiting for ${BASE_SHA}"; return 1 ;;
-            esac
-          }
-
-          # Emit "<ns>/<name> <ReadyStatus> <ReadyReason>" for one Flux kind.
-          ready_lines() {
-            kubectl get "$1" -A -o go-template='
-              {{- range .items -}}
-                {{- $ns := .metadata.namespace -}}{{- $n := .metadata.name -}}
-                {{- range .status.conditions -}}
-                  {{- if eq .type "Ready" -}}
-                    {{ $ns }}/{{ $n }} {{ .status }} {{ .reason }}{{ "\n" }}
-                  {{- end -}}
-                {{- end -}}
-              {{- end -}}' 2>/dev/null
-          }
+          head="$(gh api "repos/$REPO/commits/main" --jq .sha)"
+          echo "Gating on main HEAD $head — it must be fully reconciled by Flux."
 
           while true; do
+            status="$(gh api "repos/$REPO/commits/$head/status")"
+            state="$(echo "$status" | jq -r '.state')"
+            # apps is the last Kustomization in the dependsOn chain; its success means
+            # the whole infra→apps reconciliation finished for this revision (guards
+            # against a false green when only some statuses have reported yet).
+            apps="$(echo "$status" | jq -r '
+              [.statuses[] | select(.context | startswith("kustomization/apps/")) | .state] | first // "missing"')"
+
+            # A failed/errored Flux status means main's deploy is broken — refuse to
+            # stack another merge on top of it (fix main first; admins can bypass).
+            if echo "$status" | jq -e '.statuses[] | select(.state=="failure" or .state=="error")' >/dev/null; then
+              echo "::error::main ($head) has a failing Flux deploy status — not safe to merge onto."
+              echo "$status" | jq -r '.statuses[] | "  \(.context) = \(.state)"'
+              exit 1
+            fi
+
+            if [ "$state" = "success" ] && [ "$apps" = "success" ]; then
+              echo "main ($head) is fully reconciled and healthy. Gate passed."
+              echo "$status" | jq -r '.statuses[] | "  \(.context) = \(.state)"'
+              exit 0
+            fi
+
             if [ "$(date +%s)" -ge "$deadline" ]; then
-              echo "::error::Timed out waiting for main (${BASE_SHA}) to deploy."
-              kubectl get kustomization,helmrelease -A || true
+              echo "::error::Timed out waiting for main ($head) to finish deploying (combined=$state, apps=$apps)."
+              echo "$status" | jq -r '.statuses[] | "  \(.context) = \(.state)"'
               exit 1
             fi
 
-            if ! root_reconciled; then sleep 15; continue; fi
-
-            pending=""; failed=""
-            for kind in kustomization helmrelease; do
-              while read -r obj status reason; do
-                [ -z "${obj:-}" ] && continue
-                [ "$status" = "True" ] && continue
-                if [[ "$PENDING_REASONS" == *" ${reason:-Unknown} "* ]]; then
-                  pending="${pending} ${kind}/${obj}(${reason})"
-                else
-                  failed="${failed} ${kind}/${obj}(${reason})"
-                fi
-              done < <(ready_lines "$kind")
-            done
-
-            if [ -n "$failed" ]; then
-              echo "::error::Deploy of main (${BASE_SHA}) has failing resources:${failed}"
-              echo "Refusing to merge on top of a broken deploy. Fix main (admin bypass) first."
-              exit 1
-            fi
-            if [ -n "$pending" ]; then
-              echo "  still reconciling:${pending}"
-              sleep 15; continue
-            fi
-
-            echo "main (${BASE_SHA}) is fully reconciled and healthy. Gate passed."
-            kubectl get kustomization,helmrelease -A
-            exit 0
+            echo "  combined=$state apps=$apps — waiting for Flux..."
+            sleep 20
           done
