@@ -30,13 +30,12 @@ data:
               enabled: true
 
         custom_formats:
-          # Prefer releases the indexer flags as FreeLeech
+          # Prefer releases the indexer flags as FreeLeech (TRaSH default score)
           - trash_ids:
               - d7c747094a7c65f4c2de083c24899e8b  # FreeLeech
             assign_scores_to:
               - name: WEB-1080p
               - name: WEB-1080p (Alternative)
-            score: 101
 
         custom_format_groups:
           add:
