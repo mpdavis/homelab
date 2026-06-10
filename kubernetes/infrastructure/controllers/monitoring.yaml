@@ -26,6 +26,12 @@ spec:
   test:
     enable: true
   values:
+    crds:
+      # Helm cannot upgrade this chart's CRDs in place, and large CRD changes
+      # (e.g. the Prometheus-Operator jump in the 72->86 upgrade) otherwise fail.
+      # This pre-upgrade hook Job applies the updated CRDs server-side.
+      upgradeJob:
+        enabled: true
     grafana:
       admin:
         existingSecret: grafana-admin
