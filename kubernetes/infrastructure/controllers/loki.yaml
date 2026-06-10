@@ -21,6 +21,8 @@ spec:
     remediation:
       retries: 3
       strategy: rollback
+  test:
+    enable: true
   values:
     deploymentMode: SingleBinary
     loki:

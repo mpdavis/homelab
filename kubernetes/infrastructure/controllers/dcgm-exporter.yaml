@@ -21,6 +21,8 @@ spec:
     remediation:
       retries: 3
       strategy: rollback
+  test:
+    enable: true
   values:
     # The exporter talks to the GPU through the NVIDIA container runtime, so it
     # only works on the GPU node. nodeSelector pins the DaemonSet there (the
