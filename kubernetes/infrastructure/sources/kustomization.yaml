@@ -10,6 +10,7 @@ resources:
   - traefik.yaml
   - prometheus-community.yaml
   - grafana.yaml
+  - grafana-community.yaml
   - nfs-provisioner.yaml
   - nvidia.yaml
   - dcgm-exporter.yaml
