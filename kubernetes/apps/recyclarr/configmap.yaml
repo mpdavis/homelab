@@ -5,7 +5,7 @@ metadata:
 data:
   recyclarr.yml: |
     sonarr:
-      web-1080p:
+      sonarr-homelab:
         base_url: http://sonarr:8989
         api_key: !env_var SONARR_API_KEY
 
@@ -58,7 +58,7 @@ data:
                 - 23297a736ca77c0fc8e70f8edd7ee56c  # Upscaled
 
     radarr:
-      hd-bluray-web:
+      radarr-homelab:
         base_url: http://radarr:7878
         api_key: !env_var RADARR_API_KEY
 
