@@ -37,6 +37,14 @@ data:
                 qualities:
                   - Bluray-1080p
                   - HDTV-1080p
+              - name: WEB 2160p
+                qualities:
+                  - WEBRip-2160p
+                  - WEBDL-2160p
+              - name: non-WEB 2160p
+                qualities:
+                  - Bluray-2160p
+                  - HDTV-2160p
               - name: WEB 720p
                 qualities:
                   - WEBRip-720p
