@@ -39,9 +39,9 @@ data:
 
         custom_format_groups:
           add:
+            # Required CFs (Repack/Proper, WEB tiers, HD/UHD Streaming Boost) sync
+            # automatically with the quality profile; only opt into optional CFs here.
             - trash_id: 158188097a58d7687dee647e04af0da3  # [Optional] Golden Rule HD
-              select_all: true
-            - trash_id: 85fae4a2294965b75710ef2989c850eb  # [Streaming Services] HD/UHD boost
               select_all: true
             - trash_id: 59c3af66780d08332fdc64e68297098f  # [Unwanted] Unwanted Formats
               select_all: true
