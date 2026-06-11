@@ -14,13 +14,16 @@ See [docs/design.md](docs/design.md) for the full design document, hardware deta
 ## Repository Layout
 
 ```
-tofu/               # OpenTofu (IaC) — Proxmox LXC/VM provisioning
-ansible/            # Ansible — k3s installation, node configuration, Flux bootstrap
-apps/               # Per-service K8s manifests
-infrastructure/     # Cluster infrastructure (HelmReleases, HelmRepositories, companion manifests)
-  sources/          # HelmRepository definitions
-clusters/           # Flux Kustomization entrypoints (infra.yaml, apps.yaml, flux-system/)
-docs/               # Design documents
+bootstrap/            # Pre-Flux provisioning and configuration
+  tofu/               # OpenTofu (IaC) — Proxmox LXC/VM provisioning
+  ansible/            # Ansible — Proxmox/node setup, k3s install, Flux bootstrap
+kubernetes/           # Flux-managed cluster state (sync root)
+  apps/               # Per-service K8s manifests
+  infrastructure/     # Cluster infrastructure (HelmReleases, HelmRepositories, companion manifests)
+    sources/          # HelmRepository definitions
+    controllers/      # HelmRelease definitions
+  clusters/           # Flux Kustomization entrypoints (infra.yaml, apps.yaml, flux-system/)
+docs/                 # Design documents
 ```
 
 ## Getting Started
@@ -32,10 +35,20 @@ docs/               # Design documents
 - [kubectl](https://kubernetes.io/docs/tasks/tools/) — cluster interaction
 - SSH access to Proxmox hosts (pve1, pve2)
 
+### Configure Proxmox Hosts
+
+After a fresh Proxmox VE install on each node:
+
+```bash
+cd bootstrap/ansible
+ansible-playbook playbooks/setup-pve.yml          # repos, subscription nag, NIC fix, updates
+ansible-playbook playbooks/setup-pve-cluster.yml  # form/join the Proxmox cluster
+```
+
 ### Provision Infrastructure
 
 ```bash
-cd tofu/proxmox
+cd bootstrap/tofu/proxmox
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars with your PVE API token and SSH keys
 tofu init
@@ -45,8 +58,8 @@ tofu apply
 ### Configure Nodes and Install k3s
 
 ```bash
-cd ansible
-ansible-playbook playbooks/site.yml           # install k3s on all nodes
+cd bootstrap/ansible
+ansible-playbook playbooks/site.yml           # install k3s + apply common/lxc/vm/gpu roles
 ```
 
 ### Bootstrap Cluster
@@ -58,8 +71,10 @@ ansible-playbook playbooks/bootstrap-flux.yml     # install FluxOperator + FluxI
 
 ### Access the Cluster
 
+`site.yml` fetches the kubeconfig to the repo root:
+
 ```bash
-export KUBECONFIG=$(pwd)/kubeconfig.yaml
+export KUBECONFIG=$(git rev-parse --show-toplevel)/kubeconfig.yaml
 kubectl get nodes
 ```
 
