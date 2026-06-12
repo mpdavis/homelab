@@ -22,6 +22,8 @@ spec:
             - containerPort: 8096
               name: http
           env:
+            - name: TZ
+              value: ${TZ}
             - name: NVIDIA_VISIBLE_DEVICES
               value: all
             - name: NVIDIA_DRIVER_CAPABILITIES
