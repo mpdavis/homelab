@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - dispatcharr
   - ollama
+  - open-webui
   - ecm
   - emby
   - hello-world
