@@ -1,0 +1,46 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ollama
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: ollama
+      version: "0.x"
+      sourceRef:
+        kind: HelmRepository
+        name: ollama
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    crds: CreateReplace
+  values:
+    fullnameOverride: ollama
+    ollama:
+      gpu:
+        enabled: true
+        type: nvidia
+        number: 1
+      models:
+        pull: []
+    runtimeClassName: nvidia
+    resources:
+      limits:
+        nvidia.com/gpu: "1"
+    persistentVolume:
+      enabled: true
+      existingClaim: ollama-models
+    service:
+      type: ClusterIP
+      port: 11434
+    ingress:
+      enabled: false
+    extraEnv:
+      - name: TZ
+        value: ${TZ}
