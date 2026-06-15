@@ -11,7 +11,7 @@ spec:
       app: ecowitt-exporter
   namespaceSelector:
     matchNames:
-      - ecowitt
+      - monitoring
   endpoints:
     - port: http
       interval: 60s
