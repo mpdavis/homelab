@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ecowitt-exporter
+  labels:
+    # Must match the serviceMonitorSelector of the kube-prometheus-stack release.
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: ecowitt-exporter
+  namespaceSelector:
+    matchNames:
+      - ecowitt
+  endpoints:
+    - port: http
+      interval: 60s
+      path: /metrics

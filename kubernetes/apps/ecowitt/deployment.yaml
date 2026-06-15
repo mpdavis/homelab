@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecowitt-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ecowitt-exporter
+  template:
+    metadata:
+      labels:
+        app: ecowitt-exporter
+    spec:
+      containers:
+        - name: ecowitt-exporter
+          image: ghcr.io/djjudas21/ecowitt-exporter:latest
+          ports:
+            - containerPort: 8088
+              name: http
+          env:
+            - name: TZ
+              value: ${TZ}
+          resources:
+            requests:
+              memory: 64Mi
+              cpu: 10m
+            limits:
+              memory: 128Mi
