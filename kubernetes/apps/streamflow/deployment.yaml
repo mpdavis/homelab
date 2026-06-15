@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamflow
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: streamflow
+  template:
+    metadata:
+      labels:
+        app: streamflow
+    spec:
+      containers:
+        - name: streamflow
+          image: ghcr.io/krinkuto11/streamflow:latest
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: TZ
+              value: ${TZ}
+          volumeMounts:
+            - name: config
+              mountPath: /config
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: streamflow-config
