@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: game-thumbs
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: game-thumbs
+  template:
+    metadata:
+      labels:
+        app: game-thumbs
+    spec:
+      containers:
+        - name: game-thumbs
+          image: ghcr.io/sethwv/game-thumbs:latest
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: TZ
+              value: ${TZ}
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: game-thumbs-data

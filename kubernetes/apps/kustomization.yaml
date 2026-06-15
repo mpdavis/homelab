@@ -5,6 +5,7 @@ resources:
   - ollama
   - ecm
   - emby
+  - game-thumbs
   - hello-world
   - homepage
   - prowlarr
