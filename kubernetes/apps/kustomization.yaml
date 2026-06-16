@@ -13,6 +13,7 @@ resources:
   - recyclarr
   - seerr
   - sonarr
+  - streamflow
   - teamarr
 
 # ExternalDNS (traefik-proxy source) only provisions a record for an
