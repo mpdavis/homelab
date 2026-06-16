@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: open-webui
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`ai.mpdavis.com`)
+      kind: Rule
+      middlewares:
+        - name: authelia
+          namespace: authelia
+      services:
+        - name: open-webui
+          port: 8080
+  tls: {}
