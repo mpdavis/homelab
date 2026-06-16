@@ -3,5 +3,4 @@ kind: Kustomization
 namespace: ai
 resources:
   - namespace.yaml
-  - pvc.yaml
-  - helmrelease.yaml
+  - ollama

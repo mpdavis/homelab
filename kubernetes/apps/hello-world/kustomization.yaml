@@ -3,6 +3,4 @@ kind: Kustomization
 namespace: hello-world
 resources:
   - namespace.yaml
-  - deployment.yaml
-  - service.yaml
-  - ingressroute.yaml
+  - hello-world
