@@ -16,10 +16,10 @@ data:
       IPTV:
         style: row
         columns: 3
-      AI:
+      Infrastructure:
         style: row
         columns: 3
-      Infrastructure:
+      AI:
         style: row
         columns: 3
   bookmarks.yaml: |
