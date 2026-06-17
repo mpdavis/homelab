@@ -113,7 +113,7 @@ committed manifests.
 1. Push manifests to GitHub
 2. Flux source-controller detects the change
 3. kustomize-controller / helm-controller reconcile the desired state
-4. Dependency chain: `infrastructure-sources` → `infrastructure` → `apps`
+4. Dependency chain: `infrastructure-sources` → `infrastructure-controllers` → `infrastructure` → `apps` (plus `infrastructure-notifications`, which depends on `infrastructure`)
 
 ## Storage Strategy
 
@@ -125,9 +125,9 @@ For bulk data that doesn't need low-latency random I/O.
 
 - **What**: Media files, large appdata directories, backups, model weights
 - **Where**: Unifi NAS, exported via NFS
-- **K8s mechanism**: NFS CSI driver (`nfs-subdir-external-provisioner`)
+- **K8s mechanism**: `nfs-subdir-external-provisioner` (one HelmRelease per NAS share)
 - **Access mode**: ReadWriteMany (multiple pods can mount simultaneously)
-- **StorageClass name**: `nfs-nas`
+- **StorageClass names**: `nfs-data` (NAS `data` share, media) and `nfs-homelab` (NAS `homelab` share, bulk appdata/backups)
 
 ### Tier 2: Local SSD
 
@@ -165,6 +165,14 @@ Traefik inside k8s handles ALL HTTP/HTTPS routing, including services running
 outside the cluster. For non-k8s services, a Service+Endpoints pair routes
 through Traefik with the same wildcard cert and TLS termination as everything
 else.
+
+### Authentication
+
+Authelia runs in-cluster and is wired into Traefik as a forward-auth
+middleware. IngressRoutes for services that should sit behind login attach the
+Authelia middleware; Traefik defers the request to Authelia before proxying to
+the backend. Authelia's user database and session secrets come from Bitwarden
+via ExternalSecrets.
 
 ### Service Discovery
 
@@ -217,8 +225,8 @@ Kubernetes Secrets automatically.
 
 ### Kubernetes GPU Scheduling
 
-1. NVIDIA drivers (560) + `nvidia-container-toolkit` installed in the GPU VM via Ansible
-2. `nvidia-device-plugin` DaemonSet advertises `nvidia.com/gpu` resource
+1. NVIDIA drivers (570) + `nvidia-container-toolkit` installed in the GPU VM via Ansible
+2. `nvidia-device-plugin` DaemonSet advertises `nvidia.com/gpu` resource (GPU time-slicing enabled so multiple pods can share the card)
 3. Pods request GPU via resource limits:
 
 ```yaml
@@ -245,20 +253,25 @@ homelab/
 │   └── ansible/               # Ansible — node config, k3s install, Flux bootstrap
 ├── kubernetes/                # Flux-managed cluster state (sync root)
 │   ├── kustomization.yaml     # Entry point — includes only Flux plumbing
-│   ├── apps/
+│   ├── apps/                  # grouped by namespace, one dir per service
 │   │   ├── kustomization.yaml
-│   │   ├── hello-world/
-│   │   └── emby/
+│   │   ├── ai/                # ollama, open-webui
+│   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
+│   │   ├── homepage/
+│   │   └── hello-world/
 │   ├── infrastructure/
 │   │   ├── kustomization.yaml
 │   │   ├── sources/           # HelmRepository definitions
 │   │   ├── controllers/       # HelmRelease definitions
 │   │   ├── cert-manager/
 │   │   ├── external-secrets/
+│   │   ├── external-dns/
+│   │   ├── authelia/
 │   │   ├── metallb/
 │   │   ├── traefik/
 │   │   ├── monitoring/
-│   │   └── flux-operator/
+│   │   ├── flux-operator/
+│   │   └── flux-notifications/
 │   └── clusters/
 │       └── homelab/
 │           ├── flux-system/

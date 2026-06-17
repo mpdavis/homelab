@@ -2,13 +2,15 @@
 
 Automated PR checks for this repo. The Claude-powered reviewers use the official
 [`anthropics/claude-code-action@v1`](https://github.com/anthropics/claude-code-action);
-`image-pin-check.yml` is a deterministic script with no LLM and no secrets.
+`image-pin-check.yml` and `deploy-health-gate.yml` are deterministic scripts with no
+LLM and no secrets.
 
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `renovate-review.yml` | PRs authored by `renovate[bot]` | Reads the release notes / changelog in the PR, judges merge safety, posts a verdict comment, and **approves** clearly-safe bumps. |
 | `k8s-review.yml` | Human PRs touching `kubernetes/**` | Reviews Flux / Helm / Kustomize correctness, storage classes, security context, and repo conventions (per `CLAUDE.md`). Inline + summary comments. |
 | `image-pin-check.yml` | PRs touching `kubernetes/**` | Resolves every newly added `image:` reference against its registry and **fails the check** if any pinned tag/digest does not exist. Guards against typos like `teamarr:v2.6.0` (published tag is `2.6.0`) that would otherwise only surface at runtime as `ImagePullBackOff`. Runs `.github/scripts/verify-image-pins.py`. |
+| `deploy-health-gate.yml` | All PRs | Blocks merge until the current `main` has been reconciled and reported healthy by Flux. Polls `main`'s combined GitHub commit status (which Flux's notification-controller posts per Kustomization), so it needs no cluster access or self-hosted runner. Combined with the branch ruleset's "require branches up to date", this serializes merges by deploy health. |
 | `claude.yml` | `@claude` mention in an issue/PR comment | On-demand assistant — explain, review, or make changes when asked. |
 | `new-service.yml` | Issue labeled `new service` | Runs the `add-service` skill against the issue, scaffolds the manifests into `kubernetes/apps/<namespace>/<service>/`, and **opens a PR** (`Closes #<issue>`). Defaults to a HelmRelease (official chart, else bjw-s `app-template`). Never merges — the PR still goes through `k8s-review` / `image-pin-check`. |
 
