@@ -1,0 +1,85 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: paperless
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: "~5.0"
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    crds: CreateReplace
+  values:
+    controllers:
+      main:
+        containers:
+          main:
+            image:
+              repository: ghcr.io/paperless-ngx/paperless-ngx
+              tag: 2.14.7
+            env:
+              # Broker — Redis runs as a sidecar in this pod.
+              PAPERLESS_REDIS: redis://localhost:6379
+              PAPERLESS_URL: https://paperless.mpdavis.com
+              PAPERLESS_TIME_ZONE: ${TZ}
+              PAPERLESS_OCR_LANGUAGE: eng
+              # Map the in-container user to the NFS share's owner.
+              USERMAP_UID: "1000"
+              USERMAP_GID: "1000"
+              PAPERLESS_SECRET_KEY:
+                secretKeyRef:
+                  name: paperless-secrets
+                  key: secret-key
+              PAPERLESS_ADMIN_USER:
+                secretKeyRef:
+                  name: paperless-secrets
+                  key: admin-user
+              PAPERLESS_ADMIN_PASSWORD:
+                secretKeyRef:
+                  name: paperless-secrets
+                  key: admin-password
+          redis:
+            image:
+              repository: docker.io/library/redis
+              tag: 7.4-alpine
+    service:
+      main:
+        controller: main
+        ports:
+          http:
+            port: 8000
+    persistence:
+      data:
+        existingClaim: paperless-data
+        advancedMounts:
+          main:
+            main:
+              - path: /usr/src/paperless/data
+      media:
+        existingClaim: paperless-media
+        advancedMounts:
+          main:
+            main:
+              - path: /usr/src/paperless/media
+                subPath: media
+              - path: /usr/src/paperless/consume
+                subPath: consume
+              - path: /usr/src/paperless/export
+                subPath: export
+      redis-data:
+        type: emptyDir
+        advancedMounts:
+          main:
+            redis:
+              - path: /data

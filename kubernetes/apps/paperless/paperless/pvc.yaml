@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: paperless-data
+spec:
+  # SQLite database, search index and the trained classification model.
+  # Kept on local SSD — SQLite must not live on NFS.
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: paperless-media
+spec:
+  # Original documents, consume dropbox and exports — bulk appdata on the NAS.
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-homelab
+  resources:
+    requests:
+      storage: 50Gi

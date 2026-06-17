@@ -4,6 +4,7 @@ resources:
   - ai
   - media
   - homepage
+  - paperless
   - hello-world
 
 # ExternalDNS (traefik-proxy source) only provisions a record for an
