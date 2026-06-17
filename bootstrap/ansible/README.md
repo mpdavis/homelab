@@ -19,7 +19,6 @@ Hosts are defined in `inventory/hosts.yml` and organized into groups:
 | `k3s_server` | k3s-server | k3s control plane |
 | `k3s_agent` | k3s-agent-1, k3s-agent-gpu | k3s worker nodes |
 | `k3s_cluster` | (all k3s nodes) | Parent group for k3s |
-| `git_mirror` | gitea | Local Gitea git mirror |
 
 ## Playbooks
 
@@ -40,11 +39,10 @@ Run these after a fresh Proxmox VE install on each node.
 
 ### Node Configuration
 
-Run these after Tofu has provisioned the LXC containers and VMs.
+Run this after Tofu has provisioned the LXC containers and VMs.
 
 | Playbook | Target | Description |
 |----------|--------|-------------|
-| `setup-gitea.yml` | `git_mirror` | Installs Gitea and configures a mirror of the GitHub repo. Prompts for admin credentials. |
 | `site.yml` | `k3s_cluster` | Installs k3s (server + agents), applies common/lxc/vm/gpu roles as needed. |
 
 ### Cluster Bootstrap
@@ -66,8 +64,7 @@ ansible-playbook playbooks/setup-pve-cluster.yml
 # 2. Provision LXC/VMs with Tofu (not Ansible)
 # cd ../tofu/proxmox && tofu apply
 
-# 3. Configure nodes
-ansible-playbook playbooks/setup-gitea.yml
+# 3. Configure nodes and install k3s
 ansible-playbook playbooks/site.yml
 
 # 4. Bootstrap cluster services
@@ -86,4 +83,3 @@ ansible-playbook playbooks/bootstrap-flux.yml
 | `gpu` | k3s-agent-gpu | NVIDIA drivers, container toolkit, containerd config |
 | `k3s_server` | k3s-server | k3s server install |
 | `k3s_agent` | k3s agents | k3s agent install and cluster join |
-| `gitea` | gitea | Gitea binary, config, systemd service, mirror setup |

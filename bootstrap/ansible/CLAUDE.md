@@ -16,7 +16,7 @@ Only use `ansible.builtin.shell` or `ansible.builtin.command` when no built-in m
 
 ## Role Structure
 
-- Keep roles focused on a single concern (e.g., `common`, `lxc`, `vm`, `gpu`, `gitea`)
+- Keep roles focused on a single concern (e.g., `common`, `lxc`, `vm`, `gpu`, `pve`)
 - Do not mix conditional platform logic (LXC vs VM) into shared roles — use separate roles and apply them conditionally in the playbook
 - Use `defaults/main.yml` for non-sensitive configuration defaults
 - Use `templates/` for config files and systemd unit files (not inline `content:` in copy tasks)
