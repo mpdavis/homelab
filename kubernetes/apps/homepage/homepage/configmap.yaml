@@ -66,6 +66,10 @@ data:
             icon: mdi-key-variant
             href: https://ecm.mpdavis.com
             description: ECM server
+        - StreamFlow:
+            icon: mdi-sort-variant
+            href: https://streamflow.mpdavis.com
+            description: IPTV stream quality ordering
     - AI:
         - Open WebUI:
             icon: open-webui.png
