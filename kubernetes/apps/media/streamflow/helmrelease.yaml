@@ -32,7 +32,6 @@ spec:
               TZ: ${TZ}
     service:
       main:
-        nameOverride: streamflow
         controller: main
         ports:
           http:
