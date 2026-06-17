@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Repo Is
 
-GitOps repository for a homelab k3s cluster managed by FluxCD (via FluxOperator). Replaces a previous single-host Docker Compose setup (deployed via doco-cd). The full design is in `docs/design.md`.
+GitOps repository for a homelab k3s cluster managed by FluxCD (via FluxOperator). The full design is in `docs/design.md`.
 
 ## Architecture
 
@@ -21,16 +21,19 @@ bootstrap/          # Pre-Flux provisioning and configuration
   ansible/          # Ansible — node configuration, k3s install, Flux bootstrap
   tofu/             # OpenTofu — LXC container + VM provisioning on Proxmox
 kubernetes/         # Flux-managed cluster state (sync root)
-  apps/             # Per-service manifests (one directory per app)
+  apps/             # Per-service manifests, grouped by namespace (ai/, media/, homepage/, hello-world/)
   infrastructure/   # Cluster infrastructure — HelmReleases, HelmRepositories, companion manifests
     sources/        # HelmRepository definitions
     controllers/    # HelmRelease definitions (install CRDs first)
     cert-manager/   # ClusterIssuer + ExternalSecret
     external-secrets/ # ClusterSecretStore + TLS
+    external-dns/   # ExternalDNS RBAC + companions (Cloudflare per-service DNS)
+    authelia/       # Authelia forward-auth (Traefik middleware)
     metallb/        # IPAddressPool + L2Advertisement
     traefik/        # Certificate + TLSStore
-    monitoring/     # Grafana ingress + ExternalSecret
+    monitoring/     # Grafana ingress + ExternalSecret + dashboards
     flux-operator/  # RBAC + IngressRoute for Flux web UI
+    flux-notifications/ # Flux Alert/Provider (GitHub commit status)
   clusters/         # Flux Kustomization entrypoints (infra.yaml, apps.yaml, flux-system/)
 docs/               # Design documents
 ```
@@ -46,19 +49,22 @@ docs/               # Design documents
 
 | StorageClass | Backing | Use Case |
 |---|---|---|
-| `nfs-nas` | Unifi NAS via NFS CSI | Media, bulk appdata, model weights, backups (ReadWriteMany) |
+| `nfs-data` | Unifi NAS `data` share via NFS provisioner | Media files (ReadWriteMany) |
+| `nfs-homelab` | Unifi NAS `homelab` share via NFS provisioner | Bulk appdata, model weights, backups (ReadWriteMany) |
 | `local-path` | Local SSD via k3s local-path-provisioner | Databases (SQLite, Postgres), Prometheus TSDB, Loki WAL (ReadWriteOnce) |
 | `longhorn` | Replicated (future) | HA storage if/when needed |
 
 ## Secrets
 
-External Secrets Operator syncs from Bitwarden Secrets Manager into Kubernetes Secrets. Secret UUIDs carry over from the previous doco-cd setup.
+External Secrets Operator syncs from Bitwarden Secrets Manager into Kubernetes Secrets. ExternalSecret CRs reference only the secret store and Bitwarden UUIDs — never secret data.
 
 ## Networking
 
 - Ingress: Traefik as single entry point for all HTTP/HTTPS (k8s and external services)
 - MetalLB VIP: `10.0.1.60`
 - Wildcard cert: `*.mpdavis.com` via cert-manager (DNS-01, Cloudflare)
+- DNS records: ExternalDNS provisions a per-service Cloudflare A record from each IngressRoute's `Host()` rule
+- Auth: Authelia forward-auth Traefik middleware protects selected services
 - Service discovery: Kubernetes-native DNS (`<service>.<namespace>.svc.cluster.local`)
 
 ## Key Tools
