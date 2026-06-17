@@ -49,8 +49,13 @@ with a space). Create the label once if it doesn't exist:
 gh label create "new service" --description "Scaffold this service into the cluster via Claude" --color 0E8A16
 ```
 
-To use it: open an issue describing the service (name, image, port, storage, whether it needs a
-web UI / secrets), then add the `new service` label. Claude opens a PR you review and merge.
+To use it: open an issue with the **"Add a new service"** template
+(`.github/ISSUE_TEMPLATE/add-service.yml`) and fill in just three things — the service
+name, the target namespace, and a documentation link. The template auto-applies the
+`new service` label on submit, so no manual labeling step is needed. The workflow then
+researches the service from the documentation link (image, port, storage, ingress,
+secrets), scaffolds it per the `add-service` skill, and opens a PR you review and merge.
+You can still apply the label by hand to any free-form issue if you prefer.
 
 ## Notes
 
