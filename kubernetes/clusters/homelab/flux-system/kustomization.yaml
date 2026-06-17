@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - flux-instance.yaml
   - cluster-vars.yaml
+  - bws-secret-ids.yaml

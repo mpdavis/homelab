@@ -214,6 +214,13 @@ still used for all routes.
 Bitwarden Secrets Manager as the source of truth. ESO syncs BWSM secrets into
 Kubernetes Secrets automatically.
 
+BWSM secret UUIDs are centralized in the `bws-secret-ids` ConfigMap under
+`kubernetes/clusters/homelab/flux-system/`. Each UUID is defined once as a
+`BWS_*` key and referenced from `ExternalSecret` `remoteRef.key` fields as a
+`${BWS_*}` placeholder, resolved by Flux postBuild substitution (the same
+mechanism as `cluster-vars`). This keeps each ID in one place — referenced
+wherever needed — instead of being duplicated across manifests.
+
 ## GPU Setup
 
 ### Proxmox GPU Passthrough
@@ -277,7 +284,8 @@ homelab/
 │           ├── flux-system/
 │           │   ├── kustomization.yaml
 │           │   ├── flux-instance.yaml
-│           │   └── cluster-vars.yaml
+│           │   ├── cluster-vars.yaml
+│           │   └── bws-secret-ids.yaml
 │           ├── infra.yaml
 │           └── apps.yaml
 └── README.md

@@ -58,6 +58,8 @@ docs/               # Design documents
 
 External Secrets Operator syncs from Bitwarden Secrets Manager into Kubernetes Secrets. ExternalSecret CRs reference only the secret store and Bitwarden UUIDs — never secret data.
 
+Bitwarden (BWS) secret UUIDs are centralized in the `bws-secret-ids` ConfigMap (`kubernetes/clusters/homelab/flux-system/bws-secret-ids.yaml`). Each UUID is defined once as a `BWS_*` key and referenced from an ExternalSecret's `remoteRef.key` as a `${BWS_*}` placeholder, resolved by Flux postBuild substitution (the same mechanism as `cluster-vars`). Any Flux Kustomization holding an ExternalSecret lists `bws-secret-ids` in its `spec.postBuild.substituteFrom`.
+
 ## Networking
 
 - Ingress: Traefik as single entry point for all HTTP/HTTPS (k8s and external services)

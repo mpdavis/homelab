@@ -54,8 +54,10 @@ Before writing any manifests, determine the following by asking the user (skip q
      `path: ${NAS_DATA_PATH}/media`), `ReadWriteMany`.
    - **Appdata bulk** — `nfs-homelab` storage class, `ReadWriteMany`.
    - **None** — stateless services.
-8. **Secrets** — does it need secrets from Bitwarden Secrets Manager? If so, get the Bitwarden
-   secret UUIDs and desired key names.
+8. **Secrets** — does it need secrets from Bitwarden Secrets Manager (BWS)? If so, get the BWS
+   secret UUIDs and desired key names. BWS secret UUIDs are **not** hardcoded in ExternalSecrets —
+   they live in the central `bws-secret-ids` ConfigMap and are referenced via `${BWS_*}`
+   placeholders (Step 3).
 9. **Special requirements** — GPU (`nvidia.com/gpu` + `runtimeClassName: nvidia`), node selection
    (`nodeSelector`), sidecar containers, extra environment variables, ConfigMaps, cronjob
    schedule, etc.
@@ -298,9 +300,24 @@ Conventions:
 - Homepage lives in its own namespace and reads this ConfigMap at startup — no per-service
   annotations or label-based discovery are used here; the tile is added manually.
 
-**external-secret.yaml** (only if the service needs secrets from Bitwarden):
+**external-secret.yaml** (only if the service needs secrets from Bitwarden).
+
+First, **register each BWS secret UUID centrally** — never hardcode a UUID in an ExternalSecret.
+Add a `BWS_*` key for every secret to the `bws-secret-ids` ConfigMap in
+`kubernetes/clusters/homelab/flux-system/bws-secret-ids.yaml`, grouped under a comment for the
+service:
 ```yaml
-apiVersion: external-secrets.io/v1beta1
+data:
+  # <Service Name>
+  BWS_<SERVICE>_<KEY>: "<bitwarden-uuid>"
+```
+These UUIDs are not sensitive (the actual values are fetched at runtime by ESO); the ConfigMap is
+the single source of truth so an ID is defined once and reused everywhere. Flux postBuild
+substitution resolves the `${BWS_*}` placeholders.
+
+Then reference them in the ExternalSecret via `${BWS_*}` placeholders:
+```yaml
+apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: <service-name>-secrets
@@ -314,8 +331,13 @@ spec:
   data:
     - secretKey: <key-name>
       remoteRef:
-        key: <bitwarden-uuid>
+        key: ${BWS_<SERVICE>_<KEY>}
 ```
+The `apps` Kustomization already lists `bws-secret-ids` in its `postBuild.substituteFrom`, so a
+service under `kubernetes/apps/` needs no extra wiring. (Only if you place an ExternalSecret in a
+**new** Flux Kustomization path outside `apps`/`infrastructure` would you add `bws-secret-ids` to
+that Kustomization's `substituteFrom` in `kubernetes/clusters/homelab/`.)
+
 Reference secret values inline in the app-template `env` map via `secretKeyRef:` (see
 `recyclarr`), or in an official chart's values as that chart expects.
 
@@ -376,6 +398,8 @@ render without errors. If kustomize is not available locally, at minimum verify:
   `existingClaim` matches the PVC name
 - Port numbers are consistent across HelmRelease/Service and IngressRoute
 - The image tag is pinned (no `latest`/`edge`)
+- If the service uses secrets, every `remoteRef.key` is a `${BWS_*}` placeholder backed by a key
+  in `bws-secret-ids` (no hardcoded UUIDs; placeholder name matches a ConfigMap key exactly)
 - If the service has an IngressRoute, a matching Homepage tile exists in
   `apps/homepage/configmap.yaml` and its `href` host matches the IngressRoute
 
@@ -397,4 +421,5 @@ Before considering the service complete, verify:
 - [ ] PVC uses the right StorageClass (`local-path` RWO config/DB; `nfs-data`/`nfs-homelab` RWX bulk)
 - [ ] For an official-chart service: HelmRepository added to `infrastructure/sources/` and its `kustomization.yaml`
 - [ ] No plaintext secrets — ExternalSecret + inline `secretKeyRef` for anything sensitive
+- [ ] BWS secret UUIDs registered in the central `bws-secret-ids` ConfigMap; ExternalSecret `remoteRef.key` uses a `${BWS_*}` placeholder (never a hardcoded UUID)
 - [ ] Documentation reconciled where the change touches it (`docs/design.md`, `README.md`, `CLAUDE.md` — Step 5)

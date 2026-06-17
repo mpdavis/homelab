@@ -55,6 +55,12 @@ spec:
   # controller restart. HelmRelease health gating lives in
   # infrastructure-controllers; Deployment-level gating here is tracked in an
   # issue (move Kustomize apps to HelmReleases).
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-vars
+      - kind: ConfigMap
+        name: bws-secret-ids
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -72,5 +78,11 @@ spec:
     name: flux-system
   path: ./kubernetes/infrastructure/flux-notifications
   prune: true
-  # No wait: the github-token ExternalSecret can't sync until its Bitwarden UUID
-  # is filled in, and this must not gate anything.
+  # No wait: this path contains an ExternalSecret (github-token), which Flux's
+  # wait health check can't track, and this must not gate anything.
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-vars
+      - kind: ConfigMap
+        name: bws-secret-ids

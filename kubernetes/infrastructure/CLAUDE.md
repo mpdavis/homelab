@@ -54,6 +54,12 @@ Use stable APIs only — no beta versions:
 
 - Never commit plaintext secrets — use ExternalSecret CRs (ESO + Bitwarden Secrets Manager)
 - ExternalSecret CRs contain only secret store references and UUIDs, no secret data
+- BWS secret IDs (UUIDs) are centralized in the `bws-secret-ids` ConfigMap
+  (`kubernetes/clusters/homelab/flux-system/bws-secret-ids.yaml`). Reference each
+  one from an ExternalSecret's `remoteRef.key` as a `${BWS_*}` placeholder rather
+  than hardcoding the UUID — Flux postBuild substitution resolves it. Any
+  Kustomization holding an ExternalSecret must list `bws-secret-ids` in its
+  `spec.postBuild.substituteFrom` (see `kubernetes/clusters/homelab/`).
 
 ## FluxOperator
 
