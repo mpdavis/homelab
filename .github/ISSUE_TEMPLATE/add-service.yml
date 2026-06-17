@@ -1,23 +1,25 @@
 name: Add a new service
 description: Request a new application/service be deployed to the homelab k3s cluster
 title: "Add service: <service-name>"
-labels: ["add-service"]
+# Issues from this form are auto-labeled `new service`, which triggers
+# .github/workflows/new-service.yml to research the service and open a PR.
+labels: ["new service"]
 body:
   - type: markdown
     attributes:
       value: |
-        Use this form to request a new service for the cluster. The fields mirror the
-        `add-service` skill's requirements — fill in what you know and leave anything
-        you're unsure about blank or as a question. Defaults: services are deployed as a
-        **HelmRelease** (official chart, else the bjw-s `app-template`), images are
-        **pinned** (never `latest`/`edge`), and ingress is terminated at Traefik with a
-        Homepage tile.
+        Tell us **what** to run and **where** — that's it. When you submit, this issue is
+        labeled `new service`, which kicks off automation that researches the service from
+        the documentation link below, scaffolds it following this repo's conventions
+        (HelmRelease, pinned image, Traefik ingress, Homepage tile), and opens a **PR for
+        you to review**. You don't need to figure out the image, port, storage, or secrets
+        up front — the automation proposes a first pass and flags anything it had to guess.
 
   - type: input
     id: service-name
     attributes:
       label: Service name
-      description: lowercase, kebab-case (e.g. `bazarr`, `tautulli`)
+      description: lowercase, kebab-case — used for the directory, manifests, and `<name>.mpdavis.com`
       placeholder: my-service
     validations:
       required: true
@@ -26,125 +28,33 @@ body:
     id: namespace
     attributes:
       label: Namespace
-      description: Group related services together. Choose an existing namespace or request a new one.
+      description: Which namespace this belongs to. Pick an existing group or request a new one.
       options:
         - media (arr apps, players, download clients, request managers)
         - ai (inference / model serving)
-        - New namespace (describe in "Additional context")
-      default: 0
-    validations:
-      required: true
-
-  - type: dropdown
-    id: deployment-type
-    attributes:
-      label: Deployment type
-      description: Default is a HelmRelease. Plain Kustomize is a fallback only.
-      options:
-        - HelmRelease — bjw-s app-template (default)
-        - HelmRelease — official/community chart
-        - Plain Kustomize manifests (only if neither chart fits)
+        - New namespace (name it in "Anything else")
       default: 0
     validations:
       required: true
 
   - type: input
-    id: chart
+    id: docs
     attributes:
-      label: Chart (official-chart deployments only)
-      description: Chart name + repo URL (prefer `oci://`). Leave blank for app-template / Kustomize.
-      placeholder: "ollama — oci://ghcr.io/otwld/ollama-helm"
-    validations:
-      required: false
-
-  - type: input
-    id: image
-    attributes:
-      label: Container image (pinned)
-      description: Full image reference pinned to a tag or digest. No `latest`/`edge` — the image-pin-check workflow will fail the PR.
-      placeholder: ghcr.io/recyclarr/recyclarr:7.4.1
+      label: Documentation link
+      description: >
+        A link the automation can research from — the project's docs, GitHub repo,
+        Docker image page, or Helm chart. Used to determine the image, port, storage,
+        ingress, and any secrets.
+      placeholder: https://github.com/org/project
     validations:
       required: true
-
-  - type: input
-    id: port
-    attributes:
-      label: Primary HTTP port
-      description: The container's primary HTTP port. Leave blank if the service has no web port.
-      placeholder: "8080"
-    validations:
-      required: false
-
-  - type: dropdown
-    id: ingress
-    attributes:
-      label: Needs ingress (web UI)?
-      description: Exposes a web UI at `<service-name>.mpdavis.com` via Traefik. A web UI also requires a Homepage tile (below).
-      options:
-        - "Yes — exposed at <service-name>.mpdavis.com"
-        - "No — no web UI / internal only"
-      default: 0
-    validations:
-      required: true
-
-  - type: input
-    id: homepage
-    attributes:
-      label: Homepage tile (required if it has ingress)
-      description: Section (Media, IPTV, AI, Infrastructure, …) and a one-line description for the dashboard tile.
-      placeholder: "Media — Subtitle management for the library"
-    validations:
-      required: false
-
-  - type: dropdown
-    id: storage
-    attributes:
-      label: Persistent storage
-      description: What the service needs to persist. Choose all that apply in "Additional context" if more than one.
-      multiple: true
-      options:
-        - Config/database — local-path, ReadWriteOnce
-        - Media — nfs-data / inline NFS, ReadWriteMany
-        - Appdata bulk — nfs-homelab, ReadWriteMany
-        - None — stateless
-    validations:
-      required: true
-
-  - type: input
-    id: storage-size
-    attributes:
-      label: Config storage size
-      description: Requested size for the config/DB PVC (typical 2–5Gi). Leave blank for the default.
-      placeholder: 2Gi
-    validations:
-      required: false
 
   - type: textarea
-    id: secrets
+    id: notes
     attributes:
-      label: Secrets (Bitwarden Secrets Manager)
-      description: List each secret as `key-name → Bitwarden UUID`. Synced via ExternalSecret — never paste secret values here.
-      placeholder: |
-        api-key → 00000000-0000-0000-0000-000000000000
-    validations:
-      required: false
-
-  - type: checkboxes
-    id: special
-    attributes:
-      label: Special requirements
-      description: Check anything that applies and explain in "Additional context".
-      options:
-        - label: GPU (nvidia.com/gpu + runtimeClassName nvidia)
-        - label: Node selection (nodeSelector)
-        - label: Sidecar container(s)
-        - label: Extra environment variables / ConfigMap
-        - label: Scheduled job (cronjob)
-
-  - type: textarea
-    id: context
-    attributes:
-      label: Additional context
-      description: New-namespace details, links to docs/charts, multiple storage volumes, env vars, or anything else relevant.
+      label: Anything else (optional)
+      description: >
+        Anything that shouldn't be guessed — a specific image/tag, a new namespace name,
+        GPU/node requirements, or "no web UI". Leave blank to let the automation decide.
     validations:
       required: false
