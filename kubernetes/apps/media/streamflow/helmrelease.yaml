@@ -27,7 +27,8 @@ spec:
           main:
             image:
               repository: ghcr.io/krinkuto11/streamflow
-              tag: 2.5.6.1
+              tag: dev
+              pullPolicy: Always
             env:
               TZ: ${TZ}
     service:
