@@ -6,6 +6,7 @@ resources:
   - dispatcharr
   - ecm
   - emby
+  - game-thumbs
   - prowlarr
   - qbittorrent
   - radarr

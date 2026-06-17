@@ -1,0 +1,50 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: game-thumbs
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: "~5.0"
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    crds: CreateReplace
+  values:
+    controllers:
+      main:
+        containers:
+          main:
+            image:
+              # NOTE: image path follows the ghcr.io/<owner>/<repo> convention.
+              # TAG IS UNVERIFIED — this environment had no network access to confirm
+              # the published tags. Replace with a real published tag before merge
+              # (the image-pin-check workflow will fail otherwise).
+              repository: ghcr.io/sethwv/game-thumbs
+              tag: REPLACE-WITH-PUBLISHED-TAG # FIXME: pin to a real published tag (no latest/edge)
+            env:
+              TZ: ${TZ}
+    service:
+      main:
+        controller: main
+        ports:
+          http:
+            # NOTE: port is a best guess (common Node.js default). Confirm against
+            # the game-thumbs Dockerfile/README and update here + ingressroute.yaml.
+            port: 3000
+    persistence:
+      config:
+        existingClaim: game-thumbs
+        globalMounts:
+          # NOTE: mount path is a best guess. Confirm the app's data directory.
+          - path: /app/data

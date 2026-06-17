@@ -53,6 +53,10 @@ data:
             icon: prowlarr.png
             href: https://prowlarr.mpdavis.com
             description: Indexer management
+        - Game Thumbs:
+            icon: mdi-image-multiple
+            href: https://game-thumbs.mpdavis.com
+            description: Game thumbnail generation
     - IPTV:
         - Dispatcharr:
             icon: mdi-television-classic
