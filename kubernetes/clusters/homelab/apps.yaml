@@ -20,3 +20,5 @@ spec:
     substituteFrom:
       - kind: ConfigMap
         name: cluster-vars
+      - kind: ConfigMap
+        name: bws-secret-ids
