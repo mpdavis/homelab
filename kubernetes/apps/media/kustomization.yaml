@@ -14,3 +14,4 @@ resources:
   - sonarr
   - streamflow
   - teamarr
+  - unpackerr
