@@ -42,7 +42,7 @@ spec:
         # detection, ...) to stdout, prefixing each line with the source
         # filename, so the full log stream lands in Loki/Grafana.
         - name: log-shipper
-          image: busybox:1.37.0
+          image: busybox:1.38.0
           command:
             - /bin/sh
             - -c
