@@ -1,10 +1,13 @@
 name: New Service
 
 # Label an issue `new service` and Claude scaffolds it into the cluster and opens
-# a PR. Unlike the on-demand `claude.yml` (which only acts on an explicit @mention),
-# this fires automatically on the label and is scoped to one job: run the
-# `add-service` skill against the issue and raise a PR for review. It never merges —
-# you stay the merge gate (the k8s-review / image-pin-check workflows run on the PR).
+# a PR. The "Add a new service" issue template applies this label automatically, so
+# the maintainer only supplies a name, namespace, and documentation link; this job
+# does the investigation. Unlike the on-demand `claude.yml` (which only acts on an
+# explicit @mention), this fires automatically on the label and is scoped to one job:
+# research the service from its docs, run the `add-service` skill, and raise a PR for
+# review. It never merges — you stay the merge gate (the k8s-review / image-pin-check
+# workflows run on the PR).
 
 on:
   issues:
@@ -36,29 +39,42 @@ jobs:
             ISSUE TITLE: ${{ github.event.issue.title }}
 
             A maintainer labeled this issue `new service`, requesting that the
-            service it describes be added to the homelab k3s/FluxCD cluster.
+            service it describes be added to the homelab k3s/FluxCD cluster. The
+            issue is intentionally lightweight: it gives the service name, a target
+            namespace, and a documentation link — NOT the full manifest details.
+            Your job is to do the investigation and propose a first path forward.
 
             Do the following:
-            1. Read CLAUDE.md in the repo root, then run the `add-service` skill
-               (.claude/skills/add-service/SKILL.md) and follow it exactly. Treat
-               the issue title and body as the requirements. Infer sensible
-               defaults from the issue and the skill's conventions where details
-               are missing — do NOT block waiting for answers. Default to a
-               HelmRelease (official chart, else the bjw-s app-template chart) as
-               the skill instructs.
-            2. Create a new branch named `new-service/<service-name>`, commit the
+            1. Read the issue with `gh issue view ${{ github.event.issue.number }}`
+               to get the service name, namespace, documentation link, and any
+               optional notes.
+            2. Research the service from the documentation link (use WebFetch; follow
+               to the project's docs, GitHub repo, Docker image page, or Helm chart as
+               needed) to determine the concrete details the skill needs: the
+               container image and a PINNED tag/digest, the primary HTTP port, whether
+               it has a web UI, what persistent storage it needs, and whether it
+               requires any secrets. Honor anything the maintainer specified in the
+               notes over your own inference.
+            3. Read CLAUDE.md in the repo root, then run the `add-service` skill
+               (.claude/skills/add-service/SKILL.md) and follow it exactly, using the
+               details you researched. Infer sensible defaults from the skill's
+               conventions where the docs are silent — do NOT block waiting for
+               answers. Default to a HelmRelease (official chart, else the bjw-s
+               app-template chart) as the skill instructs.
+            4. Create a new branch named `new-service/<service-name>`, commit the
                manifests with a clear message, and push it.
-            3. Open a pull request targeting the default branch. In the PR body,
-               summarize what was scaffolded, list any assumptions/defaults you
-               made and any details the maintainer still needs to confirm (image
-               tag, secret UUIDs, storage sizes), and include `Closes #${{ github.event.issue.number }}`.
-            4. Post one comment on the issue linking the PR.
+            5. Open a pull request targeting the default branch. In the PR body,
+               summarize what was scaffolded, cite what you learned from the docs,
+               list any assumptions/defaults you made and any details the maintainer
+               still needs to confirm (image tag, secret UUIDs, storage sizes), and
+               include `Closes #${{ github.event.issue.number }}`.
+            6. Post one comment on the issue linking the PR.
 
             Constraints: pin the image tag/digest (no latest/edge). Do not merge
-            the PR. Do not modify unrelated files. If the issue is too vague to
-            identify a service at all, comment on the issue asking for the missing
-            details instead of opening a PR.
+            the PR. Do not modify unrelated files. If you cannot identify the service
+            or a usable image even after researching the link, comment on the issue
+            asking for the missing details instead of opening a PR.
           claude_args: |
             --model claude-opus-4-8
             --max-turns 40
-            --allowedTools "Read,Write,Edit,Grep,Glob,Bash(git:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(kubectl kustomize:*),Bash(kustomize build:*)"
+            --allowedTools "Read,Write,Edit,Grep,Glob,WebFetch,Bash(git:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(kubectl kustomize:*),Bash(kustomize build:*)"
