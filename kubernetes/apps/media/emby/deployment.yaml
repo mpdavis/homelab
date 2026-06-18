@@ -57,7 +57,16 @@ spec:
                     *" $f "*) ;;
                     *)
                       tailed="$tailed $f"
-                      ( tail -n 0 -F "$f" | sed "s|^|[$(basename "$f")] |" ) &
+                      # ffmpeg transcode logs are one-shot and deleted when
+                      # the session ends; follow by descriptor (-f) so the
+                      # tail goes idle instead of spamming reopen-retry
+                      # errors. Persistent server/hardware logs rotate by
+                      # name, so follow by name (-F).
+                      if echo "$f" | grep -q "ffmpeg-transcode"; then
+                        ( tail -n 0 -f "$f" | sed "s|^|[$(basename "$f")] |" ) &
+                      else
+                        ( tail -n 0 -F "$f" | sed "s|^|[$(basename "$f")] |" ) &
+                      fi
                       ;;
                   esac
                 done
@@ -69,6 +78,11 @@ spec:
               memory: 16Mi
             limits:
               memory: 64Mi
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
           volumeMounts:
             - name: config
               mountPath: /config
