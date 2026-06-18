@@ -36,6 +36,43 @@ spec:
               mountPath: /config
             - name: media
               mountPath: /media
+        # Emby writes its real logs to files under /config/logs rather than
+        # stdout, so Promtail only ever sees the startup banner. This sidecar
+        # tails every log file (embyserver, ffmpeg transcodes, hardware
+        # detection, ...) to stdout, prefixing each line with the source
+        # filename, so the full log stream lands in Loki/Grafana.
+        - name: log-shipper
+          image: busybox:1.37.0
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              LOGDIR=/config/logs
+              tailed=""
+              while true; do
+                for f in "$LOGDIR"/*.txt; do
+                  [ -e "$f" ] || continue
+                  case " $tailed " in
+                    *" $f "*) ;;
+                    *)
+                      tailed="$tailed $f"
+                      ( tail -n 0 -F "$f" | sed "s|^|[$(basename "$f")] |" ) &
+                      ;;
+                  esac
+                done
+                sleep 15
+              done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
       volumes:
         - name: config
           persistentVolumeClaim:
