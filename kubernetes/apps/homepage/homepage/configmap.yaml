@@ -22,6 +22,9 @@ data:
       AI:
         style: row
         columns: 3
+      Documents:
+        style: row
+        columns: 3
   bookmarks.yaml: |
     - Development:
         - GitHub Repo:
@@ -75,6 +78,11 @@ data:
             icon: open-webui.png
             href: https://ai.mpdavis.com
             description: AI chat interface (Ollama)
+    - Documents:
+        - Paperless:
+            icon: paperless-ngx.png
+            href: https://paperless.mpdavis.com
+            description: Document management & OCR
     - Infrastructure:
         - Grafana:
             icon: grafana.png
