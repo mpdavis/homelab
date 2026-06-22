@@ -263,6 +263,7 @@ homelab/
 │   ├── apps/                  # grouped by namespace, one dir per service
 │   │   ├── kustomization.yaml
 │   │   ├── ai/                # ollama, open-webui
+│   │   ├── docs/              # paperless-ngx (document management)
 │   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
 │   │   ├── homepage/
 │   │   └── hello-world/
