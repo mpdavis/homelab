@@ -36,6 +36,14 @@ spec:
             image:
               repository: ghcr.io/unpackerr/unpackerr
               tag: 0.15.2
+            # Container-level hardening; the pod-level securityContext above
+            # pins uid/gid. readOnlyRootFilesystem needs the tmp emptyDir below.
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                  - ALL
             env:
               TZ: ${TZ}
               # Log to stdout so output is visible via `kubectl logs`.
@@ -47,19 +55,27 @@ spec:
                 secretKeyRef:
                   name: unpackerr-secrets
                   key: sonarr-api-key
-              UN_SONARR_0_PATHS_0: /media
+              # Where qbittorrent drops completed downloads the *arr apps import,
+              # not the whole library — avoids watching the entire media tree.
+              UN_SONARR_0_PATHS_0: /media/downloads
               # Radarr — reuses the existing recyclarr API-key secret.
               UN_RADARR_0_URL: http://radarr:7878
               UN_RADARR_0_API_KEY:
                 secretKeyRef:
                   name: unpackerr-secrets
                   key: radarr-api-key
-              UN_RADARR_0_PATHS_0: /media
+              UN_RADARR_0_PATHS_0: /media/downloads
     persistence:
       config:
         existingClaim: unpackerr
         globalMounts:
           - path: /config
+      # Writable scratch for unpackerr's extraction temp files, required because
+      # the root filesystem is mounted read-only.
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp
       # The download/media share the *arr apps and qbittorrent use. unpackerr
       # must see the completed-download paths at the same location the *arr apps
       # report, so it mounts the same NFS share at /media.
