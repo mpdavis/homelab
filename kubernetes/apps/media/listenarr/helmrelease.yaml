@@ -23,19 +23,24 @@ spec:
   values:
     controllers:
       main:
-        containers:
           main:
             image:
               # Only canary prereleases are published so far (no stable tag yet).
               repository: ghcr.io/listenarrs/listenarr
               tag: canary-1.1.0
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+            env:
             env:
               TZ: ${TZ}
-              # LinuxServer-style image — run as the uid/gid that owns the
-              # media share so library/download files land with correct ownership.
-              PUID: "1000"
-              PGID: "1000"
-              UMASK: "022"
+    defaultPodOptions:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
     service:
       main:
         controller: main
