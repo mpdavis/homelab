@@ -1,0 +1,19 @@
+title: Homelab
+favicon: https://gethomepage.dev/favicon.ico
+headerStyle: clean
+layout:
+  Media:
+    style: row
+    columns: 3
+  IPTV:
+    style: row
+    columns: 3
+  Infrastructure:
+    style: row
+    columns: 3
+  AI:
+    style: row
+    columns: 3
+  Documents:
+    style: row
+    columns: 3
