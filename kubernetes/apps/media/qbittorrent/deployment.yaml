@@ -77,10 +77,37 @@ spec:
               mountPath: /config
             - name: media
               mountPath: /media
+        # Shares the pod (gluetun) network namespace so it reports/updates the
+        # ProtonVPN exit IP — the same IP the tracker sees from torrent traffic.
+        - name: mousehole
+          image: tmmrtn/mousehole:0.5.0
+          ports:
+            - containerPort: 5010
+              name: mousehole
+          env:
+            - name: MOUSEHOLE_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mousehole-auth
+                  key: auth-password
+            # Default host allowlist is localhost-only; permit the Traefik vhost.
+            - name: MOUSEHOLE_ALLOWED_HOSTS
+              value: mousehole.mpdavis.com
+            # Served exclusively over HTTPS via Traefik — mark session cookies Secure.
+            - name: MOUSEHOLE_HTTPS_ONLY_COOKIES
+              value: "true"
+            - name: TZ
+              value: ${TZ}
+          volumeMounts:
+            - name: mousehole-data
+              mountPath: /var/lib/mousehole
       volumes:
         - name: config
           persistentVolumeClaim:
             claimName: qbittorrent-config
+        - name: mousehole-data
+          persistentVolumeClaim:
+            claimName: mousehole-data
         - name: media
           nfs:
             server: ${NAS_IP}
