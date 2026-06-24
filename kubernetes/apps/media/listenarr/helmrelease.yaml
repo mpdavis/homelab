@@ -23,6 +23,7 @@ spec:
   values:
     controllers:
       main:
+        containers:
           main:
             image:
               # Only canary prereleases are published so far (no stable tag yet).
@@ -33,7 +34,6 @@ spec:
               capabilities:
                 drop:
                   - ALL
-            env:
             env:
               TZ: ${TZ}
     defaultPodOptions:
