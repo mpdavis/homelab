@@ -61,6 +61,14 @@ Before writing any manifests, determine the following by asking the user (skip q
 9. **Special requirements** — GPU (`nvidia.com/gpu` + `runtimeClassName: nvidia`), node selection
    (`nodeSelector`), sidecar containers, extra environment variables, ConfigMaps, cronjob
    schedule, etc.
+   - **Service-link env collision** — if the app reads its own config from env vars prefixed
+     with its (upper-cased) name — e.g. `MOUSEHOLE_PORT`, `<NAME>_HOST` — they will collide with
+     the legacy Docker-style **service-link** env vars Kubernetes injects for every Service in the
+     namespace (`<SERVICENAME>_PORT=tcp://<clusterIP>:<port>`, `<SERVICENAME>_SERVICE_HOST`, …).
+     Since this repo names the Service after the app, the injected `<NAME>_PORT` shadows the app's
+     own `<NAME>_PORT` and crash-loops it (it gets a `tcp://…` URL where it expects a number). Set
+     `enableServiceLinks: false` to disable the injection (the links are unused here — containers
+     use explicit env + cluster DNS). See the gotcha in Step 3.
 
 ## Step 2: Place the Service (Namespace-Grouped Layout)
 
@@ -211,6 +219,17 @@ app-template conventions (v5):
   `globalMounts` for a simple mount, `advancedMounts` to target a specific container/path.
 - Leave the chart's `ingress:` disabled — this repo uses a standalone Traefik `IngressRoute`.
 - `${TZ}`, `${NAS_IP}`, `${NAS_DATA_PATH}` are substituted by Flux postBuild from cluster-vars.
+
+> **Gotcha — service-link env collision.** If the app reads config from env vars prefixed with
+> its own name (`<NAME>_PORT`, `<NAME>_HOST`, …), disable Kubernetes service-link env injection so
+> the Service's auto-generated `<NAME>_PORT=tcp://…` vars don't shadow the app's config and
+> crash-loop it. In app-template set it at the values root:
+> ```yaml
+> defaultPodOptions:
+>   enableServiceLinks: false
+> ```
+> For a plain Deployment (fallback), set `spec.template.spec.enableServiceLinks: false`. This bit
+> `mousehole` in the `qbittorrent` pod (its `MOUSEHOLE_PORT` got a `tcp://` URL).
 
 ### HelmRelease — official chart
 
@@ -416,6 +435,7 @@ Before considering the service complete, verify:
 - [ ] `Namespace` defined exactly once — only the group dir's `namespace.yaml` defines it (Case B)
 - [ ] `./<service>` registered in `apps/<namespace>/kustomization.yaml`; new namespace group also registered in `apps/kustomization.yaml`
 - [ ] Environment uses `${TZ}` (not a hardcoded timezone); NFS uses `${NAS_IP}`/`${NAS_DATA_PATH}`
+- [ ] If the app reads `<NAME>_*` env vars for config, `enableServiceLinks: false` is set (avoids the service-link env collision)
 - [ ] IngressRoute uses `websecure` entryPoint and `tls: {}`; Service name matches the rendered chart name
 - [ ] **Service with an IngressRoute has a Homepage tile** in `apps/homepage/configmap.yaml` (correct section, `href` matches the route)
 - [ ] PVC uses the right StorageClass (`local-path` RWO config/DB; `nfs-data`/`nfs-homelab` RWX bulk)
