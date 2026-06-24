@@ -7,6 +7,7 @@ resources:
   - ecm
   - emby
   - game-thumbs
+  - lazylibrarian
   - listenarr
   - prowlarr
   - qbittorrent

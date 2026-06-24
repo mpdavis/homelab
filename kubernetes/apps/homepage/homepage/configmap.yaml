@@ -60,6 +60,10 @@ data:
             icon: mdi-headphones
             href: https://listenarr.mpdavis.com
             description: Audiobook management
+        - LazyLibrarian:
+            icon: lazylibrarian.png
+            href: https://lazylibrarian.mpdavis.com
+            description: eBook & audiobook management
     - IPTV:
         - Dispatcharr:
             icon: mdi-television-classic
