@@ -1,0 +1,48 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ecowitt-exporter
+  namespace: monitoring
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: ecowitt-exporter
+      version: "~2.2"
+      sourceRef:
+        kind: HelmRepository
+        name: ecowitt-exporter
+        namespace: flux-system
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+  values:
+    image:
+      # Chart 2.2.2 defaults to appVersion 2.2.0; pin explicitly so the
+      # image-pin-check workflow passes and upgrades are deliberate.
+      tag: "2.3.0"
+    # The station POSTs readings to /report on port 8088; the same port
+    # serves /metrics for Prometheus.
+    service:
+      port: 8088
+    env:
+      # Units — adjust to taste. US/imperial-friendly defaults for a home station.
+      temperatureUnit: f
+      pressureUnit: in
+      windUnit: mph
+      rainUnit: in
+      irradianceUnit: wm2
+      distanceUnit: mi
+      aqiStandard: epa
+    serviceMonitor:
+      enabled: true
+      interval: 60s
+      # kube-prometheus-stack's Prometheus only selects ServiceMonitors
+      # carrying the release label of the monitoring HelmRelease.
+      additionalLabels:
+        release: monitoring
