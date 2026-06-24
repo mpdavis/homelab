@@ -14,6 +14,10 @@ spec:
       labels:
         app: qbittorrent
     spec:
+      # The mousehole Service injects legacy MOUSEHOLE_* service-link env vars
+      # (e.g. MOUSEHOLE_PORT=tcp://...), which collide with mousehole's own
+      # MOUSEHOLE_PORT config and crash it. These links are unused here.
+      enableServiceLinks: false
       # Gluetun requires /dev/net/tun which is only available on VM nodes, not LXC
       nodeSelector:
         node-type: vm
