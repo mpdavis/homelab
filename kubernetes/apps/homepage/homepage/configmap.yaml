@@ -56,6 +56,10 @@ data:
             icon: prowlarr.png
             href: https://prowlarr.mpdavis.com
             description: Indexer management
+        - Listenarr:
+            icon: mdi-headphones
+            href: https://listenarr.mpdavis.com
+            description: Audiobook management
     - IPTV:
         - Dispatcharr:
             icon: mdi-television-classic
