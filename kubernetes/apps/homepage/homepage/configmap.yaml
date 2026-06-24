@@ -52,6 +52,10 @@ data:
             icon: qbittorrent.png
             href: https://qbit.mpdavis.com
             description: Torrent client
+        - Mousehole:
+            icon: mdi-vpn
+            href: https://mousehole.mpdavis.com
+            description: VPN port-forward monitor
         - Prowlarr:
             icon: prowlarr.png
             href: https://prowlarr.mpdavis.com
