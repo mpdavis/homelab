@@ -28,7 +28,8 @@ spec:
         type: nvidia
         number: 1
       models:
-        pull: []
+        pull:
+          - qwen3:4b
     runtimeClassName: nvidia
     resources:
       limits:
