@@ -4,4 +4,12 @@ resources:
   - external-secret-grafana.yaml
   - ingress-grafana.yaml
   - dashboard-dcgm.yaml
-  - dashboard-ecowitt.yaml
+configMapGenerator:
+  - name: grafana-dashboard-ecowitt
+    namespace: monitoring
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"
+    files:
+      - ecowitt-dashboard.json
