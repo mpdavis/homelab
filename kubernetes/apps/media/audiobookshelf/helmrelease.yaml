@@ -28,8 +28,14 @@ spec:
             image:
               repository: ghcr.io/advplyr/audiobookshelf
               tag: 2.35.1
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
             env:
               TZ: ${TZ}
+              PORT: "3000"
     service:
       main:
         controller: main
