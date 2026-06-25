@@ -14,5 +14,6 @@ resources:
   - nfs-provisioner.yaml
   - nvidia.yaml
   - dcgm-exporter.yaml
+  - ecowitt-exporter.yaml
   - seerr.yaml
   - ollama.yaml
