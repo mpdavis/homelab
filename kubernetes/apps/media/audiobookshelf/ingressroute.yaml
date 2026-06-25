@@ -1,0 +1,14 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: audiobookshelf
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`audiobookshelf.mpdavis.com`)
+      kind: Rule
+      services:
+        - name: audiobookshelf
+          port: 80
+  tls: {}
