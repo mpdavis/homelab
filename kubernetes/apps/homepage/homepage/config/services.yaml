@@ -75,3 +75,7 @@
         icon: traefik.png
         href: https://traefik.mpdavis.com
         description: Ingress controller
+    - Authentik:
+        icon: authentik.png
+        href: https://authentik.mpdavis.com
+        description: Identity provider (evaluation)

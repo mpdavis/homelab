@@ -17,3 +17,4 @@ resources:
   - ecowitt-exporter.yaml
   - seerr.yaml
   - ollama.yaml
+  - authentik.yaml

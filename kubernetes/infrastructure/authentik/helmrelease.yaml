@@ -1,0 +1,64 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: authentik
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: authentik
+      version: "2026.5.3"
+      sourceRef:
+        kind: HelmRepository
+        name: authentik
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+  # Sensitive values are injected from the ESO-synced Secret, never inlined.
+  valuesFrom:
+    - kind: Secret
+      name: authentik-secrets
+      valuesKey: secret_key
+      targetPath: authentik.secret_key
+    - kind: Secret
+      name: authentik-secrets
+      valuesKey: postgresql-password
+      targetPath: authentik.postgresql.password
+    - kind: Secret
+      name: authentik-secrets
+      valuesKey: postgresql-password
+      targetPath: postgresql.auth.password
+  values:
+    # Deterministic resource names so the IngressRoute can target authentik-server.
+    fullnameOverride: authentik
+    global:
+      image:
+        repository: ghcr.io/goauthentik/server
+        tag: "2026.5.3"          # pin — matches chart appVersion
+    authentik:
+      # As of 2026.x authentik no longer requires Redis — the cache and task
+      # queue are PostgreSQL-backed, so PostgreSQL is the only datastore.
+      postgresql:
+        host: authentik-postgresql
+        name: authentik
+        user: authentik
+    server:
+      service:
+        type: ClusterIP
+    # Bundled PostgreSQL (Bitnami subchart). Fine for a test deployment; revisit
+    # an external/HA database before any production cutover.
+    postgresql:
+      enabled: true
+      auth:
+        username: authentik
+        database: authentik
+      primary:
+        persistence:
+          enabled: true
+          storageClass: local-path
+          size: 8Gi

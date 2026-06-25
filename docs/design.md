@@ -275,6 +275,7 @@ homelab/
 │   │   ├── external-secrets/
 │   │   ├── external-dns/
 │   │   ├── authelia/
+│   │   ├── authentik/         # identity provider (evaluating vs. authelia)
 │   │   ├── metallb/
 │   │   ├── traefik/
 │   │   ├── monitoring/

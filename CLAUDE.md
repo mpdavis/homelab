@@ -29,6 +29,7 @@ kubernetes/         # Flux-managed cluster state (sync root)
     external-secrets/ # ClusterSecretStore + TLS
     external-dns/   # ExternalDNS RBAC + companions (Cloudflare per-service DNS)
     authelia/       # Authelia forward-auth (Traefik middleware)
+    authentik/      # Authentik IdP (evaluation; HelmRelease + bundled Postgres)
     metallb/        # IPAddressPool + L2Advertisement
     traefik/        # Certificate + TLSStore
     monitoring/     # Grafana ingress + ExternalSecret + dashboards
