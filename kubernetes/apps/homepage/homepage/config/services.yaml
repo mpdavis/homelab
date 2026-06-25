@@ -31,6 +31,10 @@
         icon: mdi-headphones
         href: https://listenarr.mpdavis.com
         description: Audiobook management
+    - AudiobookShelf:
+        icon: audiobookshelf.png
+        href: https://audiobookshelf.mpdavis.com
+        description: Audiobook & podcast server
 - IPTV:
     - Dispatcharr:
         icon: mdi-television-classic
