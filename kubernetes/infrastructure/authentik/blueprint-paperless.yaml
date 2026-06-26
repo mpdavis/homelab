@@ -14,6 +14,18 @@ data:
     metadata:
       name: paperless-oidc
     entries:
+      # Scope mapping that emits a "groups" claim (the user's Authentik group
+      # names) so Paperless can sync group membership on login.
+      - model: authentik_providers_oauth2.scopemapping
+        state: present
+        id: scope-groups
+        identifiers:
+          name: "Paperless OIDC groups"
+        attrs:
+          scope_name: groups
+          description: "Authentik group names, for Paperless group sync"
+          expression: |
+            return {"groups": [group.name for group in request.user.ak_groups.all()]}
       - model: authentik_providers_oauth2.oauth2provider
         state: present
         id: provider-paperless
@@ -33,11 +45,7 @@ data:
             - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
             - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
             - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
-          # Authorization-code flow (+ refresh) — required, else authentik
-          # rejects the login with "Invalid grant_type for provider".
-          grant_types:
-            - authorization_code
-            - refresh_token
+            - !KeyOf scope-groups
           sub_mode: hashed_user_id
       - model: authentik_core.application
         state: present
@@ -50,3 +58,12 @@ data:
           meta_publisher: Paperless-ngx
           meta_description: Document management & OCR
           policy_engine_mode: any
+      # Authentik group whose members get the matching Paperless group's
+      # permissions via group sync. A Paperless group of the same name must
+      # exist (created in Paperless) for the mapping to take effect.
+      - model: authentik_core.group
+        state: present
+        identifiers:
+          name: Paperless Admins
+        attrs:
+          name: Paperless Admins
