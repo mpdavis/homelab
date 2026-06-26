@@ -272,6 +272,7 @@ homelab/
 │   │   ├── ai/                # ollama, open-webui
 │   │   ├── docs/              # paperless-ngx (document management)
 │   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
+│   │   ├── travel/            # trek (collaborative travel planning)
 │   │   ├── homepage/
 │   │   └── hello-world/
 │   ├── infrastructure/

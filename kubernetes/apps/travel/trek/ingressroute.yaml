@@ -1,0 +1,14 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: trek
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`trek.mpdavis.com`)
+      kind: Rule
+      services:
+        - name: trek
+          port: 3000
+  tls: {}

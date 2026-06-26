@@ -62,6 +62,11 @@
         icon: paperless-ngx.png
         href: https://paperless.mpdavis.com
         description: Document management & OCR
+- Travel:
+    - Trek:
+        icon: mdi-map-marker-path
+        href: https://trek.mpdavis.com
+        description: Collaborative travel planning
 - Infrastructure:
     - Authentik:
         icon: authentik.png
