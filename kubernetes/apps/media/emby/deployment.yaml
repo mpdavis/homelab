@@ -17,7 +17,7 @@ spec:
       runtimeClassName: nvidia
       containers:
         - name: emby
-          image: emby/embyserver:4.10.0.15
+          image: emby/embyserver:4.10.0.16
           ports:
             - containerPort: 8096
               name: http
