@@ -36,11 +36,19 @@ spec:
               value: protonvpn
             - name: VPN_TYPE
               value: openvpn
-            - name: OPENVPN_USER
+            # ProtonVPN port forwarding over OpenVPN only activates when the
+            # username carries the "+pmp" label; without it NAT-PMP never grants
+            # a forwarded port, so VPN_PORT_FORWARDING_UP_COMMAND never fires and
+            # the client shows as "not connectable" on trackers. Keep the raw
+            # credential in Bitwarden and append the suffix here via Kubernetes
+            # dependent env-var expansion.
+            - name: OPENVPN_USER_BASE
               valueFrom:
                 secretKeyRef:
                   name: protonvpn-credentials
                   key: openvpn-user
+            - name: OPENVPN_USER
+              value: "$(OPENVPN_USER_BASE)+pmp"
             - name: OPENVPN_PASSWORD
               valueFrom:
                 secretKeyRef:
