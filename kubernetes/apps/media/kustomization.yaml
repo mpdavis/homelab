@@ -9,6 +9,7 @@ resources:
   - emby
   - game-thumbs
   - listenarr
+  - podfetch
   - prowlarr
   - qbittorrent
   - radarr
