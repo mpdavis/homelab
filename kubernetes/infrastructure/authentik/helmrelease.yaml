@@ -1,0 +1,70 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: authentik
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: authentik
+      version: "~2026.5"
+      sourceRef:
+        kind: HelmRepository
+        name: authentik
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    crds: CreateReplace
+  values:
+    global:
+      # Inject secret_key, postgres password, and akadmin bootstrap creds into
+      # both the server and worker pods. Bootstrap email is non-sensitive.
+      env:
+        - name: AUTHENTIK_BOOTSTRAP_EMAIL
+          value: michael@mpdavis.com
+      envFrom:
+        - secretRef:
+            name: authentik-secrets
+
+    authentik:
+      # secret_key + postgres password come from authentik-secrets (envFrom).
+      secret_key: ""
+      error_reporting:
+        enabled: false
+      postgresql:
+        password: ""
+
+    # Ingress is handled by a standalone Traefik IngressRoute, not the chart.
+    server:
+      ingress:
+        enabled: false
+
+    # Bundled PostgreSQL (Bitnami subchart) — persistent on local SSD.
+    postgresql:
+      enabled: true
+      auth:
+        username: authentik
+        database: authentik
+        existingSecret: authentik-postgresql
+        secretKeys:
+          adminPasswordKey: postgres-password
+          userPasswordKey: password
+      primary:
+        persistence:
+          enabled: true
+          storageClass: local-path
+          size: 8Gi
+
+    # Bundled Redis (Bitnami subchart) — cache + task broker, state is ephemeral.
+    redis:
+      enabled: true
+      auth:
+        enabled: false
+      master:
+        persistence:
+          enabled: false

@@ -63,6 +63,10 @@
         href: https://paperless.mpdavis.com
         description: Document management & OCR
 - Infrastructure:
+    - Authentik:
+        icon: authentik.png
+        href: https://iam.mpdavis.com
+        description: Identity provider & SSO
     - Grafana:
         icon: grafana.png
         href: https://grafana.mpdavis.com

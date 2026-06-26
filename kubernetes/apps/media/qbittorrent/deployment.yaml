@@ -36,11 +36,16 @@ spec:
               value: protonvpn
             - name: VPN_TYPE
               value: openvpn
-            - name: OPENVPN_USER
+            # ProtonVPN port forwarding needs the "+pmp" username suffix; without
+            # it NAT-PMP grants no port and the client shows as "not connectable".
+            # Append it here so the raw Bitwarden credential stays untouched.
+            - name: OPENVPN_USER_BASE
               valueFrom:
                 secretKeyRef:
                   name: protonvpn-credentials
                   key: openvpn-user
+            - name: OPENVPN_USER
+              value: "$(OPENVPN_USER_BASE)+pmp"
             - name: OPENVPN_PASSWORD
               valueFrom:
                 secretKeyRef:
