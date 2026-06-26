@@ -4,5 +4,6 @@ namespace: authentik
 resources:
   - namespace.yaml
   - external-secret.yaml
+  - blueprint-paperless.yaml
   - helmrelease.yaml
   - ingressroute.yaml

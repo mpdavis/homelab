@@ -30,6 +30,16 @@ spec:
       envFrom:
         - secretRef:
             name: authentik-secrets
+      # Mount custom blueprints into the server + worker; the worker discovers
+      # and applies everything under /blueprints on startup.
+      volumes:
+        - name: blueprints-custom
+          configMap:
+            name: authentik-blueprint-paperless
+      volumeMounts:
+        - name: blueprints-custom
+          mountPath: /blueprints/custom
+          readOnly: true
 
     authentik:
       # secret_key + postgres password come from authentik-secrets (envFrom).

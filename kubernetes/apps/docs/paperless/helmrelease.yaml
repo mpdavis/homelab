@@ -49,6 +49,21 @@ spec:
                 secretKeyRef:
                   name: paperless-secrets
                   key: admin-password
+              # --- Authentik OIDC (SSO) ---
+              # Enable allauth's OpenID Connect provider and allow social signups
+              # so an Authentik login provisions a paperless account. The local
+              # admin above stays as a break-glass login.
+              PAPERLESS_APPS: allauth.socialaccount.providers.openid_connect
+              PAPERLESS_SOCIAL_AUTO_SIGNUP: "true"
+              PAPERLESS_SOCIALACCOUNT_ALLOW_SIGNUPS: "true"
+              # Helper var (not read by paperless) — sorts before the provider
+              # JSON below so Kubernetes expands $(OIDC_CLIENT_SECRET) into it,
+              # keeping the secret out of git.
+              OIDC_CLIENT_SECRET:
+                secretKeyRef:
+                  name: paperless-secrets
+                  key: oidc-client-secret
+              PAPERLESS_SOCIALACCOUNT_PROVIDERS: '{"openid_connect": {"APPS": [{"provider_id": "authentik", "name": "Authentik", "client_id": "2637be93cafb37442b1abb9bd89330fe", "secret": "$(OIDC_CLIENT_SECRET)", "settings": {"server_url": "https://iam.mpdavis.com/application/o/paperless/.well-known/openid-configuration"}}]}}'
           # Broker for the Celery task queue. State is ephemeral (task queue only).
           redis:
             image:
