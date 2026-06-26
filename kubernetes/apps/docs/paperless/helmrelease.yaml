@@ -60,6 +60,7 @@ spec:
               # groups on each login (grants those groups' permissions; does not
               # grant superuser/staff — that stays manual).
               PAPERLESS_SOCIAL_ACCOUNT_SYNC_GROUPS: "true"
+              
               # Helper var (not read by paperless) — sorts before the provider
               # JSON below so Kubernetes expands $(OIDC_CLIENT_SECRET) into it,
               # keeping the secret out of git.
