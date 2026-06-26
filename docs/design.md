@@ -174,6 +174,13 @@ Authelia middleware; Traefik defers the request to Authelia before proxying to
 the backend. Authelia's user database and session secrets come from Bitwarden
 via ExternalSecrets.
 
+Authentik is being introduced as a full identity provider (OIDC/SAML) to
+replace Authelia. It runs from the official Helm chart with bundled PostgreSQL
+and Redis, reachable at `iam.mpdavis.com`, and its secret key, database
+password, and `akadmin` bootstrap credentials come from Bitwarden via
+ExternalSecrets. The two run in parallel during migration; services move onto
+Authentik (Paperless first, via OIDC) before Authelia is retired.
+
 ### Service Discovery
 
 K8s native: services find each other via DNS (`<service>.<namespace>.svc.cluster.local`).
@@ -275,6 +282,7 @@ homelab/
 │   │   ├── external-secrets/
 │   │   ├── external-dns/
 │   │   ├── authelia/
+│   │   ├── authentik/
 │   │   ├── metallb/
 │   │   ├── traefik/
 │   │   ├── monitoring/
