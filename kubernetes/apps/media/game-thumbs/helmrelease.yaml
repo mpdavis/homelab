@@ -27,7 +27,7 @@ spec:
           main:
             image:
               repository: ghcr.io/sethwv/game-thumbs
-              tag: v1.9.0
+              tag: v2.0.0
             env:
               TZ: ${TZ}
             probes:
