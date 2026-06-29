@@ -35,6 +35,10 @@
         icon: audiobookshelf.png
         href: https://audiobookshelf.mpdavis.com
         description: Audiobook & podcast server
+    - PodFetch:
+        icon: mdi-podcast
+        href: https://podfetch.mpdavis.com
+        description: Podcast downloader & manager
 - IPTV:
     - Dispatcharr:
         icon: mdi-television-classic

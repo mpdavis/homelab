@@ -1,0 +1,55 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: podfetch
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: "~5.0"
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    crds: CreateReplace
+  values:
+    controllers:
+      main:
+        containers:
+          main:
+            image:
+              repository: samuel19982/podfetch
+              tag: v5.1.1
+            env:
+              TZ: ${TZ}
+              POLLING_INTERVAL: "60"
+              # SQLite DB lives on the local-path config PVC mounted at /app/db
+              DATABASE_URL: sqlite:///app/db/podcast.db
+    service:
+      main:
+        controller: main
+        ports:
+          http:
+            port: 8000
+    persistence:
+      # SQLite database + app config (RWO, local SSD)
+      db:
+        existingClaim: podfetch
+        globalMounts:
+          - path: /app/db
+      # Downloaded podcast media on the shared media NFS export. Written here so
+      # AudiobookShelf (which reads /media/podcasts) can serve the same library.
+      podcasts:
+        type: nfs
+        server: ${NAS_IP}
+        path: ${NAS_DATA_PATH}/media/podcasts
+        globalMounts:
+          - path: /app/podcasts
