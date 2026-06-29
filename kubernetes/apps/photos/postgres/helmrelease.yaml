@@ -1,0 +1,56 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: immich-postgres
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: "~5.0"
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    crds: CreateReplace
+  values:
+    controllers:
+      main:
+        # Postgres is stateful — recreate rather than roll to avoid two pods
+        # holding the same RWO volume.
+        strategy: Recreate
+        containers:
+          main:
+            # Immich requires the VectorChord/pgvecto.rs extensions; use the
+            # image Immich ships and pins in its own docker-compose. The tag is
+            # coupled to the Immich app version — bump together.
+            image:
+              repository: ghcr.io/immich-app/postgres
+              tag: 14-vectorchord0.4.3-pgvectors0.2.0
+            env:
+              TZ: ${TZ}
+              POSTGRES_DB: immich
+              POSTGRES_USER: immich
+              POSTGRES_INITDB_ARGS: "--data-checksums"
+              POSTGRES_PASSWORD:
+                secretKeyRef:
+                  name: immich-db-secret
+                  key: db-password
+    service:
+      main:
+        controller: main
+        ports:
+          postgres:
+            port: 5432
+    persistence:
+      data:
+        existingClaim: immich-postgres
+        globalMounts:
+          - path: /var/lib/postgresql/data

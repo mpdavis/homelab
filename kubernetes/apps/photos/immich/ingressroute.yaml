@@ -1,0 +1,15 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: immich
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`immich.mpdavis.com`)
+      kind: Rule
+      services:
+        # The chart names the server Service <release>-server, listening on 2283.
+        - name: immich-server
+          port: 2283
+  tls: {}

@@ -1,0 +1,58 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: immich
+spec:
+  interval: 30m
+  dependsOn:
+    - name: immich-postgres
+  chart:
+    spec:
+      chart: immich
+      version: "0.12.0"
+      sourceRef:
+        kind: HelmRepository
+        name: immich
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    crds: CreateReplace
+  values:
+    # The chart intentionally does not track Immich releases — pin the app image
+    # explicitly (applies to both the server and machine-learning controllers).
+    image:
+      tag: v2.6.3
+    # Applied to every Immich worker (server + machine-learning), as the docs
+    # require. REDIS_HOSTNAME / IMMICH_MACHINE_LEARNING_URL are templated by the
+    # chart and merged with these.
+    env:
+      TZ: ${TZ}
+      DB_HOSTNAME: immich-postgres
+      DB_USERNAME: immich
+      DB_DATABASE_NAME: immich
+      DB_PASSWORD:
+        secretKeyRef:
+          name: immich-db-secret
+          key: db-password
+    immich:
+      persistence:
+        # Photo/video library — bulk, ReadWriteMany on the NAS.
+        library:
+          existingClaim: immich-library
+    machine-learning:
+      persistence:
+        # Persist downloaded ML models so they survive pod restarts instead of
+        # re-downloading into an emptyDir.
+        cache:
+          enabled: true
+          type: persistentVolumeClaim
+          existingClaim: immich-model-cache
+    # Deploy the bundled Valkey (Redis) instance the chart wires up as
+    # <release>-valkey, which REDIS_HOSTNAME already points at.
+    valkey:
+      enabled: true

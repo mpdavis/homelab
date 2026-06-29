@@ -56,6 +56,11 @@
         icon: mdi-sort-variant
         href: https://streamflow.mpdavis.com
         description: IPTV stream quality ordering
+- Photos:
+    - Immich:
+        icon: immich.png
+        href: https://immich.mpdavis.com
+        description: Self-hosted photo & video library
 - AI:
     - Open WebUI:
         icon: open-webui.png

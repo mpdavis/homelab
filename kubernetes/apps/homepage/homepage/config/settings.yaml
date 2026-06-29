@@ -11,6 +11,9 @@ layout:
   Infrastructure:
     style: row
     columns: 3
+  Photos:
+    style: row
+    columns: 3
   AI:
     style: row
     columns: 3
