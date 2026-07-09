@@ -46,6 +46,11 @@ data:
             - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
             - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
             - !KeyOf scope-groups
+          # Authorization-code flow (+ refresh) — required, else authentik
+          # rejects the login with "Invalid grant_type for provider".
+          grant_types:
+            - authorization_code
+            - refresh_token
           sub_mode: hashed_user_id
       - model: authentik_core.application
         state: present
