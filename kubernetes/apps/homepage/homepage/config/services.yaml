@@ -1,85 +1,85 @@
 - Media:
     - Emby:
         icon: emby.png
-        href: https://emby.mpdavis.com
+        href: https://emby.${DOMAIN}
         description: Media server
     - Sonarr:
         icon: sonarr.png
-        href: https://sonarr.mpdavis.com
+        href: https://sonarr.${DOMAIN}
         description: TV series management
     - Radarr:
         icon: radarr.png
-        href: https://radarr.mpdavis.com
+        href: https://radarr.${DOMAIN}
         description: Movie management
     - Seerr:
         icon: overseerr.png
-        href: https://seerr.mpdavis.com
+        href: https://seerr.${DOMAIN}
         description: Media requests
     - qBittorrent:
         icon: qbittorrent.png
-        href: https://qbit.mpdavis.com
+        href: https://qbit.${DOMAIN}
         description: Torrent client
     - Mousehole:
         icon: mdi-vpn
-        href: https://mousehole.mpdavis.com
+        href: https://mousehole.${DOMAIN}
         description: VPN port-forward monitor
     - Prowlarr:
         icon: prowlarr.png
-        href: https://prowlarr.mpdavis.com
+        href: https://prowlarr.${DOMAIN}
         description: Indexer management
     - Listenarr:
         icon: mdi-headphones
-        href: https://listenarr.mpdavis.com
+        href: https://listenarr.${DOMAIN}
         description: Audiobook management
     - AudiobookShelf:
         icon: audiobookshelf.png
-        href: https://audiobookshelf.mpdavis.com
+        href: https://audiobookshelf.${DOMAIN}
         description: Audiobook & podcast server
     - PodFetch:
         icon: mdi-podcast
-        href: https://podfetch.mpdavis.com
+        href: https://podfetch.${DOMAIN}
         description: Podcast downloader & manager
 - IPTV:
     - Dispatcharr:
         icon: mdi-television-classic
-        href: https://dispatcharr.mpdavis.com
+        href: https://dispatcharr.${DOMAIN}
         description: IPTV stream dispatcher
     - Teamarr:
         icon: mdi-account-group
-        href: https://teamarr.mpdavis.com
+        href: https://teamarr.${DOMAIN}
         description: IPTV team management
     - ECM:
         icon: mdi-key-variant
-        href: https://ecm.mpdavis.com
+        href: https://ecm.${DOMAIN}
         description: ECM server
     - StreamFlow:
         icon: mdi-sort-variant
-        href: https://streamflow.mpdavis.com
+        href: https://streamflow.${DOMAIN}
         description: IPTV stream quality ordering
 - AI:
     - Open WebUI:
         icon: open-webui.png
-        href: https://ai.mpdavis.com
+        href: https://ai.${DOMAIN}
         description: AI chat interface (Ollama)
 - Documents:
     - Paperless:
         icon: paperless-ngx.png
-        href: https://paperless.mpdavis.com
+        href: https://paperless.${DOMAIN}
         description: Document management & OCR
 - Infrastructure:
     - Authentik:
         icon: authentik.png
-        href: https://iam.mpdavis.com
+        href: https://iam.${DOMAIN}
         description: Identity provider & SSO
     - Grafana:
         icon: grafana.png
-        href: https://grafana.mpdavis.com
+        href: https://grafana.${DOMAIN}
         description: Monitoring & dashboards
     - Flux:
         icon: flux-cd.png
-        href: https://flux.mpdavis.com
+        href: https://flux.${DOMAIN}
         description: GitOps delivery
     - Traefik:
         icon: traefik.png
-        href: https://traefik.mpdavis.com
+        href: https://traefik.${DOMAIN}
         description: Ingress controller

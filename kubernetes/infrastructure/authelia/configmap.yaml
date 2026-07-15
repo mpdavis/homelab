@@ -14,7 +14,7 @@ data:
 
     totp:
       disable: false
-      issuer: mpdavis.com
+      issuer: ${DOMAIN}
 
     authentication_backend:
       file:
@@ -32,14 +32,14 @@ data:
     access_control:
       default_policy: deny
       rules:
-        - domain: '*.mpdavis.com'
+        - domain: '*.${DOMAIN}'
           policy: one_factor
 
     session:
       name: authelia_session
       cookies:
-        - domain: mpdavis.com
-          authelia_url: https://auth.mpdavis.com
+        - domain: ${DOMAIN}
+          authelia_url: https://auth.${DOMAIN}
 
     regulation:
       max_retries: 5

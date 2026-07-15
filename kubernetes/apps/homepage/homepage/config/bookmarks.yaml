@@ -1,4 +1,4 @@
 - Development:
     - GitHub Repo:
         - abbr: GH
-          href: https://github.com/mpdavis/homelab
+          href: ${GIT_REPO_URL}

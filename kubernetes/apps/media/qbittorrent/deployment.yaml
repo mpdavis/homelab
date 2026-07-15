@@ -101,11 +101,11 @@ spec:
                   key: auth-password
             # Default host allowlist is localhost-only; permit the Traefik vhost.
             - name: MOUSEHOLE_ALLOWED_HOSTS
-              value: mousehole.mpdavis.com
+              value: mousehole.${DOMAIN}
             # Traefik terminates TLS and forwards over HTTP, so the same-origin
             # default rejects the browser's https Origin; allow it explicitly.
             - name: MOUSEHOLE_ALLOWED_ORIGINS
-              value: https://mousehole.mpdavis.com
+              value: https://mousehole.${DOMAIN}
             # Served exclusively over HTTPS via Traefik — mark session cookies Secure.
             - name: MOUSEHOLE_HTTPS_ONLY_COOKIES
               value: "true"

@@ -8,3 +8,10 @@ data:
   NAS_DATA_PATH: "/var/nfs/shared/data"
   NAS_HOMELAB_PATH: "/var/nfs/shared/homelab"
   TZ: "America/Chicago"
+  # Public-facing identity
+  DOMAIN: "mpdavis.com"
+  EMAIL: "michael@mpdavis.com"
+  GIT_REPO_URL: "https://github.com/mpdavis/homelab"
+  # Networking
+  METALLB_POOL: "10.0.1.200-10.0.1.250"
+  PUBLIC_IP: "46.110.78.19"

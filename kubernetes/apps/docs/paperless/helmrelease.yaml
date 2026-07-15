@@ -35,7 +35,7 @@ spec:
               # Redis broker runs as a sidecar in this same pod (localhost).
               PAPERLESS_REDIS: redis://localhost:6379
               # Public URL — required so paperless trusts the Traefik origin (CSRF/cookies).
-              PAPERLESS_URL: https://paperless.mpdavis.com
+              PAPERLESS_URL: https://paperless.${DOMAIN}
               PAPERLESS_PORT: "8000"
               PAPERLESS_SECRET_KEY:
                 secretKeyRef:
@@ -68,7 +68,7 @@ spec:
                 secretKeyRef:
                   name: paperless-secrets
                   key: oidc-client-secret
-              PAPERLESS_SOCIALACCOUNT_PROVIDERS: '{"openid_connect": {"SCOPE": ["openid", "profile", "email", "groups"], "APPS": [{"provider_id": "authentik", "name": "Authentik", "client_id": "2637be93cafb37442b1abb9bd89330fe", "secret": "$(OIDC_CLIENT_SECRET)", "settings": {"server_url": "https://iam.mpdavis.com/application/o/paperless/.well-known/openid-configuration"}}]}}'
+              PAPERLESS_SOCIALACCOUNT_PROVIDERS: '{"openid_connect": {"SCOPE": ["openid", "profile", "email", "groups"], "APPS": [{"provider_id": "authentik", "name": "Authentik", "client_id": "2637be93cafb37442b1abb9bd89330fe", "secret": "$(OIDC_CLIENT_SECRET)", "settings": {"server_url": "https://iam.${DOMAIN}/application/o/paperless/.well-known/openid-configuration"}}]}}'
           # Broker for the Celery task queue. State is ephemeral (task queue only).
           redis:
             image:

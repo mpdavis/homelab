@@ -34,7 +34,7 @@ spec:
     sources:
       - traefik-proxy
     domainFilters:
-      - mpdavis.com
+      - ${DOMAIN}
     # The traefik-proxy source has no LoadBalancer status to derive a target
     # from, so it only emits a record for an IngressRoute that carries an
     # explicit external-dns.alpha.kubernetes.io/target annotation. (--default-

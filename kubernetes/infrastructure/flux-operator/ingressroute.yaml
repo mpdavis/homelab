@@ -7,7 +7,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`flux.mpdavis.com`)
+    - match: Host(`flux.${DOMAIN}`)
       kind: Rule
       middlewares:
         - name: authelia

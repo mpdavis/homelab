@@ -6,7 +6,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`sonarr.mpdavis.com`)
+    - match: Host(`sonarr.${DOMAIN}`)
       kind: Rule
       middlewares:
         - name: authelia

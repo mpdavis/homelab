@@ -6,7 +6,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`qbit.mpdavis.com`)
+    - match: Host(`qbit.${DOMAIN}`)
       kind: Rule
       services:
         - name: qbittorrent
