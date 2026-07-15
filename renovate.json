@@ -40,6 +40,11 @@
       ],
       "groupName": "external-secrets",
       "dependencyDashboardApproval": true
+    },
+    {
+      "description": "WHY: Listenarr only ships canary-X.Y.Z prereleases, and Renovate's default docker versioning can't parse the 'canary-' prefix, so this regex versioning treats 'canary' as a prerelease marker to keep canary tracked now while auto-switching to a stable tag once one exists. WHEN TO REMOVE: once the image is migrated to a stable (non-canary) tag, as default docker versioning then handles plain X.Y.Z tags on its own.",
+      "matchPackageNames": ["ghcr.io/listenarrs/listenarr"],
+      "versioning": "regex:^(?:v)?(?:(?<prerelease>canary)-)?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
     }
   ]
 }
