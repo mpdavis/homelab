@@ -156,7 +156,7 @@ For workloads where you want data to survive a node failure without manual resto
 
 ```
 Internet → Cloudflare DNS (per-service A records, e.g. grafana.mpdavis.com)
-         → Router port-forward 443 → MetalLB VIP (10.0.1.60)
+         → Router port-forward 443 → MetalLB VIP (10.0.1.200)
          → Traefik (k8s IngressRoute)
          → k8s Services  OR  ExternalName/Endpoints → non-k8s services
 ```
@@ -187,7 +187,7 @@ K8s native: services find each other via DNS (`<service>.<namespace>.svc.cluster
 
 ### External Access
 
-MetalLB assigns a VIP (10.0.1.60) to the Traefik LoadBalancer service. All
+MetalLB assigns a VIP (10.0.1.200) to the Traefik LoadBalancer service. All
 HTTP(S) traffic routes through this single ingress point.
 
 ### DNS
@@ -212,7 +212,7 @@ still used for all routes.
 | 10.0.1.50 | k3s-server | LXC on pve1 | k3s control plane + workloads |
 | 10.0.1.51 | k3s-agent-1 | LXC on pve1 | k3s general workloads |
 | 10.0.1.52 | k3s-agent-gpu | VM on pve2 | k3s GPU workloads |
-| 10.0.1.60 | (MetalLB VIP) | Virtual | Traefik LoadBalancer ingress |
+| 10.0.1.200 | (MetalLB VIP) | Virtual | Traefik LoadBalancer ingress |
 
 ## Secrets Management
 
