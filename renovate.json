@@ -40,6 +40,11 @@
       ],
       "groupName": "external-secrets",
       "dependencyDashboardApproval": true
+    },
+    {
+      "description": "WHY: Listenarr has no stable release yet — upstream only publishes canary-X.Y.Z prereleases (every GitHub release is flagged prerelease, and the only image tags are canary-*). Renovate's default docker versioning can't parse the leading 'canary-' prefix, so it never proposed updates and the pinned tag went stale. This regex versioning teaches Renovate to read the semver out of the tag and treat 'canary' as a prerelease marker. Effect: while we're pinned to a canary tag, Renovate keeps bumping canary->canary (allowed because the current version is itself unstable); once upstream publishes a stable X.Y.Z (or vX.Y.Z) tag, Renovate auto-switches to it (stable outranks any prerelease) and — because default ignoreUnstable then applies to a now-stable pin — it will NOT fall back to newer canaries. WHEN TO REMOVE: once we've migrated the listenarr image to a stable (non-canary) tag, delete this rule; default docker versioning handles plain X.Y.Z tags correctly on its own.",
+      "matchPackageNames": ["ghcr.io/listenarrs/listenarr"],
+      "versioning": "regex:^(?:v)?(?:(?<prerelease>canary)-)?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
     }
   ]
 }
