@@ -11,7 +11,7 @@ resources:
 # IngressRoute that carries an explicit target annotation — IngressRoute CRDs
 # expose no LoadBalancer status to derive one from. Apply it to every
 # IngressRoute so new services get a DNS record automatically. 46.110.78.19 is
-# the public IP that forwards external traffic to Traefik's VIP (10.0.1.60).
+# the public IP that forwards external traffic to Traefik's VIP (10.0.1.200).
 patches:
   - target:
       group: traefik.io

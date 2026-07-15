@@ -41,7 +41,7 @@ spec:
     # targets does NOT cover this — it is only applied to sources that already
     # provide a target.) That annotation is injected into every IngressRoute via
     # a kustomize patch in kubernetes/{apps,infrastructure}/kustomization.yaml,
-    # pointing at the public IP that forwards to Traefik's VIP (10.0.1.60).
+    # pointing at the public IP that forwards to Traefik's VIP (10.0.1.200).
     # Full GitOps: create and delete records to match IngressRoutes. The TXT
     # registry (txtOwnerId) scopes deletion to records this instance created,
     # so manually-managed records (e.g. the apex) are never touched.

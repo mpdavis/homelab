@@ -63,7 +63,7 @@ Bitwarden (BWS) secret UUIDs are centralized in the `bws-secret-ids` ConfigMap (
 ## Networking
 
 - Ingress: Traefik as single entry point for all HTTP/HTTPS (k8s and external services)
-- MetalLB VIP: `10.0.1.60`
+- MetalLB VIP: `10.0.1.200`
 - Wildcard cert: `*.mpdavis.com` via cert-manager (DNS-01, Cloudflare)
 - DNS records: ExternalDNS provisions a per-service Cloudflare A record from each IngressRoute's `Host()` rule
 - Auth: Authelia forward-auth Traefik middleware protects selected services
