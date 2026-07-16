@@ -35,22 +35,21 @@ spec:
             - name: VPN_SERVICE_PROVIDER
               value: protonvpn
             - name: VPN_TYPE
-              value: openvpn
-            # ProtonVPN port forwarding needs the "+pmp" username suffix; without
-            # it NAT-PMP grants no port and the client shows as "not connectable".
-            # Append it here so the raw Bitwarden credential stays untouched.
-            - name: OPENVPN_USER_BASE
+              value: wireguard
+            # ProtonVPN WireGuard is far more stable than OpenVPN here (no route-add
+            # errors, no healthcheck-restart loop) and keeps NAT-PMP port forwarding
+            # alive reliably. Port forwarding is unlocked by generating the WireGuard
+            # key in the ProtonVPN dashboard with "NAT-PMP (Port Forwarding)" toggled
+            # on — so the OpenVPN "+pmp" username hack is no longer needed.
+            - name: WIREGUARD_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
                   name: protonvpn-credentials
-                  key: openvpn-user
-            - name: OPENVPN_USER
-              value: "$(OPENVPN_USER_BASE)+pmp"
-            - name: OPENVPN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: protonvpn-credentials
-                  key: openvpn-password
+                  key: wireguard-private-key
+            # Copied from the "Address" line of the generated WireGuard config
+            # (ProtonVPN assigns 10.2.0.2/32).
+            - name: WIREGUARD_ADDRESSES
+              value: "10.2.0.2/32"
             - name: SERVER_COUNTRIES
               value: Netherlands
             - name: VPN_PORT_FORWARDING
