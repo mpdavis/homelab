@@ -1,0 +1,215 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: gatus
+  namespace: monitoring
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: gatus
+      version: "~1.5"
+      sourceRef:
+        kind: HelmRepository
+        name: twin
+        namespace: flux-system
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+  # The chart exposes no hostAliases value. Probes for *.mpdavis.com must hit
+  # Traefik's VIP directly — resolving the public Cloudflare records from
+  # inside the LAN would depend on NAT hairpin through the router. This still
+  # exercises Traefik routing, the wildcard cert, and Authelia forward-auth.
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: Deployment
+              name: gatus
+            patch: |
+              - op: add
+                path: /spec/template/spec/hostAliases
+                value:
+                  - ip: 10.0.1.200
+                    hostnames:
+                      - hello.mpdavis.com
+                      - home.mpdavis.com
+                      - paperless.mpdavis.com
+                      - audiobookshelf.mpdavis.com
+                      - emby.mpdavis.com
+                      - seerr.mpdavis.com
+                      - podfetch.mpdavis.com
+                      - ecm.mpdavis.com
+                      - qbit.mpdavis.com
+                      - mousehole.mpdavis.com
+                      - grafana.mpdavis.com
+                      - auth.mpdavis.com
+                      - iam.mpdavis.com
+                      - ai.mpdavis.com
+                      - dispatcharr.mpdavis.com
+                      - listenarr.mpdavis.com
+                      - prowlarr.mpdavis.com
+                      - radarr.mpdavis.com
+                      - sonarr.mpdavis.com
+                      - streamflow.mpdavis.com
+                      - teamarr.mpdavis.com
+                      - flux.mpdavis.com
+  values:
+    persistence:
+      enabled: true
+      storageClassName: local-path
+      size: 1Gi
+      mountPath: /data
+    serviceMonitor:
+      enabled: true
+      interval: 60s
+      # kube-prometheus-stack's Prometheus only selects ServiceMonitors
+      # carrying the release label of the monitoring HelmRelease.
+      labels:
+        release: monitoring
+    # Deeper per-app API checks later: create an ExternalSecret (gatus-env, in
+    # kubernetes/infrastructure/gatus/) whose keys land here via
+    #   envFrom: [secretRef: {name: gatus-env}]
+    # and reference them as ${VAR} in endpoint headers below — Gatus expands
+    # env vars when it loads its config. CAUTION: that ${VAR} syntax is shared
+    # with Flux postBuild substitution. Flux leaves undefined variables
+    # untouched, so this works — but never name a Gatus env var after a
+    # cluster-vars key or any BWS_* key, or Flux will substitute it first.
+    config:
+      # Required for the ServiceMonitor above — serves Prometheus metrics on
+      # the same port under /metrics.
+      metrics: true
+      storage:
+        type: sqlite
+        path: /data/data.db
+      # Endpoint checks run every 60s (Gatus default interval).
+      endpoints:
+        # --- external, no forward-auth: healthy == 200 after redirects ---
+        - name: hello
+          group: external-open
+          url: https://hello.mpdavis.com/
+          conditions: &open-conditions
+            - "[STATUS] == 200"
+            - "[CERTIFICATE_EXPIRATION] > 48h"
+        - name: homepage
+          group: external-open
+          url: https://home.mpdavis.com/
+          conditions: *open-conditions
+        - name: paperless
+          group: external-open
+          url: https://paperless.mpdavis.com/
+          conditions: *open-conditions
+        - name: audiobookshelf
+          group: external-open
+          url: https://audiobookshelf.mpdavis.com/
+          conditions: *open-conditions
+        - name: emby
+          group: external-open
+          url: https://emby.mpdavis.com/
+          conditions: *open-conditions
+        - name: seerr
+          group: external-open
+          url: https://seerr.mpdavis.com/
+          conditions: *open-conditions
+        - name: podfetch
+          group: external-open
+          url: https://podfetch.mpdavis.com/
+          conditions: *open-conditions
+        - name: ecm
+          group: external-open
+          url: https://ecm.mpdavis.com/
+          conditions: *open-conditions
+        - name: qbittorrent
+          group: external-open
+          url: https://qbit.mpdavis.com/
+          conditions: *open-conditions
+        - name: mousehole
+          group: external-open
+          url: https://mousehole.mpdavis.com/
+          conditions: *open-conditions
+        - name: grafana
+          group: external-open
+          url: https://grafana.mpdavis.com/login
+          conditions: *open-conditions
+        - name: authelia
+          group: external-open
+          url: https://auth.mpdavis.com/
+          conditions: *open-conditions
+        - name: authentik
+          group: external-open
+          url: https://iam.mpdavis.com/
+          conditions: *open-conditions
+        # --- Authelia forward-auth protected: healthy == 302 to the auth
+        # portal (verified live; Authelia redirects rather than 401 here).
+        # A 200 would mean the middleware is missing — that's a failure. ---
+        - name: open-webui
+          group: external-auth
+          url: https://ai.mpdavis.com/
+          client: &auth-client
+            ignore-redirect: true
+          conditions: &auth-conditions
+            - "[STATUS] == 302"
+            - "[CERTIFICATE_EXPIRATION] > 48h"
+        - name: dispatcharr
+          group: external-auth
+          url: https://dispatcharr.mpdavis.com/
+          client: *auth-client
+          conditions: *auth-conditions
+        - name: listenarr
+          group: external-auth
+          url: https://listenarr.mpdavis.com/
+          client: *auth-client
+          conditions: *auth-conditions
+        - name: prowlarr
+          group: external-auth
+          url: https://prowlarr.mpdavis.com/
+          client: *auth-client
+          conditions: *auth-conditions
+        - name: radarr
+          group: external-auth
+          url: https://radarr.mpdavis.com/
+          client: *auth-client
+          conditions: *auth-conditions
+        - name: sonarr
+          group: external-auth
+          url: https://sonarr.mpdavis.com/
+          client: *auth-client
+          conditions: *auth-conditions
+        - name: streamflow
+          group: external-auth
+          url: https://streamflow.mpdavis.com/
+          client: *auth-client
+          conditions: *auth-conditions
+        - name: teamarr
+          group: external-auth
+          url: https://teamarr.mpdavis.com/
+          client: *auth-client
+          conditions: *auth-conditions
+        - name: flux-ui
+          group: external-auth
+          url: https://flux.mpdavis.com/
+          client: *auth-client
+          conditions: *auth-conditions
+        # --- cluster-internal, no ingress ---
+        - name: prometheus
+          group: internal
+          url: http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/-/healthy
+          conditions: &internal-conditions
+            - "[STATUS] == 200"
+        - name: alertmanager
+          group: internal
+          url: http://monitoring-kube-prometheus-alertmanager.monitoring.svc.cluster.local:9093/-/healthy
+          conditions: *internal-conditions
+        - name: loki
+          group: internal
+          url: http://loki.loki.svc.cluster.local:3100/ready
+          conditions: *internal-conditions
+        - name: ollama
+          group: internal
+          url: http://ollama.ai.svc.cluster.local:11434/api/version
+          conditions: *internal-conditions
