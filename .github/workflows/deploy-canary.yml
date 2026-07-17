@@ -6,8 +6,18 @@ name: Deploy Canary
 # API (status.mpdavis.com) until every endpoint reports a healthy result
 # OBSERVED AFTER the reconcile finished (a green result from before the deploy
 # proves nothing). Posts the verdict as the `canary/gatus` commit status, which
-# deploy-health-gate.yml requires before the next PR may merge. On failure it
-# auto-opens a revert PR for this commit.
+# deploy-health-gate.yml requires before the next PR may merge.
+#
+# Regressions vs pre-existing failures: at workflow start (before Flux picks up
+# the commit) the canary snapshots which endpoints are ALREADY failing. Only a
+# pass→fail transition is blamed on this merge — it fails the canary and
+# auto-opens a revert PR. Endpoints that were already red are ignored (their
+# noise channel is the GatusEndpointDown alert, and the gate's informational
+# health report shows them on every PR), so a chronically broken service
+# neither spawns a revert PR per merge nor freezes the merge queue. Flip side:
+# once a breakage lands on main (its revert PR ignored), later merges baseline
+# it as pre-existing — the one revert PR from the offending merge is the paper
+# trail.
 #
 # workflow_dispatch re-runs the canary against current main HEAD — use it to
 # recover from a flake without reverting anything.
@@ -54,9 +64,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          post_status() { # <state> <description>
+          post_status() { # <state> <description (github rejects >140 chars)>
             gh api "repos/$REPO/statuses/$SHA" -f state="$1" -f context="$CONTEXT" \
-              -f description="$2" -f target_url="$RUN_URL" >/dev/null
+              -f description="${2:0:138}" -f target_url="$RUN_URL" >/dev/null
           }
           fail() { # <short description for commit status> <reason for revert PR>
             post_status failure "$1"
@@ -64,10 +74,39 @@ jobs:
             echo "::error::$2"
             exit 1
           }
+          fetch_statuses() {
+            curl -fsS --max-time 20 "$GATUS_URL/api/v1/endpoints/statuses?page=1&pageSize=20"
+          }
+          # Endpoints whose LATEST result is missing or failing, as a JSON
+          # array of "group/name". With $t0 > 0, a result older than t0 also
+          # counts as failing (stale ≠ verified).
+          failing_filter='[ .[] | . as $e | ($e.results | last) as $r
+            | select($r == null
+                     or ($r.success | not)
+                     or (($r.timestamp | sub("\\.[0-9]+"; "") | fromdate) < $t0))
+            | "\($e.group)/\($e.name)" ]'
 
           # Post pending immediately: other PRs' deploy-health-gate runs see the
           # context on main HEAD and wait for it instead of racing a missing one.
           post_status pending "Waiting for Flux to deploy this commit"
+
+          # --- Phase 0: baseline — what is ALREADY failing before this deploy?
+          # Flux won't pick this commit up for minutes, so "now" is pre-deploy.
+          baseline='[]'
+          baseline_ok=false
+          for _ in 1 2 3; do
+            if body="$(fetch_statuses)"; then
+              baseline="$(echo "$body" | jq -c --argjson t0 0 "$failing_filter")"
+              baseline_ok=true
+              break
+            fi
+            sleep 10
+          done
+          if [ "$baseline_ok" = "true" ]; then
+            echo "Baseline (pre-existing failures, exempt from the verdict): $baseline"
+          else
+            echo "::warning::Could not fetch a baseline from Gatus — every post-deploy failure will count as a regression."
+          fi
 
           # --- Phase 1: wait for Flux to reconcile this exact commit ---------
           deadline=$(( $(date +%s) + FLUX_TIMEOUT_SECONDS ))
@@ -105,42 +144,58 @@ jobs:
 
           T0="$(date +%s)"
           post_status pending "Deploy reconciled — verifying service health"
-          echo "Flux reconciled $SHA. Requiring every Gatus result to be green and newer than $(date -u -d "@$T0" +%FT%TZ)."
+          echo "Flux reconciled $SHA. Requiring every baseline-passing endpoint to be green with a result newer than $(date -u -d "@$T0" +%FT%TZ)."
 
-          # --- Phase 2: every endpoint green with a result newer than T0 -----
+          # --- Phase 2: no endpoint may go passing → failing -----------------
           deadline=$(( T0 + GATUS_TIMEOUT_SECONDS ))
-          failing="no data received from Gatus"
+          gatus_reachable=false
+          regressions='["no data received from Gatus"]'
           while true; do
             # pageSize paginates each endpoint's recent results; only the
             # latest matters here. curl failures just retry — Gatus itself may
             # be restarting as part of this very deploy.
-            if body="$(curl -fsS --max-time 20 "$GATUS_URL/api/v1/endpoints/statuses?page=1&pageSize=20")"; then
-              failing="$(echo "$body" | jq --argjson t0 "$T0" -r '
-                .[] | . as $e | ($e.results | last) as $r
-                | select($r == null
-                         or ($r.success | not)
-                         or (($r.timestamp | sub("\\.[0-9]+"; "") | fromdate) < $t0))
-                | "\($e.group)/\($e.name)"' | paste -sd, -)"
-              if [ -z "$failing" ]; then
-                post_status success "All Gatus endpoints healthy post-deploy"
-                echo "All endpoints report fresh, healthy results. Canary passed."
+            if body="$(fetch_statuses)"; then
+              gatus_reachable=true
+              failing="$(echo "$body" | jq -c --argjson t0 "$T0" "$failing_filter")"
+              # A failing endpoint that was NOT failing in the baseline is a
+              # regression caused by this deploy. (An endpoint this deploy
+              # newly added has no baseline entry — it must come up green.)
+              regressions="$(echo "$failing" | jq -c --argjson base "$baseline" \
+                'map(select(. as $k | ($base | index($k)) | not))')"
+              if [ "$(echo "$regressions" | jq length)" -eq 0 ]; then
+                preexisting="$(echo "$failing" | jq -r 'join(", ")')"
+                if [ -n "$preexisting" ]; then
+                  post_status success "Healthy (ignoring pre-existing failures: $preexisting)"
+                  echo "::warning::Canary passed while ignoring pre-existing failures: $preexisting"
+                else
+                  post_status success "All Gatus endpoints healthy post-deploy"
+                  echo "All endpoints report fresh, healthy results."
+                fi
+                echo "Canary passed."
                 exit 0
               fi
-              echo "  not yet fresh+green: $failing"
+              echo "  regressions not yet fresh+green: $(echo "$regressions" | jq -r 'join(", ")')"
             else
               echo "  Gatus API unreachable (may be restarting) — retrying..."
-              failing="Gatus API unreachable at $GATUS_URL"
             fi
 
             if [ "$(date +%s)" -ge "$deadline" ]; then
-              desc="Unhealthy after deploy: $failing"
-              fail "${desc:0:130}" "Endpoints still unhealthy ${GATUS_TIMEOUT_SECONDS}s after the deploy reconciled: $failing"
+              if [ "$gatus_reachable" = "false" ] && [ "$baseline_ok" = "false" ]; then
+                # Gatus was unreachable before AND after the deploy — this
+                # merge didn't break it, so opening a revert PR would be noise.
+                # Still a failure: deploying blind is not a verified deploy.
+                # Fix Gatus (or its ingress), then re-run via workflow_dispatch.
+                echo "skip_revert=true" >> "$GITHUB_OUTPUT"
+                fail "Gatus unreachable before and after deploy" "Gatus API was unreachable both before and after the deploy — cannot verify service health (not reverting: the outage predates this merge)"
+              fi
+              rlist="$(echo "$regressions" | jq -r 'join(", ")')"
+              fail "Regressions after deploy: $rlist" "Endpoints went from passing to failing after this deploy (still red ${GATUS_TIMEOUT_SECONDS}s after reconcile): $rlist"
             fi
             sleep 30
           done
 
       - name: Open revert PR
-        if: failure()
+        if: failure() && steps.canary.outputs.skip_revert != 'true'
         env:
           REASON: ${{ steps.canary.outputs.reason }}
         run: |
