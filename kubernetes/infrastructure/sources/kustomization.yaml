@@ -18,3 +18,4 @@ resources:
   - seerr.yaml
   - ollama.yaml
   - authentik.yaml
+  - twin.yaml

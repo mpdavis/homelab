@@ -1,0 +1,29 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gatus
+  namespace: monitoring
+  labels:
+    # kube-prometheus-stack's Prometheus only selects rules carrying the
+    # release label of the monitoring HelmRelease.
+    release: monitoring
+spec:
+  groups:
+    - name: gatus
+      rules:
+        - alert: GatusEndpointDown
+          expr: gatus_results_endpoint_success == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Synthetic check failing: {{ $labels.group }}/{{ $labels.name }}"
+            description: "Gatus has reported {{ $labels.group }}/{{ $labels.name }} unhealthy for 5 minutes."
+        - alert: GatusAbsent
+          expr: absent(gatus_results_endpoint_success)
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Gatus metrics absent — synthetic monitoring is blind."
+            description: "Prometheus has not scraped any gatus_results_endpoint_success series for 10 minutes. Gatus is down or its ServiceMonitor is broken."
