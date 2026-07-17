@@ -6,7 +6,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`streamflow.mpdavis.com`)
+    - match: Host(`streamflow.${DOMAIN}`)
       kind: Rule
       middlewares:
         - name: authelia

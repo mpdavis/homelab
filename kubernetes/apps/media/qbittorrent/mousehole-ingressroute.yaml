@@ -6,7 +6,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`mousehole.mpdavis.com`)
+    - match: Host(`mousehole.${DOMAIN}`)
       kind: Rule
       services:
         - name: mousehole

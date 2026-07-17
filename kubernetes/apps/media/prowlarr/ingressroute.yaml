@@ -6,7 +6,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`prowlarr.mpdavis.com`)
+    - match: Host(`prowlarr.${DOMAIN}`)
       kind: Rule
       middlewares:
         - name: authelia

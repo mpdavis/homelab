@@ -26,7 +26,7 @@ spec:
       # both the server and worker pods. Bootstrap email is non-sensitive.
       env:
         - name: AUTHENTIK_BOOTSTRAP_EMAIL
-          value: michael@mpdavis.com
+          value: ${EMAIL}
       envFrom:
         - secretRef:
             name: authentik-secrets

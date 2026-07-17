@@ -9,5 +9,5 @@ spec:
     name: letsencrypt-prod
     kind: ClusterIssuer
   dnsNames:
-    - "*.mpdavis.com"
-    - "mpdavis.com"
+    - "*.${DOMAIN}"
+    - "${DOMAIN}"

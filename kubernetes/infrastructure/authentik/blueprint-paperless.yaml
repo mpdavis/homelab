@@ -40,7 +40,7 @@ data:
           signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
           redirect_uris:
             - matching_mode: strict
-              url: https://paperless.mpdavis.com/accounts/oidc/authentik/login/callback/
+              url: https://paperless.${DOMAIN}/accounts/oidc/authentik/login/callback/
           property_mappings:
             - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
             - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
@@ -54,7 +54,7 @@ data:
         attrs:
           name: Paperless
           provider: !KeyOf provider-paperless
-          meta_launch_url: https://paperless.mpdavis.com
+          meta_launch_url: https://paperless.${DOMAIN}
           meta_publisher: Paperless-ngx
           meta_description: Document management & OCR
           policy_engine_mode: any

@@ -6,7 +6,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`audiobookshelf.mpdavis.com`)
+    - match: Host(`audiobookshelf.${DOMAIN}`)
       kind: Rule
       services:
         - name: audiobookshelf
