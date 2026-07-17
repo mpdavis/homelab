@@ -60,6 +60,12 @@ spec:
                       - teamarr.mpdavis.com
                       - flux.mpdavis.com
   values:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
     persistence:
       enabled: true
       storageClassName: local-path
