@@ -228,6 +228,49 @@ BWSM secret UUIDs are centralized in the `bws-secret-ids` ConfigMap under
 mechanism as `cluster-vars`). This keeps each ID in one place — referenced
 wherever needed — instead of being duplicated across manifests.
 
+## Deploy Verification & Synthetic Monitoring
+
+Flux applying manifests is necessary but not sufficient: the `infrastructure` and `apps`
+Kustomizations reconcile with `wait: false` (ExternalSecrets defeat kstatus health checking),
+so a merge could "deploy green" while pods crash-loop or Traefik routes nowhere. Two layers
+close that gap with one tool.
+
+### Gatus (continuous synthetic checks)
+
+Gatus runs in the `monitoring` namespace (HelmRelease in `infrastructure/controllers/`,
+companions in `infrastructure/gatus/`) and probes every service every 60s:
+
+- **Open services**: HTTP 200 + TLS certificate validity
+- **Authelia-protected services**: expect a 302 redirect to the auth portal with redirects
+  disabled — this *proves the forward-auth middleware is active* (a 200 would mean it's missing)
+- **Internal services** (Prometheus, Alertmanager, Loki, Ollama): cluster-DNS health endpoints
+
+`*.mpdavis.com` probes resolve to the Traefik VIP via a `hostAliases` patch rather than public
+DNS, so checks exercise Traefik + wildcard TLS + Authelia without depending on NAT hairpin.
+The status page is public (read-only) at `status.mpdavis.com` — required so the deploy canary
+can query it from GitHub Actions. Results export to Prometheus
+(`gatus_results_endpoint_success`); the `GatusEndpointDown` and `GatusAbsent` PrometheusRules
+alert on failures and on the monitoring itself going dark. Deeper per-app API checks (e.g.
+Radarr `/api/v3/health` with an API key) can be added later via an ExternalSecret exposed to
+Gatus as env vars — Gatus expands `${VAR}` in its config.
+
+### Deploy canary (per-merge verification)
+
+`deploy-canary.yml` runs on every push to `main`:
+
+1. Snapshots which endpoints are **already failing** (the baseline) before Flux picks up the
+   commit
+2. Waits for Flux's `kustomization/apps/<digest>` commit status on that exact SHA
+3. Polls the Gatus API until every endpoint is healthy **with a result newer than the
+   reconcile** — a stale green from before the deploy proves nothing
+4. Verdict as the `canary/gatus` commit status: only **passing → failing transitions** are
+   blamed on the merge (canary fails, a revert PR auto-opens); pre-existing failures are
+   exempt so a chronically red service doesn't spawn revert PRs per merge or freeze the queue
+
+`deploy-health-gate.yml` requires both the Flux status and the canary status on the current
+`main` before any PR can merge, and surfaces an informational report of already-failing
+endpoints on every PR.
+
 ## GPU Setup
 
 ### Proxmox GPU Passthrough
@@ -286,6 +329,7 @@ homelab/
 │   │   ├── metallb/
 │   │   ├── traefik/
 │   │   ├── monitoring/
+│   │   ├── gatus/             # status-page IngressRoute + PrometheusRule
 │   │   ├── flux-operator/
 │   │   └── flux-notifications/
 │   └── clusters/
@@ -318,6 +362,7 @@ homelab/
 | 2025-05-27 | FluxCD over ArgoCD | Declarative, no UI to maintain, HelmRelease per component |
 | 2025-05-27 | LXC containers over VMs | Lower overhead; VM only for GPU node (VFIO requires it) |
 | 2025-05-27 | Traefik as single ingress for all services | Routes to both k8s and external services via Service+Endpoints |
+| 2026-07-17 | Gatus for synthetic monitoring + deploy canary | One declarative tool serves both continuous health checks (→ Prometheus alerts) and post-merge deploy verification (→ commit status + auto-revert PR); baseline comparison exempts pre-existing failures from reverts |
 
 ## Deploy Sequence
 

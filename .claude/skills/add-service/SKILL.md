@@ -319,6 +319,33 @@ Conventions:
 - Homepage lives in its own namespace and reads this ConfigMap at startup — no per-service
   annotations or label-based discovery are used here; the tile is added manually.
 
+**Gatus check — required whenever the service has an IngressRoute.** Every service with a
+hostname must be probed by the synthetic-monitoring stack, in **two places** in
+`kubernetes/infrastructure/controllers/gatus.yaml`:
+
+1. An entry in `spec.values.config.endpoints`, reusing the existing anchors:
+```yaml
+        - name: <service-name>
+          group: external-open          # service is NOT behind Authelia
+          url: https://<service-name>.mpdavis.com/
+          conditions: *open-conditions
+```
+```yaml
+        - name: <service-name>
+          group: external-auth          # service IS behind the authelia middleware
+          url: https://<service-name>.mpdavis.com/
+          client: *auth-client
+          conditions: *auth-conditions
+```
+2. The hostname added to the `hostAliases` list in the `postRenderers` patch (same file) — in-cluster
+   probes resolve `*.mpdavis.com` via the Traefik VIP, not public DNS.
+
+Pick the group by whether the IngressRoute has the `authelia` middleware: protected services are
+healthy when they 302 to the auth portal; open services when they return 200. Skipping this means
+the new service is invisible to the deploy canary and to `GatusEndpointDown` alerting — but note
+the canary treats an endpoint with no baseline entry as must-pass, so once added, the service's
+first failing deploy WILL trigger a revert PR (that's the point).
+
 **external-secret.yaml** (only if the service needs secrets from Bitwarden).
 
 First, **register each BWS secret UUID centrally** — never hardcode a UUID in an ExternalSecret.
@@ -421,6 +448,9 @@ render without errors. If kustomize is not available locally, at minimum verify:
   in `bws-secret-ids` (no hardcoded UUIDs; placeholder name matches a ConfigMap key exactly)
 - If the service has an IngressRoute, a matching Homepage tile exists in
   `apps/homepage/configmap.yaml` and its `href` host matches the IngressRoute
+- If the service has an IngressRoute, `infrastructure/controllers/gatus.yaml` has BOTH a matching
+  `config.endpoints` entry (group matches the service's Authelia status) AND the hostname in the
+  `hostAliases` postRenderers patch
 
 ## Checklist
 
@@ -438,6 +468,7 @@ Before considering the service complete, verify:
 - [ ] If the app reads `<NAME>_*` env vars for config, `enableServiceLinks: false` is set (avoids the service-link env collision)
 - [ ] IngressRoute uses `websecure` entryPoint and `tls: {}`; Service name matches the rendered chart name
 - [ ] **Service with an IngressRoute has a Homepage tile** in `apps/homepage/configmap.yaml` (correct section, `href` matches the route)
+- [ ] **Service with an IngressRoute has a Gatus check** — endpoint entry (correct group: `external-open` vs `external-auth`) **and** hostname in the `hostAliases` patch, both in `infrastructure/controllers/gatus.yaml`
 - [ ] PVC uses the right StorageClass (`local-path` RWO config/DB; `nfs-data`/`nfs-homelab` RWX bulk)
 - [ ] For an official-chart service: HelmRepository added to `infrastructure/sources/` and its `kustomization.yaml`
 - [ ] No plaintext secrets — ExternalSecret + inline `secretKeyRef` for anything sensitive

@@ -32,6 +32,7 @@ kubernetes/         # Flux-managed cluster state (sync root)
     metallb/        # IPAddressPool + L2Advertisement
     traefik/        # Certificate + TLSStore
     monitoring/     # Grafana ingress + ExternalSecret + dashboards
+    gatus/          # Synthetic-monitoring companions (status page IngressRoute + PrometheusRule)
     flux-operator/  # RBAC + IngressRoute for Flux web UI
     flux-notifications/ # Flux Alert/Provider (GitHub commit status)
   clusters/         # Flux Kustomization entrypoints (infra.yaml, apps.yaml, flux-system/)
@@ -59,6 +60,30 @@ docs/               # Design documents
 External Secrets Operator syncs from Bitwarden Secrets Manager into Kubernetes Secrets. ExternalSecret CRs reference only the secret store and Bitwarden UUIDs — never secret data.
 
 Bitwarden (BWS) secret UUIDs are centralized in the `bws-secret-ids` ConfigMap (`kubernetes/clusters/homelab/flux-system/bws-secret-ids.yaml`). Each UUID is defined once as a `BWS_*` key and referenced from an ExternalSecret's `remoteRef.key` as a `${BWS_*}` placeholder, resolved by Flux postBuild substitution (the same mechanism as `cluster-vars`). Any Flux Kustomization holding an ExternalSecret lists `bws-secret-ids` in its `spec.postBuild.substituteFrom`.
+
+## Synthetic Monitoring & Deploy Canary
+
+Gatus (`kubernetes/infrastructure/controllers/gatus.yaml`, ns `monitoring`) probes every service
+every 60s; the status page is public at `status.mpdavis.com` (no Authelia — the deploy canary
+queries it from GitHub Actions). Check conventions:
+
+- Open services: `[STATUS] == 200` + cert expiry (`*open-conditions` anchor)
+- Authelia-protected services: `ignore-redirect: true` + `[STATUS] == 302` (`*auth-conditions`) —
+  a 200 would mean the forward-auth middleware is missing
+- Internal services (no ingress): cluster-DNS health endpoint, `[STATUS] == 200`
+- `*.mpdavis.com` probes resolve via a `hostAliases` postRenderers patch to the Traefik VIP
+  (no NAT-hairpin dependency)
+
+**When a service gains or loses an IngressRoute, update BOTH lists in `gatus.yaml`:** the
+`config.endpoints` entry (correct group/conditions) *and* the hostname in the `hostAliases`
+postRenderers patch. The `add-service` skill covers this for new services.
+
+Deploy pipeline: merges are serialized by `deploy-health-gate.yml`, which requires Flux's
+`kustomization/apps/<digest>` commit status **and** the `canary/gatus` status posted by
+`deploy-canary.yml`. The canary baselines what's already failing before each deploy and only
+blames the merge for passing→failing transitions — those auto-open a revert PR; pre-existing
+failures are exempt and alert via the `GatusEndpointDown` PrometheusRule instead. Details in
+`.github/workflows/README.md`.
 
 ## Networking
 
