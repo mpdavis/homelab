@@ -66,6 +66,21 @@ spec:
               value: "1.1.1.1"
             - name: TZ
               value: ${TZ}
+          # A failed NAT-PMP lease renewal clears the forwarded-port file and can
+          # leave the client unconnectable indefinitely while the pod stays
+          # Running; restart gluetun to force a fresh VPN session and port grant.
+          # (Gluetun's own healthcheck only watches VPN connectivity, not the
+          # forwarded port.)
+          startupProbe:
+            exec:
+              command: ["/bin/sh", "-c", "test -s /tmp/gluetun/forwarded_port"]
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "test -s /tmp/gluetun/forwarded_port"]
+            periodSeconds: 60
+            failureThreshold: 3
           volumeMounts:
             - name: tun
               mountPath: /dev/net/tun
