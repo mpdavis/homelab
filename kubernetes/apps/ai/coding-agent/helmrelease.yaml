@@ -61,6 +61,8 @@ spec:
                 secretKeyRef:
                   name: coding-agent-secrets
                   key: github-token
+            securityContext:
+              allowPrivilegeEscalation: false
             resources:
               requests:
                 cpu: 100m

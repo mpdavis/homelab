@@ -51,7 +51,6 @@ spec:
                       - auth.mpdavis.com
                       - iam.mpdavis.com
                       - ai.mpdavis.com
-                      - code.mpdavis.com
                       - dispatcharr.mpdavis.com
                       - listenarr.mpdavis.com
                       - prowlarr.mpdavis.com
@@ -200,11 +199,6 @@ spec:
         - name: flux-ui
           group: external-auth
           url: https://flux.mpdavis.com/
-          client: *auth-client
-          conditions: *auth-conditions
-        - name: coding-agent
-          group: external-auth
-          url: https://code.mpdavis.com/
           client: *auth-client
           conditions: *auth-conditions
         # --- cluster-internal, no ingress ---
