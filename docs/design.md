@@ -296,6 +296,11 @@ resources:
 
 - **Ollama**: Model management, OpenAI-compatible API
 - **Open WebUI**: Chat interface pointing at Ollama
+- **Coding Agent**: CloudCLI (claudecodeui) web UI driving the `claude` and
+  `opencode` CLIs from a phone/browser (`code.mpdavis.com`, Authelia-protected).
+  Custom image (`docker/coding-agent/`, built by GitHub Actions to
+  `ghcr.io/mpdavis/coding-agent`) bundles kubectl/flux/gh/git; the pod runs with
+  a read-only cluster ServiceAccount and proposes fixes via branches + PRs
 
 Model storage on NAS (Tier 1). Inference scratch/KV cache uses local memory/GPU VRAM.
 
@@ -308,11 +313,13 @@ homelab/
 ├── bootstrap/                 # Pre-Flux provisioning and configuration
 │   ├── tofu/                  # OpenTofu — LXC/VM provisioning
 │   └── ansible/               # Ansible — node config, k3s install, Flux bootstrap
+├── docker/                    # Custom images built by GitHub Actions → ghcr.io
+│   └── coding-agent/          # CloudCLI + claude/opencode CLIs + k8s tooling
 ├── kubernetes/                # Flux-managed cluster state (sync root)
 │   ├── kustomization.yaml     # Entry point — includes only Flux plumbing
 │   ├── apps/                  # grouped by namespace, one dir per service
 │   │   ├── kustomization.yaml
-│   │   ├── ai/                # ollama, open-webui
+│   │   ├── ai/                # ollama, open-webui, coding-agent
 │   │   ├── docs/              # paperless-ngx (document management)
 │   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
 │   │   ├── homepage/

@@ -61,6 +61,10 @@
         icon: open-webui.png
         href: https://ai.${DOMAIN}
         description: AI chat interface (Ollama)
+    - Coding Agent:
+        icon: claude-ai.png
+        href: https://code.${DOMAIN}
+        description: Claude Code / opencode web UI (CloudCLI)
 - Documents:
     - Paperless:
         icon: paperless-ngx.png
