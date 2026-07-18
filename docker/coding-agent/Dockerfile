@@ -17,8 +17,12 @@ ARG FLUX_VERSION=v2.9.2
 # renovate: datasource=github-releases depName=cli/cli
 ARG GH_VERSION=v2.96.0
 
+# python3/make/g++ serve double duty: node-gyp needs them when a native module
+# (better-sqlite3, from cloudcli) has no prebuilt binary, and they're useful
+# runtime tooling for a coding agent anyway.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       git curl ca-certificates jq ripgrep less procps openssh-client \
+      python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSLo /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
