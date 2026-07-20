@@ -9,8 +9,8 @@ spec:
     - match: Host(`streamflow.${DOMAIN}`)
       kind: Rule
       middlewares:
-        - name: authelia
-          namespace: authelia
+        - name: authentik-forward-auth
+          namespace: authentik
       services:
         - name: streamflow
           port: 5000

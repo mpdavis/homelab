@@ -9,8 +9,8 @@ spec:
     - match: Host(`listenarr.${DOMAIN}`)
       kind: Rule
       middlewares:
-        - name: authelia
-          namespace: authelia
+        - name: authentik-forward-auth
+          namespace: authentik
       services:
         - name: listenarr
           port: 4545
