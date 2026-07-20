@@ -9,8 +9,8 @@ spec:
     - match: Host(`teamarr.${DOMAIN}`)
       kind: Rule
       middlewares:
-        - name: authelia
-          namespace: authelia
+        - name: authentik-forward-auth
+          namespace: authentik
       services:
         - name: teamarr
           port: 9195
