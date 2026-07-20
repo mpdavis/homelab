@@ -322,6 +322,7 @@ homelab/
 │   │   ├── ai/                # ollama, open-webui, coding-agent
 │   │   ├── docs/              # paperless-ngx (document management)
 │   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
+│   │   ├── ntfy/              # ntfy (push notifications / Alertmanager sink)
 │   │   ├── travel/            # trek (travel planning)
 │   │   ├── homepage/
 │   │   └── hello-world/
