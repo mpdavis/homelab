@@ -48,6 +48,7 @@ spec:
                       - qbit.mpdavis.com
                       - mousehole.mpdavis.com
                       - grafana.mpdavis.com
+                      - ntfy.mpdavis.com
                       - auth.mpdavis.com
                       - iam.mpdavis.com
                       - ai.mpdavis.com
@@ -150,6 +151,12 @@ spec:
         - name: authentik
           group: external-open
           url: https://iam.mpdavis.com/
+          conditions: *open-conditions
+        - name: ntfy
+          group: external-open
+          # /v1/health is unauthenticated even with auth-default-access:
+          # deny-all, so it's a clean 200 liveness signal.
+          url: https://ntfy.mpdavis.com/v1/health
           conditions: *open-conditions
         - name: trek
           group: external-open

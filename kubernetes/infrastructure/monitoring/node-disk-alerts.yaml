@@ -1,0 +1,48 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: node-disk
+  namespace: monitoring
+  labels:
+    # kube-prometheus-stack's Prometheus only selects rules carrying the
+    # release label of the monitoring HelmRelease.
+    release: monitoring
+spec:
+  groups:
+    - name: node-disk
+      rules:
+        # The bundled NodeFilesystemAlmostOutOfSpace only fires at <5% free
+        # (95% full) — a node can sit at ~89% and silently trip DiskPressure
+        # first, evicting pods, before that ever alerts. This fires early, at
+        # 80% full, for real disks (>5GB, read-write), so there's time to act.
+        - alert: NodeFilesystemEarlyWarning
+          expr: |
+            (
+              node_filesystem_avail_bytes{job="node-exporter",fstype!="",mountpoint!=""}
+                / node_filesystem_size_bytes{job="node-exporter",fstype!="",mountpoint!=""} * 100 < 20
+            and
+              node_filesystem_readonly{job="node-exporter",fstype!="",mountpoint!=""} == 0
+            and
+              node_filesystem_size_bytes{job="node-exporter",fstype!="",mountpoint!=""} > 5e9
+            )
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Disk over 80% full on {{ $labels.instance }} ({{ $labels.mountpoint }})"
+            description: >-
+              {{ $labels.device }} mounted at {{ $labels.mountpoint }} on
+              {{ $labels.instance }} has only {{ printf "%.1f" $value }}% free.
+              Reclaim space before it fills and evicts pods.
+        # Definitive signal that took down the GPU node — fires regardless of
+        # which filesystem or threshold tripped kubelet.
+        - alert: NodeDiskPressure
+          expr: kube_node_status_condition{condition="DiskPressure",status="true"} == 1
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Node {{ $labels.node }} under DiskPressure"
+            description: >-
+              kubelet reports DiskPressure on {{ $labels.node }} — it is
+              evicting pods to reclaim disk. Free space on the node now.

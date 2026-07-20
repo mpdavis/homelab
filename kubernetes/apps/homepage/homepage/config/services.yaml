@@ -84,6 +84,10 @@
         icon: grafana.png
         href: https://grafana.${DOMAIN}
         description: Monitoring & dashboards
+    - ntfy:
+        icon: mdi-bell-ring
+        href: https://ntfy.${DOMAIN}
+        description: Push notifications (alerting)
     - Flux:
         icon: flux-cd.png
         href: https://flux.${DOMAIN}

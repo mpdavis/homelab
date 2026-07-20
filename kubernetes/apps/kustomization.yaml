@@ -4,6 +4,7 @@ resources:
   - ai
   - docs
   - media
+  - ntfy
   - travel
   - homepage
   - hello-world
