@@ -5,5 +5,7 @@ resources:
   - namespace.yaml
   - external-secret.yaml
   - blueprint-paperless.yaml
+  - blueprint-forward-auth.yaml
   - helmrelease.yaml
   - ingressroute.yaml
+  - middleware.yaml

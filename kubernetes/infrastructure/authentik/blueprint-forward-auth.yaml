@@ -1,0 +1,46 @@
+# Authentik blueprint for domain-level forward auth — the replacement for the
+# Authelia forwardAuth middleware (issue #287). One proxy provider + application
+# covers every *.${DOMAIN} service behind the authentik-forward-auth Traefik
+# middleware, mirroring Authelia's single one_factor rule. The provider is
+# served by the embedded outpost, so no separate outpost deployment is needed.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authentik-blueprint-forward-auth
+data:
+  forward-auth.yaml: |
+    # yaml-language-server: $schema=https://goauthentik.io/blueprints/schema.json
+    version: 1
+    metadata:
+      name: homelab-forward-auth
+    entries:
+      - model: authentik_providers_proxy.proxyprovider
+        state: present
+        id: provider-forward-auth
+        identifiers:
+          name: homelab-forward-auth
+        attrs:
+          mode: forward_domain
+          external_host: https://iam.${DOMAIN}
+          cookie_domain: ${DOMAIN}
+          authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+          invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      - model: authentik_core.application
+        state: present
+        identifiers:
+          slug: homelab
+        attrs:
+          name: Homelab
+          provider: !KeyOf provider-forward-auth
+          meta_description: Forward-auth gate for *.${DOMAIN} services
+          policy_engine_mode: any
+      # Attach the provider to the embedded outpost (identified by its managed
+      # marker). attrs.providers is the full desired list — extend it here if
+      # more proxy providers are added later.
+      - model: authentik_outposts.outpost
+        state: present
+        identifiers:
+          managed: goauthentik.io/outposts/embedded
+        attrs:
+          providers:
+            - !KeyOf provider-forward-auth
