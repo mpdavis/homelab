@@ -13,6 +13,18 @@
       "/kubernetes/.+\\.ya?ml$/"
     ]
   },
+  "customManagers": [
+    {
+      "description": "Bump tool versions pinned as annotated ARGs in custom image Dockerfiles (docker/*/Dockerfile).",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^docker/.+/Dockerfile$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\nARG [A-Z_]+=(?<currentValue>[^\\s]+)"
+      ]
+    }
+  ],
   "packageRules": [
     {
       "description": "Major version bumps usually require migration steps. Gate them behind manual approval on the dependency dashboard instead of opening PRs automatically.",
