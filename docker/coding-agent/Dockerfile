@@ -2,7 +2,7 @@
 # opencode CLIs, with the cluster/GitOps tooling (kubectl, flux, gh, git) the
 # agent needs to debug the homelab. Built by .github/workflows/build-coding-agent.yml
 # and deployed from kubernetes/apps/ai/coding-agent/.
-FROM node:22-bookworm-slim
+FROM node:24-bookworm-slim
 
 # renovate: datasource=npm depName=@cloudcli-ai/cloudcli
 ARG CLOUDCLI_VERSION=1.36.3
