@@ -12,6 +12,11 @@ resource "proxmox_download_file" "lxc_template" {
   datastore_id = "local"
   node_name    = each.key
   url          = "https://mirrors.servercentral.com/ubuntu-cloud-images/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64-root.tar.xz"
+  # Pin the cached image: with the default (true), an upstream size change at
+  # the unversioned URL forces a re-download, which cascades into destroying &
+  # recreating the LXC nodes that reference this template. false skips the size
+  # check. Flip to true for one apply to intentionally refresh the image.
+  overwrite = false
 }
 
 # --- VM Cloud Image Downloads ---
@@ -24,6 +29,9 @@ resource "proxmox_download_file" "vm_cloud_image" {
   node_name    = each.key
   url          = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
   file_name    = "noble-server-cloudimg-amd64.qcow2"
+  # See lxc_template above: pin the cached image so an upstream size change
+  # can't force a re-download and disrupt the VM that imports from it.
+  overwrite = false
 }
 
 # --- LXC Containers ---
