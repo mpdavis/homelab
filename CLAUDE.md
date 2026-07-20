@@ -69,8 +69,10 @@ every 60s; the status page is public at `status.mpdavis.com` (no Authelia — th
 queries it from GitHub Actions). Check conventions:
 
 - Open services: `[STATUS] == 200` + cert expiry (`*open-conditions` anchor)
-- Authelia-protected services: `ignore-redirect: true` + `[STATUS] == 302` (`*auth-conditions`) —
-  a 200 would mean the forward-auth middleware is missing
+- Authelia-protected services: `ignore-redirect: true` + `Accept: text/html` header
+  (`*auth-headers`) + `[STATUS] == 302` (`*auth-conditions`) — a 200 would mean the
+  forward-auth middleware is missing. The header is required: Authelia only 302-redirects
+  browser-style requests; without it (no Accept header) it returns 401
 - Internal services (no ingress): cluster-DNS health endpoint, `[STATUS] == 200`
 - `*.mpdavis.com` probes resolve via a `hostAliases` postRenderers patch to the Traefik VIP
   (no NAT-hairpin dependency)
