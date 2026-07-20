@@ -81,6 +81,23 @@ spec:
             memory: 2Gi
     alertmanager:
       alertmanagerSpec:
+        # Mount the ntfy token (Secret alertmanager-ntfy, from the ExternalSecret
+        # in infrastructure/monitoring/) as an OPTIONAL volume: this HelmRelease
+        # reconciles in infrastructure-controllers, before the ExternalSecret is
+        # applied in the later infrastructure Kustomization, so the secret may
+        # not exist yet when the AM pod rolls. optional:true lets the pod start
+        # regardless (no downtime → no false alertmanager gatus failure), and
+        # credentials_file is read per-request, so publishing starts working as
+        # soon as the token syncs.
+        volumes:
+          - name: ntfy-token
+            secret:
+              secretName: alertmanager-ntfy
+              optional: true
+        volumeMounts:
+          - name: ntfy-token
+            mountPath: /etc/alertmanager/ntfy
+            readOnly: true
         storage:
           volumeClaimTemplate:
             spec:
@@ -89,3 +106,43 @@ spec:
               resources:
                 requests:
                   storage: 2Gi
+      # Route alerts to self-hosted ntfy (ntfy.mpdavis.com, topic
+      # homelab-alerts). ntfy's tpl=1 templating turns the Alertmanager JSON
+      # into a readable title/body — no bridge needed. critical → priority 5 +
+      # rotating_light; everything else → priority 3 + warning. The token in
+      # credentials_file grants write access to the (deny-all) topic.
+      config:
+        route:
+          group_by: ["alertname", "namespace"]
+          group_wait: 30s
+          group_interval: 5m
+          repeat_interval: 4h
+          receiver: ntfy-warning
+          routes:
+            # Watchdog is an always-firing dead-man's-switch; InfoInhibitor is
+            # plumbing. Neither should page.
+            - receiver: "null"
+              matchers:
+                - alertname = "Watchdog"
+            - receiver: "null"
+              matchers:
+                - alertname = "InfoInhibitor"
+            - receiver: ntfy-critical
+              matchers:
+                - severity = "critical"
+        receivers:
+          - name: "null"
+          - name: ntfy-warning
+            webhook_configs:
+              - url: "http://ntfy.ntfy.svc.cluster.local/homelab-alerts?tpl=1&title=%7B%7Bif%20eq%20.status%20%22resolved%22%7D%7D%E2%9C%85%20%7B%7Belse%7D%7D%F0%9F%94%A5%20%7B%7Bend%7D%7D%7B%7B.commonLabels.alertname%7D%7D&message=%7B%7Brange%20.alerts%7D%7D%7B%7B.annotations.description%7D%7D%0A%7B%7Bend%7D%7D&priority=3&tags=warning"
+                send_resolved: true
+                http_config:
+                  authorization:
+                    credentials_file: /etc/alertmanager/ntfy/token
+          - name: ntfy-critical
+            webhook_configs:
+              - url: "http://ntfy.ntfy.svc.cluster.local/homelab-alerts?tpl=1&title=%7B%7Bif%20eq%20.status%20%22resolved%22%7D%7D%E2%9C%85%20%7B%7Belse%7D%7D%F0%9F%94%A5%20%7B%7Bend%7D%7D%7B%7B.commonLabels.alertname%7D%7D&message=%7B%7Brange%20.alerts%7D%7D%7B%7B.annotations.description%7D%7D%0A%7B%7Bend%7D%7D&priority=5&tags=rotating_light"
+                send_resolved: true
+                http_config:
+                  authorization:
+                    credentials_file: /etc/alertmanager/ntfy/token
