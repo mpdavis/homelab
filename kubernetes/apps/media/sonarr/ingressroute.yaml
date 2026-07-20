@@ -9,8 +9,8 @@ spec:
     - match: Host(`sonarr.${DOMAIN}`)
       kind: Rule
       middlewares:
-        - name: authelia
-          namespace: authelia
+        - name: authentik-forward-auth
+          namespace: authentik
       services:
         - name: sonarr
           port: 8989

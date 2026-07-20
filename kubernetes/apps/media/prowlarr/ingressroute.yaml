@@ -9,8 +9,8 @@ spec:
     - match: Host(`prowlarr.${DOMAIN}`)
       kind: Rule
       middlewares:
-        - name: authelia
-          namespace: authelia
+        - name: authentik-forward-auth
+          namespace: authentik
       services:
         - name: prowlarr
           port: 9696

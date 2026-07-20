@@ -9,8 +9,8 @@ spec:
     - match: Host(`dispatcharr.${DOMAIN}`)
       kind: Rule
       middlewares:
-        - name: authelia
-          namespace: authelia
+        - name: authentik-forward-auth
+          namespace: authentik
       services:
         - name: dispatcharr
           port: 9191
