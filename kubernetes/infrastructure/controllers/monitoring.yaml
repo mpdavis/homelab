@@ -32,6 +32,18 @@ spec:
       # This pre-upgrade hook Job applies the updated CRDs server-side.
       upgradeJob:
         enabled: true
+    # k3s runs the controller-manager, scheduler, and kube-proxy inside the
+    # single k3s process and does not expose the separate metrics endpoints this
+    # chart scrapes by default. Left enabled, those targets read as "down" and
+    # fire perpetual false-positive Kube*Down criticals. Disabling the component
+    # removes both the scrape and the alert. Control-plane health is still
+    # covered via the apiserver and node/kubelet metrics.
+    kubeControllerManager:
+      enabled: false
+    kubeScheduler:
+      enabled: false
+    kubeProxy:
+      enabled: false
     grafana:
       admin:
         existingSecret: grafana-admin
