@@ -31,11 +31,16 @@ spec:
         - secretRef:
             name: authentik-secrets
       # Mount custom blueprints into the server + worker; the worker discovers
-      # and applies everything under /blueprints on startup.
+      # and applies everything under /blueprints on startup. One projected
+      # volume merges all blueprint ConfigMaps into a single directory.
       volumes:
         - name: blueprints-custom
-          configMap:
-            name: authentik-blueprint-paperless
+          projected:
+            sources:
+              - configMap:
+                  name: authentik-blueprint-paperless
+              - configMap:
+                  name: authentik-blueprint-forward-auth
       volumeMounts:
         - name: blueprints-custom
           mountPath: /blueprints/custom
