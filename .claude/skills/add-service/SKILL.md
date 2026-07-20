@@ -335,6 +335,7 @@ hostname must be probed by the synthetic-monitoring stack, in **two places** in
           group: external-auth          # service IS behind the authelia middleware
           url: https://<service-name>.mpdavis.com/
           client: *auth-client
+          headers: *auth-headers        # Accept: text/html — makes Authelia 302 (not 401)
           conditions: *auth-conditions
 ```
 2. The hostname added to the `hostAliases` list in the `postRenderers` patch (same file) — in-cluster

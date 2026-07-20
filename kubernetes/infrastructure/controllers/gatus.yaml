@@ -151,13 +151,17 @@ spec:
           url: https://iam.mpdavis.com/
           conditions: *open-conditions
         # --- Authelia forward-auth protected: healthy == 302 to the auth
-        # portal (verified live; Authelia redirects rather than 401 here).
+        # portal. Authelia only redirects when the request looks like a browser
+        # navigation; with no Accept header it returns 401 (API-client path),
+        # so send `Accept: text/html` to exercise the real user-facing redirect.
         # A 200 would mean the middleware is missing — that's a failure. ---
         - name: open-webui
           group: external-auth
           url: https://ai.mpdavis.com/
           client: &auth-client
             ignore-redirect: true
+          headers: &auth-headers
+            Accept: text/html
           conditions: &auth-conditions
             - "[STATUS] == 302"
             - "[CERTIFICATE_EXPIRATION] > 48h"
@@ -165,41 +169,49 @@ spec:
           group: external-auth
           url: https://dispatcharr.mpdavis.com/
           client: *auth-client
+          headers: *auth-headers
           conditions: *auth-conditions
         - name: listenarr
           group: external-auth
           url: https://listenarr.mpdavis.com/
           client: *auth-client
+          headers: *auth-headers
           conditions: *auth-conditions
         - name: prowlarr
           group: external-auth
           url: https://prowlarr.mpdavis.com/
           client: *auth-client
+          headers: *auth-headers
           conditions: *auth-conditions
         - name: radarr
           group: external-auth
           url: https://radarr.mpdavis.com/
           client: *auth-client
+          headers: *auth-headers
           conditions: *auth-conditions
         - name: sonarr
           group: external-auth
           url: https://sonarr.mpdavis.com/
           client: *auth-client
+          headers: *auth-headers
           conditions: *auth-conditions
         - name: streamflow
           group: external-auth
           url: https://streamflow.mpdavis.com/
           client: *auth-client
+          headers: *auth-headers
           conditions: *auth-conditions
         - name: teamarr
           group: external-auth
           url: https://teamarr.mpdavis.com/
           client: *auth-client
+          headers: *auth-headers
           conditions: *auth-conditions
         - name: flux-ui
           group: external-auth
           url: https://flux.mpdavis.com/
           client: *auth-client
+          headers: *auth-headers
           conditions: *auth-conditions
         # --- cluster-internal, no ingress ---
         - name: prometheus
