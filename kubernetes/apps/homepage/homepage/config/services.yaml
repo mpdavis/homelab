@@ -70,6 +70,11 @@
         icon: paperless-ngx.png
         href: https://paperless.${DOMAIN}
         description: Document management & OCR
+- Travel:
+    - Trek:
+        icon: mdi-airplane
+        href: https://trek.${DOMAIN}
+        description: Travel planning
 - Infrastructure:
     - Authentik:
         icon: authentik.png

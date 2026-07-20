@@ -59,6 +59,7 @@ spec:
                       - streamflow.mpdavis.com
                       - teamarr.mpdavis.com
                       - flux.mpdavis.com
+                      - trek.mpdavis.com
   values:
     resources:
       requests:
@@ -149,6 +150,10 @@ spec:
         - name: authentik
           group: external-open
           url: https://iam.mpdavis.com/
+          conditions: *open-conditions
+        - name: trek
+          group: external-open
+          url: https://trek.mpdavis.com/
           conditions: *open-conditions
         # --- Authelia forward-auth protected: healthy == 302 to the auth
         # portal (verified live; Authelia redirects rather than 401 here).

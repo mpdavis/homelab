@@ -17,3 +17,6 @@ layout:
   Documents:
     style: row
     columns: 3
+  Travel:
+    style: row
+    columns: 3
