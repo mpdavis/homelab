@@ -114,7 +114,7 @@ variable "vms" {
       node        = "pve2"
       cores       = 6
       memory      = 49152
-      disk_size   = 96
+      disk_size   = 128
       ip          = "10.0.1.52"
       gpu_mapping = "gpu"
       tags        = ["k3s", "agent", "gpu"]
