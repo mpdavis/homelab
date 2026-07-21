@@ -60,8 +60,8 @@ The mechanism is sound. Two gaps:
 |---|---|---|
 | `NAS_IP`, `NAS_DATA_PATH`, `NAS_HOMELAB_PATH` | 21 manifests | Parameterized (in-git ConfigMap) |
 | `TZ` | 24+ manifests | Parameterized (in-git ConfigMap) |
-| Domain (`mpdavis.com`) | 19+ IngressRoutes, Authelia, external-dns, cert-manager | **Hardcoded** |
-| Contact email | cert-manager, Authentik, Authelia | **Hardcoded (×3)** |
+| Domain (`mpdavis.com`) | 19+ IngressRoutes, Authentik, external-dns, cert-manager | **Hardcoded** |
+| Contact email | cert-manager, Authentik | **Hardcoded (×2)** |
 | GitHub repo URL | flux-instance, Ansible bootstrap | **Hardcoded (×2)** |
 | MetalLB VIP pool (`10.0.1.200-250`) | metallb IPAddressPool | **Hardcoded** |
 | Authentik OIDC client ID (non-secret) | blueprint + paperless | **Hardcoded** |

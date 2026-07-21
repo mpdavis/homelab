@@ -29,7 +29,7 @@ kubernetes/         # Flux-managed cluster state (sync root)
     cert-manager/   # ClusterIssuer + ExternalSecret
     external-secrets/ # ClusterSecretStore + TLS
     external-dns/   # ExternalDNS RBAC + companions (Cloudflare per-service DNS)
-    authelia/       # Authelia forward-auth (Traefik middleware)
+    authentik/      # Authentik IdP (HelmRelease, blueprints, forward-auth middleware)
     metallb/        # IPAddressPool + L2Advertisement
     traefik/        # Certificate + TLSStore
     monitoring/     # Grafana ingress + ExternalSecret + dashboards
@@ -65,14 +65,14 @@ Bitwarden (BWS) secret UUIDs are centralized in the `bws-secret-ids` ConfigMap (
 ## Synthetic Monitoring & Deploy Canary
 
 Gatus (`kubernetes/infrastructure/controllers/gatus.yaml`, ns `monitoring`) probes every service
-every 60s; the status page is public at `status.mpdavis.com` (no Authelia — the deploy canary
+every 60s; the status page is public at `status.mpdavis.com` (no auth — the deploy canary
 queries it from GitHub Actions). Check conventions:
 
 - Open services: `[STATUS] == 200` + cert expiry (`*open-conditions` anchor)
-- Authelia-protected services: `ignore-redirect: true` + `Accept: text/html` header
+- Authentik-protected services: `ignore-redirect: true` + `Accept: text/html` header
   (`*auth-headers`) + `[STATUS] == 302` (`*auth-conditions`) — a 200 would mean the
-  forward-auth middleware is missing. The header is required: Authelia only 302-redirects
-  browser-style requests; without it (no Accept header) it returns 401
+  forward-auth middleware is missing. The header exercises the browser-style
+  redirect path to `iam.mpdavis.com`
 - Internal services (no ingress): cluster-DNS health endpoint, `[STATUS] == 200`
 - `*.mpdavis.com` probes resolve via a `hostAliases` postRenderers patch to the Traefik VIP
   (no NAT-hairpin dependency)
@@ -94,7 +94,7 @@ failures are exempt and alert via the `GatusEndpointDown` PrometheusRule instead
 - MetalLB VIP: `10.0.1.200`
 - Wildcard cert: `*.mpdavis.com` via cert-manager (DNS-01, Cloudflare)
 - DNS records: ExternalDNS provisions a per-service Cloudflare A record from each IngressRoute's `Host()` rule
-- Auth: Authelia forward-auth Traefik middleware protects selected services
+- Auth: Authentik forward-auth Traefik middleware (`authentik-forward-auth`, domain-level provider on the embedded outpost) protects selected services; native OIDC for apps that support it (e.g. Paperless)
 - Service discovery: Kubernetes-native DNS (`<service>.<namespace>.svc.cluster.local`)
 
 ## Key Tools

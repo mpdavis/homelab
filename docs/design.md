@@ -168,18 +168,26 @@ else.
 
 ### Authentication
 
-Authelia runs in-cluster and is wired into Traefik as a forward-auth
-middleware. IngressRoutes for services that should sit behind login attach the
-Authelia middleware; Traefik defers the request to Authelia before proxying to
-the backend. Authelia's user database and session secrets come from Bitwarden
-via ExternalSecrets.
+Authentik is the cluster's identity provider, reachable at `iam.mpdavis.com`.
+It runs from the official Helm chart with bundled PostgreSQL and Redis; its
+secret key, database password, and `akadmin` bootstrap credentials come from
+Bitwarden via ExternalSecrets. Providers and applications are managed
+declaratively as blueprint ConfigMaps mounted into the server/worker.
 
-Authentik is being introduced as a full identity provider (OIDC/SAML) to
-replace Authelia. It runs from the official Helm chart with bundled PostgreSQL
-and Redis, reachable at `iam.mpdavis.com`, and its secret key, database
-password, and `akadmin` bootstrap credentials come from Bitwarden via
-ExternalSecrets. The two run in parallel during migration; services move onto
-Authentik (Paperless first, via OIDC) before Authelia is retired.
+Two integration modes are in use:
+
+- **Forward auth** (most services): a domain-level proxy provider on the
+  embedded outpost backs the `authentik-forward-auth` Traefik middleware
+  (namespace `authentik`). IngressRoutes for services that should sit behind
+  login attach that middleware; Traefik defers each request to the outpost
+  before proxying to the backend. One provider covers `*.mpdavis.com`, so a
+  single login gives SSO across all gated services.
+- **Native OIDC** (services that support it, e.g. Paperless): a per-app OAuth2
+  provider + application blueprint, with the client secret injected from
+  Bitwarden via the environment.
+
+(Authelia previously provided forward-auth; it was replaced by Authentik in
+July 2026.)
 
 ### Service Discovery
 
@@ -241,12 +249,12 @@ Gatus runs in the `monitoring` namespace (HelmRelease in `infrastructure/control
 companions in `infrastructure/gatus/`) and probes every service every 60s:
 
 - **Open services**: HTTP 200 + TLS certificate validity
-- **Authelia-protected services**: expect a 302 redirect to the auth portal with redirects
+- **Authentik-protected services**: expect a 302 redirect to the auth portal with redirects
   disabled — this *proves the forward-auth middleware is active* (a 200 would mean it's missing)
 - **Internal services** (Prometheus, Alertmanager, Loki, Ollama): cluster-DNS health endpoints
 
 `*.mpdavis.com` probes resolve to the Traefik VIP via a `hostAliases` patch rather than public
-DNS, so checks exercise Traefik + wildcard TLS + Authelia without depending on NAT hairpin.
+DNS, so checks exercise Traefik + wildcard TLS + Authentik without depending on NAT hairpin.
 The status page is public (read-only) at `status.mpdavis.com` — required so the deploy canary
 can query it from GitHub Actions. Results export to Prometheus
 (`gatus_results_endpoint_success`); the `GatusEndpointDown` and `GatusAbsent` PrometheusRules
@@ -297,7 +305,7 @@ resources:
 - **Ollama**: Model management, OpenAI-compatible API
 - **Open WebUI**: Chat interface pointing at Ollama
 - **Coding Agent**: CloudCLI (claudecodeui) web UI driving the `claude` and
-  `opencode` CLIs from a phone/browser (`code.mpdavis.com`, Authelia-protected).
+  `opencode` CLIs from a phone/browser (`code.mpdavis.com`, Authentik-protected).
   Custom image (`docker/coding-agent/`, built by GitHub Actions to
   `ghcr.io/mpdavis/coding-agent`) bundles kubectl/flux/gh/git; the pod runs with
   a read-only cluster ServiceAccount and proposes fixes via branches + PRs
@@ -333,7 +341,6 @@ homelab/
 │   │   ├── cert-manager/
 │   │   ├── external-secrets/
 │   │   ├── external-dns/
-│   │   ├── authelia/
 │   │   ├── authentik/
 │   │   ├── metallb/
 │   │   ├── traefik/

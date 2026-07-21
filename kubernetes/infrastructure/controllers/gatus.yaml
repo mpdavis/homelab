@@ -24,7 +24,7 @@ spec:
   # The chart exposes no hostAliases value. Probes for *.mpdavis.com must hit
   # Traefik's VIP directly — resolving the public Cloudflare records from
   # inside the LAN would depend on NAT hairpin through the router. This still
-  # exercises Traefik routing, the wildcard cert, and Authelia forward-auth.
+  # exercises Traefik routing, the wildcard cert, and Authentik forward-auth.
   postRenderers:
     - kustomize:
         patches:
@@ -49,7 +49,6 @@ spec:
                       - mousehole.mpdavis.com
                       - grafana.mpdavis.com
                       - ntfy.mpdavis.com
-                      - auth.mpdavis.com
                       - iam.mpdavis.com
                       - ai.mpdavis.com
                       - code.mpdavis.com
@@ -145,10 +144,6 @@ spec:
           group: external-open
           url: https://grafana.mpdavis.com/login
           conditions: *open-conditions
-        - name: authelia
-          group: external-open
-          url: https://auth.mpdavis.com/
-          conditions: *open-conditions
         - name: authentik
           group: external-open
           url: https://iam.mpdavis.com/
@@ -163,10 +158,9 @@ spec:
           group: external-open
           url: https://trek.mpdavis.com/
           conditions: *open-conditions
-        # --- Authelia forward-auth protected: healthy == 302 to the auth
-        # portal. Authelia only redirects when the request looks like a browser
-        # navigation; with no Accept header it returns 401 (API-client path),
-        # so send `Accept: text/html` to exercise the real user-facing redirect.
+        # --- Authentik forward-auth protected: healthy == 302 to the auth
+        # portal (iam.mpdavis.com). `Accept: text/html` exercises the real
+        # user-facing browser redirect path.
         # A 200 would mean the middleware is missing — that's a failure. ---
         - name: open-webui
           group: external-auth

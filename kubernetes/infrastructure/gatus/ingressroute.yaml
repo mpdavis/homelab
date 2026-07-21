@@ -1,4 +1,4 @@
-# Public, read-only status page — deliberately NOT behind Authelia: the
+# Public, read-only status page — deliberately NOT behind Authentik: the
 # deploy-canary GitHub workflow polls /api/v1/endpoints/statuses from the
 # internet after each merge to verify the deploy actually serves traffic.
 apiVersion: traefik.io/v1alpha1
