@@ -14,4 +14,12 @@ spec:
       services:
         - name: coding-agent
           port: 3001
+    - match: Host(`meridian.${DOMAIN}`)
+      kind: Rule
+      middlewares:
+        - name: authentik-forward-auth
+          namespace: authentik
+      services:
+        - name: coding-agent-meridian
+          port: 3456
   tls: {}

@@ -61,6 +61,7 @@ spec:
                       - teamarr.mpdavis.com
                       - flux.mpdavis.com
                       - trek.mpdavis.com
+                      - meridian.mpdavis.com
   values:
     resources:
       requests:
@@ -217,6 +218,12 @@ spec:
         - name: teamarr
           group: external-auth
           url: https://teamarr.mpdavis.com/
+          client: *auth-client
+          headers: *auth-headers
+          conditions: *auth-conditions
+        - name: meridian
+          group: external-auth
+          url: https://meridian.mpdavis.com/health
           client: *auth-client
           headers: *auth-headers
           conditions: *auth-conditions

@@ -85,11 +85,14 @@ spec:
               tag: 1.54.0
             env:
               TZ: ${TZ}
-              # The proxy is unauthenticated and spends the Claude
-              # subscription: bind loopback so it is reachable only inside
-              # this pod's network namespace, not via the pod IP (the image
-              # default is 0.0.0.0).
-              CLAUDE_PROXY_HOST: "127.0.0.1"
+              # Bind all interfaces so the proxy is reachable via the
+              # Kubernetes Service and IngressRoute (local opencode).
+              # Protected by MERIDIAN_API_KEY — see external-secret.yaml.
+              CLAUDE_PROXY_HOST: "0.0.0.0"
+              MERIDIAN_API_KEY:
+                secretKeyRef:
+                  name: coding-agent-secrets
+                  key: meridian-api-key
               CLAUDE_CODE_OAUTH_TOKEN:
                 secretKeyRef:
                   name: coding-agent-secrets
@@ -99,10 +102,11 @@ spec:
               MERIDIAN_PROFILES: '[{"id":"default","oauthToken":"$(CLAUDE_CODE_OAUTH_TOKEN)"}]'
               MERIDIAN_DEFAULT_PROFILE: default
             probes:
-              # Liveness only (exec, since kubelet httpGet probes target the
-              # pod IP and Meridian binds loopback). No readiness probe: an
-              # unhealthy proxy shouldn't mark the pod unready and take the
-              # CloudCLI UI offline with it.
+              # Liveness only (exec probe targets loopback, which is always
+              # reachable inside the container network namespace regardless of
+              # the bind address). No readiness probe: an unhealthy proxy
+              # shouldn't mark the pod unready and take the CloudCLI UI
+              # offline with it.
               liveness:
                 enabled: true
                 custom: true
@@ -127,6 +131,11 @@ spec:
         ports:
           http:
             port: 3001
+      meridian:
+        controller: main
+        ports:
+          http:
+            port: 3456
     persistence:
       home:
         existingClaim: coding-agent
