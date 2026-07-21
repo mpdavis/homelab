@@ -10,8 +10,8 @@ spec:
     - match: Host(`flux.${DOMAIN}`)
       kind: Rule
       middlewares:
-        - name: authelia
-          namespace: authelia
+        - name: authentik-forward-auth
+          namespace: authentik
       services:
         - name: flux-operator
           port: 9080

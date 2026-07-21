@@ -9,8 +9,8 @@ spec:
     - match: Host(`code.${DOMAIN}`)
       kind: Rule
       middlewares:
-        - name: authelia
-          namespace: authelia
+        - name: authentik-forward-auth
+          namespace: authentik
       services:
         - name: coding-agent
           port: 3001
