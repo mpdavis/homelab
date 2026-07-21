@@ -9,8 +9,8 @@ spec:
     - match: Host(`ai.${DOMAIN}`)
       kind: Rule
       middlewares:
-        - name: authelia
-          namespace: authelia
+        - name: authentik-forward-auth
+          namespace: authentik
       services:
         - name: open-webui
           port: 8080
