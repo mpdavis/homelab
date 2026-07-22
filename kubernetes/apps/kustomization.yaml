@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - ai
   - docs
+  - external
   - media
   - ntfy
   - travel

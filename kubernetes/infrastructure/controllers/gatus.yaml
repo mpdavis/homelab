@@ -61,6 +61,8 @@ spec:
                       - teamarr.mpdavis.com
                       - flux.mpdavis.com
                       - trek.mpdavis.com
+                      - birdnet.mpdavis.com
+                      - proxmox.mpdavis.com
   values:
     resources:
       requests:
@@ -157,6 +159,16 @@ spec:
         - name: trek
           group: external-open
           url: https://trek.mpdavis.com/
+          conditions: *open-conditions
+        # External (non-k8s) LAN hosts routed through Traefik via
+        # Service+Endpoints — probed exactly like in-cluster open services.
+        - name: birdnet
+          group: external-open
+          url: https://birdnet.mpdavis.com/
+          conditions: *open-conditions
+        - name: proxmox
+          group: external-open
+          url: https://proxmox.mpdavis.com/
           conditions: *open-conditions
         # --- Authentik forward-auth protected: healthy == 302 to the auth
         # portal (iam.mpdavis.com). `Accept: text/html` exercises the real
