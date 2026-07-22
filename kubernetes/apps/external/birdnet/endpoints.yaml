@@ -1,18 +1,14 @@
-# Manual Endpoints pointing at the BirdNET host on the LAN. The port name
+# Manual Endpoints pointing at the BirdNET-Pi host on the LAN. The port name
 # (`http`) must match the Service port name; the port VALUE is the real port
 # the BirdNET web UI listens on (this is authoritative for a selector-less
 # Service — the Service's targetPort is ignored).
-#
-# TODO(placeholder): set ip + port to your actual BirdNET host.
-#   - BirdNET-Pi  → typically port 80
-#   - BirdNET-Go  → typically port 8080  (also update service.yaml port/targetPort)
 apiVersion: v1
 kind: Endpoints
 metadata:
   name: birdnet
 subsets:
   - addresses:
-      - ip: 10.0.1.50 # TODO: BirdNET host LAN IP
+      - ip: 10.0.63.190
     ports:
       - name: http
-        port: 80 # TODO: BirdNET web UI port
+        port: 80
