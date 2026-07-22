@@ -19,3 +19,8 @@ data:
     # ACL. Alertmanager publishes to the alerts topic with a token; your phone
     # reads it with a token. See docs for the one-time token/ACL setup.
     auth-default-access: "deny-all"
+
+    # Instant iOS push: forward a poll request to ntfy.sh, which delivers it
+    # via APNS. Only the message ID and a SHA256 hash of the topic URL go
+    # upstream — the device fetches the message content from this server.
+    upstream-base-url: "https://ntfy.sh"
