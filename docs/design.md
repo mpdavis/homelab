@@ -329,7 +329,8 @@ homelab/
 │   │   ├── kustomization.yaml
 │   │   ├── ai/                # ollama, open-webui, coding-agent
 │   │   ├── docs/              # paperless-ngx (document management)
-│   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
+│   │   ├── downloads/         # *arr, qbittorrent, prowlarr, recyclarr, seerr, unpackerr
+│   │   ├── media/             # emby, dispatcharr, ecm, streamflow, teamarr, ...
 │   │   ├── ntfy/              # ntfy (push notifications / Alertmanager sink)
 │   │   ├── travel/            # trek (travel planning)
 │   │   ├── homepage/

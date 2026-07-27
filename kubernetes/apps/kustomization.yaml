@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - ai
   - docs
+  - downloads
   - external
   - media
   - ntfy

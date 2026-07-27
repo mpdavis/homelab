@@ -22,7 +22,7 @@ bootstrap/          # Pre-Flux provisioning and configuration
   tofu/             # OpenTofu — LXC container + VM provisioning on Proxmox
 docker/             # Custom images built by GitHub Actions to ghcr.io (e.g. coding-agent)
 kubernetes/         # Flux-managed cluster state (sync root)
-  apps/             # Per-service manifests, grouped by namespace (ai/, media/, homepage/, hello-world/)
+  apps/             # Per-service manifests, grouped by namespace (ai/, downloads/, media/, homepage/, hello-world/)
   infrastructure/   # Cluster infrastructure — HelmReleases, HelmRepositories, companion manifests
     sources/        # HelmRepository definitions
     controllers/    # HelmRelease definitions (install CRDs first)
