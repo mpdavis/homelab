@@ -9,7 +9,7 @@ resources:
   - traefik.yaml
   - monitoring.yaml
   - loki.yaml
-  - promtail.yaml
+  - alloy.yaml
   - nfs-data.yaml
   - nfs-homelab.yaml
   - nvidia-device-plugin.yaml
