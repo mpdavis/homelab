@@ -75,6 +75,11 @@
         icon: mdi-airplane
         href: https://trek.${DOMAIN}
         description: Travel planning
+- Automation:
+    - n8n:
+        icon: n8n.png
+        href: https://n8n.${DOMAIN}
+        description: Workflow automation
 - Infrastructure:
     - Authentik:
         icon: authentik.png

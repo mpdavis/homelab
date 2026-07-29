@@ -1,0 +1,62 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: n8n
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: "~5.0"
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    crds: CreateReplace
+  values:
+    # n8n reads its listen port from N8N_PORT. The Service is named `n8n`, so
+    # Kubernetes' service-link injection would set N8N_PORT=tcp://<clusterIP>:…
+    # and crash-loop it — disable the injection (see the add-service skill).
+    defaultPodOptions:
+      enableServiceLinks: false
+    controllers:
+      main:
+        strategy: Recreate          # RWO config volume; avoid two pods mounting it
+        containers:
+          main:
+            image:
+              repository: docker.n8n.io/n8nio/n8n
+              tag: "1.122.4"
+            env:
+              TZ: ${TZ}
+              N8N_HOST: n8n.${DOMAIN}
+              N8N_PORT: "5678"
+              N8N_PROTOCOL: https
+              N8N_EDITOR_BASE_URL: https://n8n.${DOMAIN}
+              WEBHOOK_URL: https://n8n.${DOMAIN}
+              # Traefik is the single proxy hop in front of n8n.
+              N8N_PROXY_HOPS: "1"
+              # Persisted with the config volume; also externalised to BWS so it
+              # survives PVC loss and can decrypt existing credentials.
+              N8N_ENCRYPTION_KEY:
+                secretKeyRef:
+                  name: n8n-secrets
+                  key: encryption-key
+    service:
+      main:
+        controller: main
+        ports:
+          http:
+            port: 5678
+    persistence:
+      config:
+        existingClaim: n8n
+        globalMounts:
+          - path: /home/node/.n8n

@@ -61,6 +61,7 @@ spec:
                       - teamarr.mpdavis.com
                       - flux.mpdavis.com
                       - trek.mpdavis.com
+                      - n8n.mpdavis.com
                       - birdnet.mpdavis.com
                       - proxmox.mpdavis.com
   values:
@@ -159,6 +160,10 @@ spec:
         - name: trek
           group: external-open
           url: https://trek.mpdavis.com/
+          conditions: *open-conditions
+        - name: n8n
+          group: external-open
+          url: https://n8n.mpdavis.com/
           conditions: *open-conditions
         # External (non-k8s) LAN hosts routed through Traefik via
         # Service+Endpoints — probed exactly like in-cluster open services.
