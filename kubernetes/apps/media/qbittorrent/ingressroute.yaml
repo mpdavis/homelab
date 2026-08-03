@@ -8,6 +8,9 @@ spec:
   routes:
     - match: Host(`qbit.${DOMAIN}`)
       kind: Rule
+      middlewares:
+        - name: authentik-forward-auth
+          namespace: authentik
       services:
         - name: qbittorrent
           port: 8080

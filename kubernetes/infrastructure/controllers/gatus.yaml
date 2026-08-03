@@ -134,10 +134,6 @@ spec:
           group: external-open
           url: https://ecm.mpdavis.com/
           conditions: *open-conditions
-        - name: qbittorrent
-          group: external-open
-          url: https://qbit.mpdavis.com/
-          conditions: *open-conditions
         - name: mousehole
           group: external-open
           url: https://mousehole.mpdavis.com/
@@ -205,6 +201,12 @@ spec:
         - name: prowlarr
           group: external-auth
           url: https://prowlarr.mpdavis.com/
+          client: *auth-client
+          headers: *auth-headers
+          conditions: *auth-conditions
+        - name: qbittorrent
+          group: external-auth
+          url: https://qbit.mpdavis.com/
           client: *auth-client
           headers: *auth-headers
           conditions: *auth-conditions
