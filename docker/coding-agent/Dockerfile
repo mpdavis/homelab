@@ -15,7 +15,7 @@ ARG KUBECTL_VERSION=v1.36.3
 # renovate: datasource=github-releases depName=fluxcd/flux2
 ARG FLUX_VERSION=v2.9.3
 # renovate: datasource=github-releases depName=cli/cli
-ARG GH_VERSION=v2.96.0
+ARG GH_VERSION=v2.97.0
 
 # python3/make/g++ serve double duty: node-gyp needs them when a native module
 # (better-sqlite3, from cloudcli) has no prebuilt binary, and they're useful
