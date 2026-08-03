@@ -23,7 +23,7 @@ spec:
         node-type: vm
       containers:
         - name: gluetun
-          image: qmcgaw/gluetun:v3.41.2
+          image: qmcgaw/gluetun:v3.41.3
           securityContext:
             capabilities:
               add:
