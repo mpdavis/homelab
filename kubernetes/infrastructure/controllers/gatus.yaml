@@ -45,6 +45,7 @@ spec:
                       - seerr.mpdavis.com
                       - podfetch.mpdavis.com
                       - ecm.mpdavis.com
+                      - thumbs.mpdavis.com
                       - qbit.mpdavis.com
                       - mousehole.mpdavis.com
                       - grafana.mpdavis.com
@@ -133,6 +134,11 @@ spec:
         - name: ecm
           group: external-open
           url: https://ecm.mpdavis.com/
+          conditions: *open-conditions
+        - name: game-thumbs
+          group: external-open
+          # Root path has no page; /health is the service's liveness endpoint.
+          url: https://thumbs.mpdavis.com/health
           conditions: *open-conditions
         - name: mousehole
           group: external-open
