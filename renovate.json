@@ -54,6 +54,34 @@
       "dependencyDashboardApproval": true
     },
     {
+      "description": "Auto-merge the bumps that carry the least migration risk: digest re-pins and patch releases. Uses GitHub's native auto-merge (platformAutomerge), so the PR only lands once every REQUIRED status check on main's ruleset passes — deploy-health-gate and verify (image-pin-check) in particular. If those are not marked required in the ruleset, auto-merge lands the PR immediately with no gate at all.",
+      "matchUpdateTypes": [
+        "digest",
+        "patch"
+      ],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": "Never auto-merge CRD apiVersion bumps, even a patch-shaped one. Dashboard approval only controls whether the PR opens — it does not imply the diff was reviewed. Keep this and the rule below AFTER the automerge rule: Renovate applies packageRules in order and the last write to `automerge` wins.",
+      "matchDatasources": [
+        "kubernetes-api"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "Never auto-merge the external-secrets group — chart and CRD apiVersions move in lockstep and need to be read together.",
+      "matchPackageNames": [
+        "external-secrets",
+        "ClusterSecretStore",
+        "ClusterExternalSecret",
+        "ExternalSecret",
+        "SecretStore",
+        "PushSecret"
+      ],
+      "automerge": false
+    },
+    {
       "description": "WHY: Listenarr only ships canary-X.Y.Z prereleases, and Renovate's default docker versioning can't parse the 'canary-' prefix, so this regex versioning treats 'canary' as a prerelease marker to keep canary tracked now while auto-switching to a stable tag once one exists. WHEN TO REMOVE: once the image is migrated to a stable (non-canary) tag, as default docker versioning then handles plain X.Y.Z tags on its own.",
       "matchPackageNames": ["ghcr.io/listenarrs/listenarr"],
       "versioning": "regex:^(?:v)?(?:(?<prerelease>canary)-)?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
