@@ -1,0 +1,15 @@
+# Holds processed.json (which meetings have been digested) and the rendered
+# digests. nfs-homelab rather than local-path so a CronJob pod can be scheduled
+# on any node and still see the state from the previous run — losing state means
+# re-summarizing meetings that were already paid for.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ames-council-digest
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-homelab
+  resources:
+    requests:
+      storage: 2Gi
