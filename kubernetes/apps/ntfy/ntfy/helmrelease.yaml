@@ -43,7 +43,7 @@ spec:
           main:
             image:
               repository: binwiederhier/ntfy
-              tag: v2.26.3
+              tag: v2.27.0
             args: ["serve"]
             env:
               TZ: ${TZ}
