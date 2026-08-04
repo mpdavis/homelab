@@ -219,7 +219,8 @@ class MeetingSummarizer:
         self, meeting: Meeting, agenda_text: str, items: list[ItemSummary]
     ) -> str:
         lines = [
-            f"Meeting: {meeting.board}, {meeting.meeting_date.strftime('%B %-d, %Y')}",
+            f"Meeting: {meeting.display_name}, "
+            f"{meeting.meeting_date.strftime('%B %-d, %Y')}",
             "",
         ]
 

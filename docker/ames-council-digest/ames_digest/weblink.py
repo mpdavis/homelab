@@ -29,8 +29,13 @@ log = logging.getLogger(__name__)
 ENTRY_TYPE_FOLDER = 0
 ENTRY_TYPE_DOCUMENT = -2
 
-# Meeting folders are named "YYYY MMDD" (e.g. "2026 0728").
-MEETING_FOLDER_RE = re.compile(r"^(\d{4})\s+(\d{2})(\d{2})$")
+# Meeting folders are named "YYYY MMDD" (e.g. "2026 0728"), with two variants
+# seen across the archive:
+#   "2025 02040506"    a meeting spanning Feb 4, 5, and 6 — extra day pairs are
+#                      appended, and the folder is keyed to the first day
+#   "2026 0324 Tax Levy"  a labeled special meeting, which can share a date with
+#                         that day's regular meeting
+MEETING_FOLDER_RE = re.compile(r"^(\d{4})\s+(\d{2})(\d{2})((?:\d{2})*)\s*(.*)$")
 
 # Packet items are prefixed with an agenda code: "A001 - Motion approving …".
 ITEM_CODE_RE = re.compile(r"^([A-Z]{1,3}\d{2,3})\s*[-–]\s*(.*)$", re.DOTALL)
@@ -83,20 +88,32 @@ class MeetingFolder:
     entry_id: int
     name: str
     meeting_date: date
+    # "" for a regular meeting; "Tax Levy" and the like for special sessions.
+    label: str = ""
     documents: list[Entry] = field(default_factory=list)
 
 
-def parse_meeting_date(folder_name: str) -> date | None:
-    """Parse a ``YYYY MMDD`` folder name, or return None if it isn't one."""
+def parse_meeting_folder(folder_name: str) -> tuple[date, str] | None:
+    """Parse a meeting folder name into its start date and optional label.
+
+    Returns None if the name isn't a meeting folder at all.
+    """
     m = MEETING_FOLDER_RE.match(folder_name.strip())
     if not m:
         return None
     try:
-        return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        start = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
     except ValueError:
         # Folders occasionally carry a typo'd date (month 13, day 32, …).
         log.warning("meeting folder %r has an invalid date", folder_name)
         return None
+    return start, m.group(5).strip()
+
+
+def parse_meeting_date(folder_name: str) -> date | None:
+    """The start date of a meeting folder, ignoring any label."""
+    parsed = parse_meeting_folder(folder_name)
+    return parsed[0] if parsed else None
 
 
 def _zip_columns(col_types: list[dict], row: dict) -> dict:
@@ -220,17 +237,19 @@ class WebLinkClient:
         for entry in self.list_folder(parent_id):
             if not entry.is_folder:
                 continue
-            meeting_date = parse_meeting_date(entry.name)
-            if meeting_date is None:
+            parsed = parse_meeting_folder(entry.name)
+            if parsed is None:
                 continue
+            meeting_date, label = parsed
             found.append(
                 MeetingFolder(
                     entry_id=entry.entry_id,
                     name=entry.name,
                     meeting_date=meeting_date,
+                    label=label,
                 )
             )
-        yield from sorted(found, key=lambda f: f.meeting_date)
+        yield from sorted(found, key=lambda f: (f.meeting_date, f.label))
 
     def year_folders(self, parent_id: int) -> dict[int, int]:
         """Map a four-digit year to the folder id holding that year's meetings."""

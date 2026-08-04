@@ -65,7 +65,7 @@ def _pretty_date(digest: MeetingDigest) -> str:
 
 
 def subject_line(digest: MeetingDigest) -> str:
-    return f"{digest.meeting.board} — {_pretty_date(digest)}"
+    return f"{digest.meeting.display_name} — {_pretty_date(digest)}"
 
 
 def _source_line(digest: MeetingDigest) -> str:

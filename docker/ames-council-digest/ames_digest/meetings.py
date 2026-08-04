@@ -14,6 +14,7 @@ one.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -34,6 +35,10 @@ class Meeting:
 
     board: str
     meeting_date: date
+    # "" for a regular meeting. A labeled special session (e.g. "Tax Levy") can
+    # fall on the same date as a regular one, so the label is part of a
+    # meeting's identity, not decoration.
+    label: str = ""
     agenda: Entry | None = None
     agenda_folder_id: int | None = None
     packet_master: Entry | None = None
@@ -43,16 +48,22 @@ class Meeting:
     @property
     def key(self) -> str:
         """Stable identifier used for state tracking and output filenames."""
-        slug = self.board.lower().replace(" ", "-")
-        return f"{slug}-{self.meeting_date.isoformat()}"
+        parts = [self.board, self.meeting_date.isoformat(), self.label]
+        slug = "-".join(p for p in parts if p).lower()
+        return re.sub(r"[^a-z0-9]+", "-", slug).strip("-")
+
+    @property
+    def display_name(self) -> str:
+        return f"{self.board} — {self.label}" if self.label else self.board
 
     @property
     def has_documents(self) -> bool:
         return bool(self.agenda or self.packet_master or self.packet_items)
 
     def __str__(self) -> str:
+        label = f" [{self.label}]" if self.label else ""
         return (
-            f"{self.board} {self.meeting_date.isoformat()} "
+            f"{self.board}{label} {self.meeting_date.isoformat()} "
             f"(agenda={'yes' if self.agenda else 'no'}, items={len(self.packet_items)})"
         )
 
@@ -109,7 +120,10 @@ class MeetingSource:
         agenda_years = self._agenda_year_folders()
         packet_years = self._packet_year_folders()
 
-        meetings: dict[date, Meeting] = {}
+        # Keyed by (date, label) so a "Tax Levy" session and that day's regular
+        # meeting stay separate. Packet folders carry no label, so an unlabeled
+        # packet pairs with the unlabeled agenda — which is the regular meeting.
+        meetings: dict[tuple[date, str], Meeting] = {}
 
         for year in years:
             folder_id = agenda_years.get(year)
@@ -118,8 +132,12 @@ class MeetingSource:
                 continue
             for folder in self.client.meeting_folders(folder_id):
                 meeting = meetings.setdefault(
-                    folder.meeting_date,
-                    Meeting(board=self.board, meeting_date=folder.meeting_date),
+                    (folder.meeting_date, folder.label),
+                    Meeting(
+                        board=self.board,
+                        meeting_date=folder.meeting_date,
+                        label=folder.label,
+                    ),
                 )
                 meeting.agenda_folder_id = folder.entry_id
                 docs = _documents(self.client, folder.entry_id)
@@ -134,8 +152,12 @@ class MeetingSource:
                 continue
             for folder in self.client.meeting_folders(folder_id):
                 meeting = meetings.setdefault(
-                    folder.meeting_date,
-                    Meeting(board=self.board, meeting_date=folder.meeting_date),
+                    (folder.meeting_date, folder.label),
+                    Meeting(
+                        board=self.board,
+                        meeting_date=folder.meeting_date,
+                        label=folder.label,
+                    ),
                 )
                 meeting.packet_folder_id = folder.entry_id
                 master, items = _split_master(_documents(self.client, folder.entry_id))

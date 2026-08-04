@@ -27,7 +27,11 @@ A run then:
 
 1. **Discovers** meetings by date, pairing each agenda folder with its packet
    folder (`meetings.py`). Either side may be missing — packets are often
-   posted after the agenda.
+   posted after the agenda. Two folder-naming variants appear in the archive
+   and are both handled: multi-day meetings (`2025 02040506` — February 4, 5,
+   and 6, keyed to the first day) and labeled special sessions
+   (`2026 0324 Tax Levy`), which can fall on the same date as that day's
+   regular meeting and so are tracked as distinct meetings.
 2. **Maps**: fetches every packet item PDF concurrently, extracts its text
    (`pdftext.py`), and asks the model for 2–4 sentences plus a significance
    rating of `routine` / `notable` / `major` (`summarize.py`).

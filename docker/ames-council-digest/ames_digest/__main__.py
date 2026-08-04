@@ -141,7 +141,7 @@ def _select(
         candidates = [m for m in candidates if not state.seen(m.key)]
 
     # Newest first, so a limited run covers the meeting a reader most wants.
-    candidates.sort(key=lambda m: m.meeting_date, reverse=True)
+    candidates.sort(key=lambda m: (m.meeting_date, m.label), reverse=True)
     return candidates[: max(args.limit, 0)] if args.limit else candidates
 
 
