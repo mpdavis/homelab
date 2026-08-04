@@ -110,12 +110,6 @@ def parse_meeting_folder(folder_name: str) -> tuple[date, str] | None:
     return start, m.group(5).strip()
 
 
-def parse_meeting_date(folder_name: str) -> date | None:
-    """The start date of a meeting folder, ignoring any label."""
-    parsed = parse_meeting_folder(folder_name)
-    return parsed[0] if parsed else None
-
-
 def _zip_columns(col_types: list[dict], row: dict) -> dict:
     """Merge an entry's positional ``data`` array with the listing's column names."""
     values = row.get("data") or []
