@@ -6,7 +6,13 @@ existed, still shows up on the next run.
 
 Titles are read back out of each digest's ``<title>`` tag — the same value
 :func:`ames_digest.render.subject_line` put there — so the index and the pages
-it links can't drift apart.
+it links can't drift apart. Whether a meeting has been updated with its outcomes
+comes from the same place: a ``ames-digest-phase`` meta tag on the page itself.
+
+A meeting is one page. Digests written before that change put the outcome in a
+separate ``<key>-outcome.html``; those are still found and still linked, folded
+into their meeting's row rather than sitting beside it as a phantom second
+meeting, until the meeting is regenerated.
 """
 
 from __future__ import annotations
@@ -18,13 +24,16 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from .state import State, Totals
+from .state import PHASE_OUTCOME, PHASE_PREVIEW, State, Totals
 
 log = logging.getLogger(__name__)
 
 INDEX_FILENAME = "index.html"
 
 TITLE_RE = re.compile(r"<title>(.*?)</title>", re.DOTALL | re.IGNORECASE)
+PHASE_RE = re.compile(
+    r'<meta\s+name="ames-digest-phase"\s+content="([a-z]+)"', re.IGNORECASE
+)
 # Every digest stem embeds its meeting date: city-council-2026-07-28[-tax-levy].
 STEM_DATE_RE = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
 
@@ -105,16 +114,20 @@ class DigestEntry:
     title: str
     meeting_date: date | None
     has_markdown: bool
+    # Which pass last wrote the page. Pages written before the phase tag existed
+    # report "preview", which is what they were.
+    phase: str = PHASE_PREVIEW
 
     @property
-    def is_outcome(self) -> bool:
+    def is_legacy_outcome(self) -> bool:
+        """A standalone outcome page from before the two passes shared one file."""
         return self.stem.endswith(OUTCOME_SUFFIX)
 
     @property
     def meeting_stem(self) -> str:
-        """The preview's stem — the identity both passes of a meeting share."""
+        """The meeting's own stem — what its page and any legacy file share."""
         return (
-            self.stem[: -len(OUTCOME_SUFFIX)] if self.is_outcome else self.stem
+            self.stem[: -len(OUTCOME_SUFFIX)] if self.is_legacy_outcome else self.stem
         )
 
     @property
@@ -125,42 +138,57 @@ class DigestEntry:
 
 @dataclass
 class MeetingRow:
-    """Both passes of one meeting, shown as a single entry."""
+    """One meeting: its page, plus any standalone outcome page left over."""
 
     meeting_stem: str
-    preview: DigestEntry | None = None
-    outcome: DigestEntry | None = None
+    page: DigestEntry | None = None
+    legacy_outcome: DigestEntry | None = None
 
     @property
     def title(self) -> str:
-        # The preview's title is the plain meeting name; the outcome's carries
-        # a "what council decided" suffix that would read oddly as the heading.
-        if self.preview:
-            return self.preview.title
-        if self.outcome:
-            return self.outcome.title.split(" — what council decided")[0]
+        if self.page:
+            return self.page.title
+        if self.legacy_outcome:
+            # Legacy outcome titles carry a "what council decided" suffix that
+            # would read oddly as this row's heading.
+            return self.legacy_outcome.title.split(" — what council decided")[0]
         return self.meeting_stem
 
     @property
     def meeting_date(self) -> date | None:
-        for entry in (self.preview, self.outcome):
+        for entry in (self.page, self.legacy_outcome):
             if entry and entry.meeting_date:
                 return entry.meeting_date
         return None
+
+    @property
+    def updated(self) -> bool:
+        """Whether the minutes have been folded into this meeting's page."""
+        return bool(self.page and self.page.phase == PHASE_OUTCOME)
 
     @property
     def sort_key(self) -> tuple[date, str]:
         return (self.meeting_date or date.min, self.meeting_stem)
 
 
-def _title_of(path: Path) -> str:
+def _head_of(path: Path) -> str:
+    """The top of a digest page, where its title and phase tag live."""
     try:
-        head = path.read_text(encoding="utf-8", errors="replace")[:4000]
+        return path.read_text(encoding="utf-8", errors="replace")[:4000]
     except OSError as exc:
         log.debug("cannot read %s: %s", path, exc)
-        return path.stem
+        return ""
+
+
+def _title_of(head: str, fallback: str) -> str:
     m = TITLE_RE.search(head)
-    return html.unescape(m.group(1).strip()) if m else path.stem
+    return html.unescape(m.group(1).strip()) if m else fallback
+
+
+def _phase_of(head: str) -> str:
+    m = PHASE_RE.search(head)
+    phase = m.group(1).lower() if m else PHASE_PREVIEW
+    return phase if phase in (PHASE_PREVIEW, PHASE_OUTCOME) else PHASE_PREVIEW
 
 
 def _date_of(stem: str) -> date | None:
@@ -175,28 +203,32 @@ def _date_of(stem: str) -> date | None:
 
 def collect(output_dir: Path) -> list[DigestEntry]:
     """Every digest file in the directory, newest meeting first."""
-    entries = [
-        DigestEntry(
-            stem=path.stem,
-            title=_title_of(path),
-            meeting_date=_date_of(path.stem),
-            has_markdown=path.with_suffix(".md").exists(),
+    entries = []
+    for path in sorted(output_dir.glob("*.html")):
+        if path.name == INDEX_FILENAME:
+            continue
+        head = _head_of(path)
+        entries.append(
+            DigestEntry(
+                stem=path.stem,
+                title=_title_of(head, path.stem),
+                meeting_date=_date_of(path.stem),
+                has_markdown=path.with_suffix(".md").exists(),
+                phase=_phase_of(head),
+            )
         )
-        for path in sorted(output_dir.glob("*.html"))
-        if path.name != INDEX_FILENAME
-    ]
     return sorted(entries, key=lambda e: e.sort_key, reverse=True)
 
 
 def collect_meetings(output_dir: Path) -> list[MeetingRow]:
-    """Digests grouped by meeting, so both passes share one row."""
+    """Digests grouped by meeting, one row each."""
     rows: dict[str, MeetingRow] = {}
     for entry in collect(output_dir):
         row = rows.setdefault(entry.meeting_stem, MeetingRow(entry.meeting_stem))
-        if entry.is_outcome:
-            row.outcome = entry
+        if entry.is_legacy_outcome:
+            row.legacy_outcome = entry
         else:
-            row.preview = entry
+            row.page = entry
     return sorted(rows.values(), key=lambda r: r.sort_key, reverse=True)
 
 
@@ -286,15 +318,27 @@ def render_index(
                 if row.meeting_date
                 else "date unknown"
             )
-            # The heading links to the outcome once it exists — that's the
-            # fuller account — and to the preview before then.
-            primary = row.outcome or row.preview
-            assert primary is not None  # a row exists only if one pass wrote a file
-            parts = [
-                _links(row.preview, "Before the meeting"),
-                _links(row.outcome, "What council decided"),
-            ]
-            meta = " · ".join([html.escape(when), *[p for p in parts if p]])
+            # One page per meeting. A legacy standalone outcome is the fuller
+            # account for the meetings that still have one, so it wins the
+            # heading link until that meeting is regenerated.
+            primary = row.page or row.legacy_outcome
+            assert primary is not None  # a row exists only if some file wrote it
+            parts = [html.escape(when)]
+            if row.page is not None:
+                # A meeting still carrying a legacy outcome file has its result
+                # published, just not on this page — saying it awaits the
+                # minutes would contradict the link sitting next to it.
+                if row.updated:
+                    parts.append("Updated after the meeting")
+                elif row.legacy_outcome is None:
+                    parts.append("Awaiting the minutes")
+                if row.page.has_markdown:
+                    parts.append(
+                        f'<a href="{html.escape(row.page.stem)}.md" class="md">Markdown</a>'
+                    )
+            if row.legacy_outcome is not None:
+                parts.append(_links(row.legacy_outcome, "Outcome (older format)"))
+            meta = " · ".join(p for p in parts if p)
             items.append(
                 f'      <li><a href="{html.escape(primary.stem)}.html">'
                 f"{html.escape(row.title)}</a>"

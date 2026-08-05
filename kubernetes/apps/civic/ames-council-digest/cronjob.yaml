@@ -1,9 +1,10 @@
 # Ten-minute check for newly posted Ames City Council agendas, packets, and
 # minutes.
 #
-# Each meeting is digested twice: once from the agenda and packet before it
-# happens, and again from the minutes about a week later. Frequent polling is
-# what makes both land promptly without anyone watching for them.
+# Each meeting gets one page, written twice: once from the agenda and packet
+# before it happens, and again from the minutes about a week later, which
+# updates that same page in place rather than adding a second one. Frequent
+# polling is what makes both land promptly without anyone watching for them.
 #
 # COST OF THIS CADENCE: a run with nothing new costs 9 folder listings against
 # the city's server and zero model calls — meetings whose passes are all done
@@ -22,8 +23,9 @@
 # :07 past rather than :00 — nothing depends on the exact minute, and it keeps
 # this off the wall-clock boundary every other scheduled poller lands on.
 #
-# Delivery is `file`: each digest lands on the PVC as Markdown + HTML. Add the
-# ntfy or smtp sink to AMES_DELIVERY below once a destination is settled on.
+# Delivery is `file`: each meeting's page lands on the PVC as Markdown + HTML,
+# and the outcome pass overwrites both. Add the ntfy or smtp sink to
+# AMES_DELIVERY below once a destination is settled on.
 #
 # To pause spend without reverting: suspend: true.
 apiVersion: batch/v1

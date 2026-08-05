@@ -3,6 +3,10 @@
 Three representations come out of one digest: Markdown (the canonical artifact
 written to disk and read in a terminal), HTML (for an email body or a browser),
 and a short plain-text form for push notifications.
+
+Both passes of a meeting render to the same filename. The outcome pass rewrites
+the page rather than adding a second one, so a reader has one URL per meeting
+whose content grows once the minutes land.
 """
 
 from __future__ import annotations
@@ -11,6 +15,7 @@ from dataclasses import dataclass
 
 import markdown as markdown_lib
 
+from . import merge
 from .summarize import MeetingDigest
 
 # Kept inline rather than in a stylesheet: email clients strip <style> blocks
@@ -21,6 +26,10 @@ HTML_TEMPLATE = """\
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Which pass last wrote this page. The index reads it back to mark a meeting
+     as updated, which keeps that page self-describing: a digest restored from
+     backup still lands in the right state without consulting the run ledger. -->
+<meta name="ames-digest-phase" content="{phase}">
 <title>{title}</title>
 </head>
 <body style="margin:0;padding:24px 16px;background:#f6f7f9;
@@ -65,24 +74,21 @@ def _pretty_date(digest: MeetingDigest) -> str:
 
 
 def subject_line(digest: MeetingDigest) -> str:
-    suffix = " — what council decided" if digest.is_outcome else ""
-    return f"{digest.meeting.display_name} — {_pretty_date(digest)}{suffix}"
+    # No "what council decided" suffix any more: one page carries the meeting
+    # from preview to outcome, and a title that changed underneath a reader's
+    # bookmark would suggest a different document.
+    return f"{digest.meeting.display_name} — {_pretty_date(digest)}"
 
 
 def filename_stem(digest: MeetingDigest) -> str:
-    """Output basename. The outcome sits beside its preview, not over it."""
-    return (
-        f"{digest.meeting.key}-outcome" if digest.is_outcome else digest.meeting.key
-    )
+    """Output basename. Both passes write this same file."""
+    return digest.meeting.key
 
 
 def _source_line(digest: MeetingDigest) -> str:
     links = []
-    if digest.is_outcome:
+    if digest.minutes_url:
         links.append(f"[Minutes]({digest.minutes_url})")
-        # Relative link: the preview is the sibling file the web server already
-        # serves, so this works both on disk and over HTTP.
-        links.append(f"[Before the meeting]({digest.meeting.key}.html)")
     if digest.agenda_url:
         links.append(f"[Agenda]({digest.agenda_url})")
     if digest.packet_url:
@@ -115,16 +121,27 @@ def _appendix(digest: MeetingDigest) -> list[str]:
 
 
 def _footer(digest: MeetingDigest) -> str:
-    usage = digest.usage
-    scope = (
-        "from the official summary minutes"
-        if digest.is_outcome
-        else f"{len(digest.items)} packet items"
-    )
+    # The page is one artifact built by up to two passes, so it reports what the
+    # whole thing cost. Billing only the update pass would show a few thousand
+    # tokens for a page whose packet summaries cost half a million.
+    usage = digest.total_usage
+
+    scope = []
+    if digest.items:
+        scope.append(f"{len(digest.items)} packet items")
+    if digest.is_outcome:
+        scope.append("official summary minutes")
+
+    when = f"Generated {digest.generated_at.strftime('%Y-%m-%d %H:%M')}"
+    if digest.is_outcome and digest.preview_generated_at:
+        when = (
+            f"Generated {digest.preview_generated_at.strftime('%Y-%m-%d %H:%M')}, "
+            f"updated {digest.generated_at.strftime('%Y-%m-%d %H:%M')}"
+        )
+
     return (
-        f"Generated {digest.generated_at.strftime('%Y-%m-%d %H:%M')} by "
-        f"ames-council-digest using {digest.model} · "
-        f"{scope} · "
+        f"{when} by ames-council-digest using {digest.model} · "
+        f"{' · '.join(scope) or 'no source documents'} · "
         f"{usage.calls} model calls, "
         f"{usage.input_tokens:,} in / {usage.output_tokens:,} out tokens · "
         "Summaries are machine-generated — verify against the source documents "
@@ -160,12 +177,15 @@ def render(digest: MeetingDigest) -> RenderedDigest:
         subtitle=subtitle_html,
         body=body_html,
         footer=_footer(digest),
+        phase=digest.kind,
     )
 
     return RenderedDigest(
         subject=subject_line(digest),
         markdown=markdown_text,
         html=html,
-        text=digest.body_markdown.strip(),
+        # The update spans are markup a push notification would show raw, so the
+        # text form keeps the words and drops the styling.
+        text=merge.plaintext(digest.body_markdown.strip()),
         filename_stem=filename_stem(digest),
     )

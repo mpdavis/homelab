@@ -335,10 +335,10 @@ def cmd_run(args: argparse.Namespace, cfg: Config) -> int:
                 if job.phase == PHASE_PREVIEW:
                     digest = summarizer.run_preview(meeting)
                 else:
-                    # The archive is what lets the outcome say "council
-                    # approved the thing the packet described" without paying
-                    # to summarize the packet a second time. Its absence is
-                    # survivable: run_outcome falls back to the minutes alone.
+                    # The archive holds the page the preview wrote, which the
+                    # update pass edits in place instead of paying to
+                    # regenerate. Its absence is survivable: run_outcome falls
+                    # back to writing the page from the minutes alone.
                     digest = summarizer.run_outcome(
                         meeting, archive.load_preview(cfg.state_dir, meeting.key)
                     )
@@ -356,14 +356,23 @@ def cmd_run(args: argparse.Namespace, cfg: Config) -> int:
             if state is not None:
                 if job.phase == PHASE_PREVIEW:
                     try:
+                        # Every item, not just the summarized ones: the page's
+                        # appendix lists the whole packet, and the update pass
+                        # rebuilds that list from here.
                         archive.save_preview(
                             cfg.state_dir,
                             meeting.key,
-                            [i.to_archive() for i in digest.items if i.ok],
+                            [i.to_archive() for i in digest.items],
+                            body=digest.body_markdown,
+                            usage=digest.usage,
+                            model=digest.model,
+                            generated_at=digest.generated_at.isoformat(
+                                timespec="seconds"
+                            ),
                         )
                     except (OSError, ValueError) as exc:
-                        # Costs the outcome pass its cross-reference, not the
-                        # digest that was just delivered.
+                        # Costs the update pass its page and cross-reference,
+                        # not the digest that was just delivered.
                         log.warning("could not archive %s: %s", meeting.key, exc)
 
                 state.record(

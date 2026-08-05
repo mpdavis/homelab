@@ -7,6 +7,10 @@ independent network round trip followed by an independent model call.
 Reduce: the agenda (which supplies the meeting's structure — consent agenda,
 public hearings, ordinances) and every item summary are handed to one final
 call that writes the reader-facing digest.
+
+Update: once the minutes are published, a third call reads them against that
+same page and returns what council did to each of its bullets. The page is
+edited in place rather than rewritten — see :mod:`ames_digest.merge`.
 """
 
 from __future__ import annotations
@@ -18,6 +22,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from . import merge
+from .archive import PreviewArchive
 from .config import Config
 from .llm import LLMClient, LLMError, Usage
 from .meetings import Meeting
@@ -72,13 +78,17 @@ adjectives do not.
 
 Produce GitHub-flavored Markdown with exactly these sections:
 
-## The short version
-One paragraph, 2-4 sentences, on what this meeting is actually about.
+## Notable Topics
+3-5 bullets, one sentence each, on what this meeting is actually about. No \
+bolded labels and no sub-bullets — this is the at-a-glance read.
 
-## Worth a closer look
+## Additional Reading
 3-6 bullets covering the major and notable items. Each bullet starts with a \
 bolded short label, then a sentence or two of substance including the money.
 If there are fewer than three non-routine items, use however many exist.
+Give every bullet a distinct label. After the meeting, what council decided is \
+attached to each bullet by its label, so two bullets sharing one label lose an \
+outcome between them.
 
 ## Public input
 Public hearings, comment periods, and anything else where a resident could \
@@ -91,51 +101,96 @@ aggregate. Do not list them individually.
 Do not add a title, a greeting, a sign-off, or any section beyond these four.
 """
 
-OUTCOME_SYSTEM = """\
-You report what an Ames, Iowa city council meeting actually decided, for a \
-resident who read the preview of that meeting and now wants to know how it \
-turned out.
-
-You are given the official summary minutes, and — when available — the \
-pre-meeting summary of each agenda item. The minutes are the authority on what \
-happened; the item summaries only tell you what each item was about, so you \
-can describe outcomes in plain terms instead of quoting motion numbers.
-
-Rules:
+# Shared by both post-meeting prompts: the same reporting discipline applies
+# whether the outcomes are being spliced into an existing page or written onto a
+# fresh one.
+_MINUTES_RULES = """\
 - Report only what the minutes state. Never infer a vote, an amount, or an \
 outcome that isn't written there.
 - Votes matter: give the tally and name dissenters when the minutes do \
-("passed 5-1, Gartin dissenting"). A unanimous vote can just say unanimous.
+("approved 5-1, Gartin dissenting"). A unanimous vote can just say unanimous.
 - Distinguish what was decided from what was merely discussed, referred to \
 staff, continued to a later date, or pulled from the consent agenda.
 - Note when council changed something before approving it, or departed from \
-the staff recommendation the preview described.
-- Cover substantive business that never appeared in the preview at all — items \
-raised at public forum, council referrals, staff reports — under its own \
-heading. This is often where the real news is.
-- Do not editorialize or characterize any decision as good or bad.
+the staff recommendation.
+- Do not editorialize or characterize any decision as good or bad."""
+
+# The normal post-meeting path. The page already exists and is already correct
+# about what each item *was*; the only thing missing is what happened to it. So
+# this returns outcomes keyed to the page's bullets rather than a new page —
+# regenerating the prose would pay twice for text nobody asked to change, and
+# invite the model to quietly reword it.
+UPDATE_SYSTEM = """\
+You report what an Ames, Iowa city council meeting actually decided, so that \
+the page written before the meeting can be updated in place.
+
+You are given that page, the label of each bullet in its "Additional Reading" \
+section, and the official summary minutes. The minutes are the authority on \
+what happened; the page only tells you what each item was about, so you can \
+describe outcomes in plain terms instead of quoting motion numbers.
+
+Rules:
+{rules}
+- If the minutes do not cover a bullet at all, give its outcome as exactly \
+"Not recorded in the minutes." Do not guess, and do not pad.
+- Each update is one or two sentences, read immediately after the bullet it \
+belongs to. Do not restate what the item was — say what happened to it.
+
+Respond with a single JSON object and nothing else:
+{{"updates": [{{"label": "one of the labels you were given, copied exactly",
+              "outcome": "1-2 sentences: what council did, and the vote"}}],
+ "after_the_meeting": "Markdown bullets covering substantive business the page \
+did not anticipate: items raised at public forum, council referrals, staff \
+reports, anything pulled out of the consent agenda and handled separately. \
+This is often where the real news is. Use an empty string if there is none."}}
+
+Return exactly one entry per label, in the order the labels were given. A label \
+you did not receive is dropped, so copy them character for character.
+"""
+
+# The fallback: minutes exist but no preview page does, because the packet was
+# never digested. One call has to produce both the page and its outcomes, so the
+# outcomes ride along on a plain-text marker that render-time turns red — asking
+# for raw HTML here would be a coin flip.
+MINUTES_ONLY_SYSTEM = """\
+You write the page for an Ames, Iowa city council meeting that has already \
+happened, working from the official summary minutes alone — no pre-meeting \
+packet summary exists for this meeting.
+
+Rules:
+{rules}
 
 Produce GitHub-flavored Markdown with exactly these sections:
 
-## What council decided
-One paragraph, 2-4 sentences, on the meeting's substantive outcomes.
+## Notable Topics
+3-5 bullets, one sentence each, on what this meeting was about. No bolded \
+labels — this is the at-a-glance read.
 
-## Decisions
-3-8 bullets on the items that mattered. Each starts with a bolded short label, \
-then what council did and the vote. Where the preview explains what the item \
-was, fold in one clause of that context so the outcome is legible on its own.
+## Additional Reading
+3-6 bullets on the items that mattered. Each bullet starts with a bolded short \
+label, then a sentence on what the item was, then the marker {sentinel} \
+followed by what council did and the vote. Exactly like this:
 
-## Raised, not decided
+- **Water rate increase** — A 6% increase to residential water rates, the \
+first since 2023. {sentinel} Approved 5-1, Gartin dissenting.
+
+Give every bullet a distinct label, and put {sentinel} in every bullet.
+
+## After the meeting
 Items continued, tabled, referred to staff, or pulled from the consent agenda, \
 and anything brought up at public forum. Write "Nothing of note." if there is \
 none.
 
-## Consent agenda
-One compact sentence on the routine items approved as a block, including \
-anything pulled out of it and handled separately.
+## Everything else
+One compact sentence on the routine items approved as a block.
 
 Do not add a title, a greeting, a sign-off, or any section beyond these four.
 """
+
+UPDATE_SYSTEM = UPDATE_SYSTEM.format(rules=_MINUTES_RULES)
+MINUTES_ONLY_SYSTEM = MINUTES_ONLY_SYSTEM.format(
+    rules=_MINUTES_RULES, sentinel=merge.SENTINEL
+)
 
 
 @dataclass
@@ -157,23 +212,49 @@ class ItemSummary:
         return self.skipped is None and bool(self.summary)
 
     def to_archive(self) -> dict:
-        """The subset the outcome pass needs to explain what this item was."""
+        """Everything the outcome pass needs to rebuild this item.
+
+        Skipped items are archived too, and with their reason: the page's
+        appendix lists every item in the packet, and that list has to survive
+        the update pass intact or items would vanish from it once the minutes
+        landed.
+        """
         return {
             "code": self.code,
             "title": self.title,
+            "entry_id": self.entry_id,
             "url": self.url,
+            "pages": self.pages,
             "summary": self.summary,
             "significance": self.significance,
             "amount": self.amount,
+            "skipped": self.skipped,
         }
+
+    @classmethod
+    def from_archive(cls, payload: dict) -> "ItemSummary":
+        amount = payload.get("amount")
+        pages = payload.get("pages")
+        return cls(
+            code=str(payload.get("code") or ""),
+            title=str(payload.get("title") or ""),
+            entry_id=int(payload.get("entry_id") or 0),
+            url=str(payload.get("url") or ""),
+            pages=int(pages) if isinstance(pages, int) else None,
+            summary=str(payload.get("summary") or ""),
+            significance=str(payload.get("significance") or "routine"),
+            amount=str(amount) if amount else None,
+            skipped=str(payload["skipped"]) if payload.get("skipped") else None,
+        )
 
 
 @dataclass
 class MeetingDigest:
     meeting: Meeting
     body_markdown: str
-    # "preview" (agenda + packet, before the meeting) or "outcome" (minutes,
-    # after it). Determines how this renders and what it links to.
+    # "preview" (agenda + packet, before the meeting) or "outcome" (the same
+    # page, updated from the minutes afterwards). Both write the same file; the
+    # kind decides what the page links to and how the footer reads.
     kind: str = PHASE_PREVIEW
     items: list[ItemSummary] = field(default_factory=list)
     agenda_url: str | None = None
@@ -182,6 +263,11 @@ class MeetingDigest:
     generated_at: datetime = field(default_factory=datetime.now)
     usage: Usage = field(default_factory=Usage)
     model: str = ""
+    # What the preview pass spent, carried through the archive. One page now
+    # represents both passes, so a footer reporting only the update's handful of
+    # tokens would understate what the page cost by an order of magnitude.
+    prior_usage: Usage = field(default_factory=Usage)
+    preview_generated_at: datetime | None = None
 
     @property
     def skipped_items(self) -> list[ItemSummary]:
@@ -190,6 +276,14 @@ class MeetingDigest:
     @property
     def is_outcome(self) -> bool:
         return self.kind == PHASE_OUTCOME
+
+    @property
+    def total_usage(self) -> Usage:
+        return Usage(
+            input_tokens=self.usage.input_tokens + self.prior_usage.input_tokens,
+            output_tokens=self.usage.output_tokens + self.prior_usage.output_tokens,
+            calls=self.usage.calls + self.prior_usage.calls,
+        )
 
 
 def _parse_json_object(raw: str) -> dict:
@@ -202,6 +296,15 @@ def _parse_json_object(raw: str) -> dict:
     if start == -1 or end <= start:
         raise ValueError("no JSON object in response")
     return json.loads(text[start : end + 1])
+
+
+def _parse_timestamp(raw: str) -> datetime | None:
+    """Read an archived ISO timestamp back, tolerating one that never wrote."""
+    try:
+        return datetime.fromisoformat(raw) if raw else None
+    except ValueError:
+        log.debug("unparseable archived timestamp %r", raw)
+        return None
 
 
 def _coerce_summary(payload: dict) -> tuple[str, str, str | None]:
@@ -317,20 +420,40 @@ class MeetingSummarizer:
             max_tokens=2500,
         )
 
-    def compose_outcome(
-        self, meeting: Meeting, minutes_text: str, preview_items: list[dict]
-    ) -> str:
-        lines = [
+    def _meeting_header(self, meeting: Meeting) -> list[str]:
+        return [
             f"Meeting: {meeting.display_name}, "
             f"{meeting.meeting_date.strftime('%B %-d, %Y')}",
             "",
         ]
 
-        if preview_items:
+    def compose_update(
+        self, meeting: Meeting, minutes_text: str, preview: PreviewArchive
+    ) -> str:
+        """Splice what council decided into the page written before the meeting."""
+        page_labels = merge.labels(preview.body)
+        lines = self._meeting_header(meeting)
+        lines += [
+            "--- THE PAGE AS WRITTEN BEFORE THE MEETING ---",
+            preview.body.strip(),
+            "",
+        ]
+
+        if page_labels:
             lines.append(
-                "--- WHAT EACH AGENDA ITEM WAS (from the pre-meeting packet) ---"
+                "--- ADDITIONAL READING LABELS "
+                "(return exactly one update per label, copied exactly) ---"
             )
-            for item in preview_items:
+            lines += [f"{n}. {label}" for n, label in enumerate(page_labels, 1)]
+            lines.append("")
+
+        summarized = [i for i in preview.items if i.get("summary")]
+        if summarized:
+            # The page's bullets are prose about a handful of items; these are
+            # the per-item summaries behind them, and are what lets an outcome
+            # for a consent-agenda item be written at all.
+            lines.append("--- WHAT EACH AGENDA ITEM WAS (from the packet) ---")
+            for item in summarized:
                 title = str(item.get("title") or "").strip()
                 if not title:
                     continue
@@ -340,20 +463,54 @@ class MeetingSummarizer:
                 head = f"\n[{tag}]" + (f" [{amount}]" if amount else "") + f" {title}"
                 lines.append(head + (f"\n{summary}" if summary else ""))
             lines.append("")
-        else:
-            lines.append(
-                "(No pre-meeting summaries are available for this meeting — work "
-                "from the minutes alone.)\n"
-            )
 
         lines += ["--- OFFICIAL SUMMARY MINUTES ---", minutes_text.strip()]
 
-        return self.llm.complete(
+        raw = self.llm.complete(
             model=self.cfg.digest_model,
-            system=OUTCOME_SYSTEM,
+            system=UPDATE_SYSTEM,
+            prompt="\n".join(lines),
+            max_tokens=3000,
+        )
+        try:
+            payload = _parse_json_object(raw)
+        except (ValueError, json.JSONDecodeError) as exc:
+            # Not recorded in state, so the next run retries rather than leaving
+            # the page permanently stuck on its pre-meeting text.
+            raise RuntimeError(f"update pass returned no usable JSON: {exc}") from exc
+
+        updates = {
+            str(entry.get("label") or ""): str(entry.get("outcome") or "")
+            for entry in payload.get("updates") or []
+            if isinstance(entry, dict)
+        }
+        matched, total, body = merge.apply_updates(preview.body, updates)
+        if total and matched < total:
+            # Every bullet still gets an update line; the unmatched ones just say
+            # "not recorded", which is indistinguishable on the page from a real
+            # silence in the minutes. Worth seeing in the logs.
+            log.warning(
+                "%s: only %d of %d bullets matched an outcome by label",
+                meeting.key,
+                matched,
+                total,
+            )
+
+        return merge.append_section(
+            body, merge.AFTER_THE_MEETING, str(payload.get("after_the_meeting") or "")
+        )
+
+    def compose_minutes_only(self, meeting: Meeting, minutes_text: str) -> str:
+        """Write the whole page from the minutes, for a meeting never previewed."""
+        lines = self._meeting_header(meeting)
+        lines += ["--- OFFICIAL SUMMARY MINUTES ---", minutes_text.strip()]
+        raw = self.llm.complete(
+            model=self.cfg.digest_model,
+            system=MINUTES_ONLY_SYSTEM,
             prompt="\n".join(lines),
             max_tokens=2500,
         )
+        return merge.promote_sentinels(raw)
 
     # --- orchestration -----------------------------------------------------
 
@@ -427,12 +584,14 @@ class MeetingSummarizer:
         )
 
     def run_outcome(
-        self, meeting: Meeting, preview_items: list[dict]
+        self, meeting: Meeting, preview: PreviewArchive
     ) -> MeetingDigest:
-        """Digest the minutes — what council actually did.
+        """Update the meeting's page with what council actually did.
 
-        ``preview_items`` comes from the archived preview; an empty list is
-        fine and simply means the outcome is written from the minutes alone.
+        This produces the same page the preview did, so it overwrites it rather
+        than sitting beside it. An archive with no page body — none was ever
+        written, or it predates the merged format — falls back to writing the
+        page from the minutes alone.
         """
         if not meeting.minutes:
             raise RuntimeError(f"no minutes published for {meeting.key}")
@@ -447,18 +606,22 @@ class MeetingSummarizer:
                 f"{extracted.error or 'likely a scan'}"
             )
 
-        if not preview_items:
+        if preview.has_page:
+            body = self.compose_update(meeting, extracted.text, preview)
+            items = [ItemSummary.from_archive(i) for i in preview.items]
+        else:
             log.info(
-                "%s has no archived preview; writing outcomes from minutes alone",
+                "%s has no archived page; writing it from the minutes alone",
                 meeting.key,
             )
-
-        body = self.compose_outcome(meeting, extracted.text, preview_items)
+            body = self.compose_minutes_only(meeting, extracted.text)
+            items = []
 
         return MeetingDigest(
             meeting=meeting,
             body_markdown=body,
             kind=PHASE_OUTCOME,
+            items=items,
             agenda_url=(
                 self.weblink.viewer_url(meeting.agenda.entry_id)
                 if meeting.agenda
@@ -472,4 +635,6 @@ class MeetingSummarizer:
             minutes_url=self.weblink.viewer_url(meeting.minutes.entry_id),
             usage=self._usage_since(before),
             model=self.cfg.digest_model,
+            prior_usage=preview.usage,
+            preview_generated_at=_parse_timestamp(preview.generated_at),
         )

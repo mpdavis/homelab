@@ -1,9 +1,11 @@
-"""Machine-readable record of what a preview digest found.
+"""Machine-readable record of what a preview digest produced.
 
-The outcome pass needs to say "council approved *this*, the thing the packet
-described" — which means it needs the preview's per-item summaries. Re-deriving
-them would mean re-downloading and re-summarizing the whole packet a second
-time, at full token cost, to reconstruct something already computed.
+A meeting has one page, written before the meeting and updated after it. The
+outcome pass therefore needs two things the preview already computed: the page's
+Markdown, so it can splice outcomes into the bullets rather than rewrite them,
+and the per-item summaries, so it can say "council approved *this*, the thing
+the packet described". Re-deriving either would mean re-downloading and
+re-summarizing the whole packet at full token cost.
 
 So each preview writes a small JSON sidecar next to the state file. It lives in
 the state directory rather than the output directory because it is pipeline
@@ -11,7 +13,7 @@ state, not a delivered artifact — it must exist regardless of which delivery
 sinks are configured.
 
 Missing or unreadable archives are not an error: the outcome pass degrades to
-summarizing the minutes on their own.
+writing the page from the minutes on their own.
 """
 
 from __future__ import annotations
@@ -21,16 +23,38 @@ import logging
 import os
 import re
 import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from .llm import Usage
 
 log = logging.getLogger(__name__)
 
 ARCHIVE_DIRNAME = "meetings"
-ARCHIVE_VERSION = 1
+# v1 stored the item summaries alone, because the outcome pass wrote its own
+# separate page and had nothing to merge into.
+ARCHIVE_VERSION = 2
 
 # Meeting keys are already slugs, but this file name reaches the filesystem —
 # refuse anything that could climb out of the archive directory.
 SAFE_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+
+
+@dataclass
+class PreviewArchive:
+    """What the preview pass left behind for the outcome pass to build on."""
+
+    items: list[dict] = field(default_factory=list)
+    # Empty for a v1 archive, or when no preview ever ran. Both mean the same
+    # thing to the caller: there is no page to update, so write one.
+    body: str = ""
+    usage: Usage = field(default_factory=Usage)
+    model: str = ""
+    generated_at: str = ""
+
+    @property
+    def has_page(self) -> bool:
+        return bool(self.body.strip())
 
 
 def _path(state_dir: Path, key: str) -> Path:
@@ -39,11 +63,32 @@ def _path(state_dir: Path, key: str) -> Path:
     return state_dir / ARCHIVE_DIRNAME / f"{key}.json"
 
 
-def save_preview(state_dir: Path, key: str, items: list[dict]) -> None:
-    """Persist a preview's item summaries for later cross-reference."""
+def save_preview(
+    state_dir: Path,
+    key: str,
+    items: list[dict],
+    *,
+    body: str,
+    usage: Usage,
+    model: str,
+    generated_at: str,
+) -> None:
+    """Persist everything the outcome pass needs to update this page in place."""
     path = _path(state_dir, key)
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"version": ARCHIVE_VERSION, "key": key, "items": items}
+    payload = {
+        "version": ARCHIVE_VERSION,
+        "key": key,
+        "items": items,
+        "body": body,
+        "model": model,
+        "generated_at": generated_at,
+        "usage": {
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "calls": usage.calls,
+        },
+    }
 
     fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=f".{key}-", suffix=".json")
     try:
@@ -57,26 +102,58 @@ def save_preview(state_dir: Path, key: str, items: list[dict]) -> None:
         raise
 
 
-def load_preview(state_dir: Path, key: str) -> list[dict]:
-    """Item summaries from a previous preview, or [] if there is no usable archive."""
+def _usage(payload: dict) -> Usage:
+    raw = payload.get("usage")
+    if not isinstance(raw, dict):
+        return Usage()
+    return Usage(
+        input_tokens=int(raw.get("input_tokens") or 0),
+        output_tokens=int(raw.get("output_tokens") or 0),
+        calls=int(raw.get("calls") or 0),
+    )
+
+
+def load_preview(state_dir: Path, key: str) -> PreviewArchive:
+    """The previous preview's output, or an empty archive if there is none.
+
+    A v1 file still yields its item summaries; it simply has no page body, so
+    the caller falls back to writing the page from the minutes.
+    """
+    empty = PreviewArchive()
+
     try:
         path = _path(state_dir, key)
     except ValueError as exc:
         log.warning("%s", exc)
-        return []
+        return empty
 
     if not path.exists():
         log.debug("no preview archive for %s", key)
-        return []
+        return empty
 
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
         log.warning("preview archive for %s is unreadable (%s)", key, exc)
-        return []
+        return empty
 
     items = payload.get("items")
     if not isinstance(items, list):
         log.warning("preview archive for %s has no item list", key)
-        return []
-    return [i for i in items if isinstance(i, dict)]
+        items = []
+
+    body = payload.get("body")
+    if payload.get("version") == 1:
+        log.info(
+            "%s has a v1 preview archive (no page body); the outcome will be "
+            "written from the minutes alone",
+            key,
+        )
+
+    return PreviewArchive(
+        items=[i for i in items if isinstance(i, dict)],
+        body=body if isinstance(body, str) else "",
+        usage=_usage(payload),
+        model=str(payload.get("model") or ""),
+        generated_at=str(payload.get("generated_at") or ""),
+    )
