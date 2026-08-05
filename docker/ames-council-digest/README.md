@@ -41,8 +41,11 @@ A run then:
    the configured delivery sinks (`delivery.py`).
 5. **Records** the meeting in a state file so the next run skips it.
 
-A typical regular meeting is ~40 packet items and ~600 pages, costing roughly
-300k input / 36k output tokens.
+A typical regular meeting is ~40 packet items and ~600 pages, measured at ~294k
+input / 33k output tokens. On zen's `claude-sonnet-4-5` ($3/$15 per M) that is
+roughly **$1.40 per meeting**, or ~$55/year across ~40 meetings. Pointing
+`AMES_ITEM_MODEL` at `claude-haiku-4-5` ($1/$5) cuts it to about a third, since
+per-item summaries are ~95% of the spend.
 
 Items whose PDFs are scans with no text layer are reported by title in the
 digest's appendix rather than silently dropped — there is no OCR in the image.
@@ -87,6 +90,11 @@ Per-item summaries dominate token spend, so `AMES_ITEM_MODEL` is worth pointing
 at something cheap; `AMES_DIGEST_MODEL` is a single call and worth spending on.
 Any gateway speaking the Anthropic Messages API works — `api.anthropic.com` or
 a local bridge just needs a different `AMES_LLM_BASE_URL`.
+
+Model IDs are the bare form zen's API uses (`claude-sonnet-4-5`,
+`claude-haiku-4-5`, `claude-opus-5`) — not the `opencode/`-prefixed names in
+zen's docs, which are its config-file form. `GET /zen/v1/models` lists them, and
+an unsupported ID fails fast with a `ModelError` rather than retrying.
 
 ## Usage
 

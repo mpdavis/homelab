@@ -7,7 +7,10 @@ a vendor SDK) keeps the image small and avoids coupling the gateway's behavior
 to an SDK version.
 
 Auth is sent as both ``x-api-key`` and ``Authorization: Bearer`` because
-gateways differ on which one they read; each ignores the other.
+gateways differ on which one they read; each ignores the other. This is not
+belt-and-braces: zen's ``/messages`` reads ``x-api-key`` specifically and
+answers "Missing API key" to a Bearer-only request, even though its docs show
+Bearer for the OpenAI-shaped endpoints.
 """
 
 from __future__ import annotations
