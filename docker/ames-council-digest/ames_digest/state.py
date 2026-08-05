@@ -1,6 +1,11 @@
-"""Which meetings have already been digested.
+"""Which meetings have been digested, and in which pass.
 
-A single JSON file on the PVC. Written atomically so a pod evicted mid-write
+A meeting is digested twice: once from the agenda and packet before it happens
+(``preview``), and once from the minutes afterwards (``outcome``). They are
+tracked separately because the documents arrive days apart — a meeting whose
+preview is done still has an outcome pending for a week or more.
+
+A single JSON file on the PVC, written atomically so a pod evicted mid-write
 leaves the previous state intact rather than a truncated file that would make
 the next run re-digest (and re-bill) everything.
 """
@@ -18,7 +23,43 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 STATE_FILENAME = "processed.json"
-STATE_VERSION = 1
+STATE_VERSION = 2
+
+PHASE_PREVIEW = "preview"
+PHASE_OUTCOME = "outcome"
+PHASES = (PHASE_PREVIEW, PHASE_OUTCOME)
+
+
+def _migrate(payload: dict) -> dict[str, dict]:
+    """Bring an on-disk payload up to the current schema.
+
+    v1 stored one flat record per meeting, which was always a preview — the
+    outcome pass didn't exist. Re-keying those under ``preview`` is what keeps
+    an upgrade from re-summarizing (and re-paying for) every packet on disk.
+    """
+    processed = payload.get("processed") or {}
+    version = payload.get("version")
+
+    if version == STATE_VERSION:
+        return processed
+
+    if version == 1:
+        migrated = {
+            key: {PHASE_PREVIEW: record}
+            for key, record in processed.items()
+            if isinstance(record, dict)
+        }
+        log.info("migrated %d state entries from v1 to v2", len(migrated))
+        return migrated
+
+    # An unknown (newer) version: keep whatever is already phase-shaped rather
+    # than discarding it, since dropping state costs real money.
+    log.warning("unrecognized state version %r; salvaging phase-shaped entries", version)
+    return {
+        key: record
+        for key, record in processed.items()
+        if isinstance(record, dict) and any(p in record for p in PHASES)
+    }
 
 
 @dataclass
@@ -38,13 +79,14 @@ class State:
             # inspection — losing state costs money, so make the loss visible.
             log.error("state file %s unreadable (%s); starting empty", path, exc)
             return cls(path=path, processed={})
-        return cls(path=path, processed=payload.get("processed") or {})
+        return cls(path=path, processed=_migrate(payload))
 
-    def seen(self, key: str) -> bool:
-        return key in self.processed
+    def seen(self, key: str, phase: str = PHASE_PREVIEW) -> bool:
+        return phase in (self.processed.get(key) or {})
 
-    def record(self, key: str, **details: object) -> None:
-        self.processed[key] = {
+    def record(self, key: str, phase: str = PHASE_PREVIEW, **details: object) -> None:
+        entry = self.processed.setdefault(key, {})
+        entry[phase] = {
             "digested_at": datetime.now().astimezone().isoformat(timespec="seconds"),
             **details,
         }

@@ -52,6 +52,7 @@ INDEX_TEMPLATE = """\
   a:hover {{ text-decoration: underline; }}
   .meta {{ color: #59636e; font-size: 12px; margin-top: 2px; }}
   .meta a {{ font-weight: 400; }}
+  .md {{ color: #59636e; }}
   .empty {{ color: #59636e; font-style: italic; }}
   footer {{ margin-top: 24px; border-top: 1px solid #e4e8ec; padding-top: 12px;
             color: #59636e; font-size: 12px; }}
@@ -77,6 +78,9 @@ INDEX_TEMPLATE = """\
 """
 
 
+OUTCOME_SUFFIX = "-outcome"
+
+
 @dataclass(frozen=True)
 class DigestEntry:
     stem: str
@@ -85,9 +89,50 @@ class DigestEntry:
     has_markdown: bool
 
     @property
+    def is_outcome(self) -> bool:
+        return self.stem.endswith(OUTCOME_SUFFIX)
+
+    @property
+    def meeting_stem(self) -> str:
+        """The preview's stem — the identity both passes of a meeting share."""
+        return (
+            self.stem[: -len(OUTCOME_SUFFIX)] if self.is_outcome else self.stem
+        )
+
+    @property
     def sort_key(self) -> tuple[date, str]:
         # Undated files sort last rather than crashing the comparison.
         return (self.meeting_date or date.min, self.stem)
+
+
+@dataclass
+class MeetingRow:
+    """Both passes of one meeting, shown as a single entry."""
+
+    meeting_stem: str
+    preview: DigestEntry | None = None
+    outcome: DigestEntry | None = None
+
+    @property
+    def title(self) -> str:
+        # The preview's title is the plain meeting name; the outcome's carries
+        # a "what council decided" suffix that would read oddly as the heading.
+        if self.preview:
+            return self.preview.title
+        if self.outcome:
+            return self.outcome.title.split(" — what council decided")[0]
+        return self.meeting_stem
+
+    @property
+    def meeting_date(self) -> date | None:
+        for entry in (self.preview, self.outcome):
+            if entry and entry.meeting_date:
+                return entry.meeting_date
+        return None
+
+    @property
+    def sort_key(self) -> tuple[date, str]:
+        return (self.meeting_date or date.min, self.meeting_stem)
 
 
 def _title_of(path: Path) -> str:
@@ -111,7 +156,7 @@ def _date_of(stem: str) -> date | None:
 
 
 def collect(output_dir: Path) -> list[DigestEntry]:
-    """Every digest in the directory, newest meeting first."""
+    """Every digest file in the directory, newest meeting first."""
     entries = [
         DigestEntry(
             stem=path.stem,
@@ -125,36 +170,62 @@ def collect(output_dir: Path) -> list[DigestEntry]:
     return sorted(entries, key=lambda e: e.sort_key, reverse=True)
 
 
-def render_index(entries: list[DigestEntry]) -> str:
-    if not entries:
+def collect_meetings(output_dir: Path) -> list[MeetingRow]:
+    """Digests grouped by meeting, so both passes share one row."""
+    rows: dict[str, MeetingRow] = {}
+    for entry in collect(output_dir):
+        row = rows.setdefault(entry.meeting_stem, MeetingRow(entry.meeting_stem))
+        if entry.is_outcome:
+            row.outcome = entry
+        else:
+            row.preview = entry
+    return sorted(rows.values(), key=lambda r: r.sort_key, reverse=True)
+
+
+def _links(entry: DigestEntry | None, label: str) -> str:
+    if entry is None:
+        return ""
+    stem = html.escape(entry.stem)
+    link = f'<a href="{stem}.html">{label}</a>'
+    if entry.has_markdown:
+        link += f' <a href="{stem}.md" class="md">(md)</a>'
+    return link
+
+
+def render_index(rows: list[MeetingRow]) -> str:
+    if not rows:
         body = '<p class="empty">No digests yet.</p>'
         count = "Nothing published yet."
     else:
         items = []
-        for entry in entries:
-            markdown_link = (
-                f' · <a href="{html.escape(entry.stem)}.md">Markdown</a>'
-                if entry.has_markdown
-                else ""
-            )
+        for row in rows:
             when = (
-                entry.meeting_date.strftime("%B %-d, %Y")
-                if entry.meeting_date
+                row.meeting_date.strftime("%B %-d, %Y")
+                if row.meeting_date
                 else "date unknown"
             )
+            # The heading links to the outcome once it exists — that's the
+            # fuller account — and to the preview before then.
+            primary = row.outcome or row.preview
+            assert primary is not None  # a row exists only if one pass wrote a file
+            parts = [
+                _links(row.preview, "Before the meeting"),
+                _links(row.outcome, "What council decided"),
+            ]
+            meta = " · ".join([html.escape(when), *[p for p in parts if p]])
             items.append(
-                f'      <li><a href="{html.escape(entry.stem)}.html">'
-                f"{html.escape(entry.title)}</a>"
-                f'<div class="meta">{html.escape(when)}{markdown_link}</div></li>'
+                f'      <li><a href="{html.escape(primary.stem)}.html">'
+                f"{html.escape(row.title)}</a>"
+                f'<div class="meta">{meta}</div></li>'
             )
         body = "<ul>\n" + "\n".join(items) + "\n    </ul>"
-        count = f"{len(entries)} meeting{'s' if len(entries) != 1 else ''}"
+        count = f"{len(rows)} meeting{'s' if len(rows) != 1 else ''}"
 
     return INDEX_TEMPLATE.format(count=html.escape(count), body=body)
 
 
 def rebuild(output_dir: Path) -> int:
     """Regenerate index.html from the directory's contents. Returns the count."""
-    entries = collect(output_dir)
-    (output_dir / INDEX_FILENAME).write_text(render_index(entries), encoding="utf-8")
-    return len(entries)
+    rows = collect_meetings(output_dir)
+    (output_dir / INDEX_FILENAME).write_text(render_index(rows), encoding="utf-8")
+    return len(rows)

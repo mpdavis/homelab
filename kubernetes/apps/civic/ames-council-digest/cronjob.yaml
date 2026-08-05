@@ -1,10 +1,14 @@
 # Hourly check for newly posted Ames City Council agendas and packets.
 #
-# A run with nothing new costs 6 folder listings against the city's server and
-# zero model calls — meetings already in the state file on the PVC are filtered
-# out before their documents are ever listed. That puts hourly polling at ~144
-# requests/day. A new meeting adds 2 listings, and only then does it cost
-# tokens (~$1.40, see the README).
+# Each meeting is digested twice: once from the agenda and packet before it
+# happens, and again from the minutes about a week later. Hourly polling is
+# what makes both land promptly without anyone watching for them.
+#
+# A run with nothing new costs 9 folder listings against the city's server and
+# zero model calls — meetings whose passes are all done are filtered out before
+# their documents are ever listed. That puts hourly polling at ~216
+# requests/day. A new meeting adds 3 listings, and only then does it cost
+# tokens: ~$1.40 for the packet pass, a few cents for the minutes (README).
 #
 # :17 rather than :00 — nothing depends on the exact minute, and it keeps this
 # off the top-of-hour spike that every other scheduled poller lands on.

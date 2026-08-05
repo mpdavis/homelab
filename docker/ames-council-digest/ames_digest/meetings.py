@@ -1,14 +1,17 @@
-"""Meeting discovery: pair each dated agenda folder with its council packet.
+"""Meeting discovery: pair each dated meeting folder across the clerk's trees.
 
-The clerk's repository keeps the agenda and the packet in parallel trees:
+The repository keeps a meeting's documents in three parallel trees, all keyed
+by the meeting date:
 
     Clerk Files/Agendas/<Board>/<Year>/<YYYY MMDD>/   -> the agenda PDF
     Clerk Files/Council Packet/<Year>/<YYYY MMDD>/    -> one PDF per agenda item
+    Clerk Files/Minutes/<Board>/<Year>/<YYYY MMDD>/   -> the summary minutes
 
-Only the City Council has a packet tree; other boards publish an agenda alone.
-A meeting is keyed by date, and either side may be missing — packets are often
-posted a few days after the agenda, and special meetings sometimes never get
-one.
+Only the City Council has a packet tree; other boards publish an agenda and
+minutes alone. Any side may be missing, and they arrive at different times:
+the agenda first, the packet a few days later, the minutes about a week after
+the meeting itself. That staggering is why a meeting is digested in two
+passes — see :mod:`ames_digest.summarize`.
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ log = logging.getLogger(__name__)
 
 AGENDAS_FOLDER = "Agendas"
 PACKET_FOLDER = "Council Packet"
+MINUTES_FOLDER = "Minutes"
 # The packet tree is council-only; agendas for other boards live one level
 # deeper under Agendas/<Board>.
 COUNCIL_BOARD = "City Council"
@@ -44,6 +48,8 @@ class Meeting:
     packet_master: Entry | None = None
     packet_items: list[Entry] = field(default_factory=list)
     packet_folder_id: int | None = None
+    minutes: Entry | None = None
+    minutes_folder_id: int | None = None
     # False until MeetingSource.load_documents has listed this meeting's
     # folders, so an unexamined meeting is never mistaken for an empty one.
     documents_loaded: bool = False
@@ -61,13 +67,27 @@ class Meeting:
 
     @property
     def has_documents(self) -> bool:
+        """Whether anything is published for this meeting at all."""
+        return bool(
+            self.agenda or self.packet_master or self.packet_items or self.minutes
+        )
+
+    @property
+    def has_preview_documents(self) -> bool:
+        """Whether the before-the-meeting material (agenda/packet) is up."""
         return bool(self.agenda or self.packet_master or self.packet_items)
+
+    @property
+    def has_minutes(self) -> bool:
+        return self.minutes is not None
 
     def __str__(self) -> str:
         label = f" [{self.label}]" if self.label else ""
         return (
             f"{self.board}{label} {self.meeting_date.isoformat()} "
-            f"(agenda={'yes' if self.agenda else 'no'}, items={len(self.packet_items)})"
+            f"(agenda={'yes' if self.agenda else 'no'}, "
+            f"items={len(self.packet_items)}, "
+            f"minutes={'yes' if self.minutes else 'no'})"
         )
 
 
@@ -113,6 +133,18 @@ class MeetingSource:
             return {}
         return self.client.year_folders(parent)
 
+    def _minutes_year_folders(self) -> dict[int, int]:
+        try:
+            parent = self.client.resolve_path(
+                self.root_folder_id, MINUTES_FOLDER, self.board
+            )
+        except LookupError:
+            # Not every board publishes minutes here; the preview pass is
+            # unaffected, so this is a debug note rather than a warning.
+            log.debug("no %s/%s folder in the repository", MINUTES_FOLDER, self.board)
+            return {}
+        return self.client.year_folders(parent)
+
     def discover(self, years: list[int]) -> list[Meeting]:
         """Return every meeting folder in the given years, oldest first.
 
@@ -123,44 +155,31 @@ class MeetingSource:
         from here with no documents attached and ``has_documents`` False; that
         means "not looked at yet", not "empty".
         """
-        agenda_years = self._agenda_year_folders()
-        packet_years = self._packet_year_folders()
-
         # Keyed by (date, label) so a "Tax Levy" session and that day's regular
-        # meeting stay separate. Packet folders carry no label, so an unlabeled
-        # packet pairs with the unlabeled agenda — which is the regular meeting.
+        # meeting stay separate. Packet and minutes folders carry no label, so
+        # an unlabeled one pairs with the unlabeled agenda — the regular meeting.
         meetings: dict[tuple[date, str], Meeting] = {}
 
-        for year in years:
-            folder_id = agenda_years.get(year)
-            if folder_id is None:
-                log.debug("no agenda folder for %s", year)
-                continue
-            for folder in self.client.meeting_folders(folder_id):
-                meeting = meetings.setdefault(
-                    (folder.meeting_date, folder.label),
-                    Meeting(
-                        board=self.board,
-                        meeting_date=folder.meeting_date,
-                        label=folder.label,
-                    ),
-                )
-                meeting.agenda_folder_id = folder.entry_id
+        def absorb(year_folders: dict[int, int], attr: str) -> None:
+            for year in years:
+                folder_id = year_folders.get(year)
+                if folder_id is None:
+                    log.debug("no %s folder for %s", attr, year)
+                    continue
+                for folder in self.client.meeting_folders(folder_id):
+                    meeting = meetings.setdefault(
+                        (folder.meeting_date, folder.label),
+                        Meeting(
+                            board=self.board,
+                            meeting_date=folder.meeting_date,
+                            label=folder.label,
+                        ),
+                    )
+                    setattr(meeting, attr, folder.entry_id)
 
-        for year in years:
-            folder_id = packet_years.get(year)
-            if folder_id is None:
-                continue
-            for folder in self.client.meeting_folders(folder_id):
-                meeting = meetings.setdefault(
-                    (folder.meeting_date, folder.label),
-                    Meeting(
-                        board=self.board,
-                        meeting_date=folder.meeting_date,
-                        label=folder.label,
-                    ),
-                )
-                meeting.packet_folder_id = folder.entry_id
+        absorb(self._agenda_year_folders(), "agenda_folder_id")
+        absorb(self._packet_year_folders(), "packet_folder_id")
+        absorb(self._minutes_year_folders(), "minutes_folder_id")
 
         return [m for _, m in sorted(meetings.items(), key=lambda kv: kv[0])]
 
@@ -183,6 +202,12 @@ class MeetingSource:
             )
             meeting.packet_master = master
             meeting.packet_items = items
+
+        if meeting.minutes_folder_id is not None:
+            master, extra = _split_master(
+                _documents(self.client, meeting.minutes_folder_id)
+            )
+            meeting.minutes = master or (extra[0] if extra else None)
 
         meeting.documents_loaded = True
         return meeting

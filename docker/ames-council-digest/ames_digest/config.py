@@ -75,6 +75,11 @@ class Config:
     agenda_char_budget: int = field(
         default_factory=lambda: _env_int("AMES_AGENDA_CHAR_BUDGET", 200_000)
     )
+    # Summary minutes run ~25k chars for a full meeting, so this is generous
+    # headroom rather than a real constraint.
+    minutes_char_budget: int = field(
+        default_factory=lambda: _env_int("AMES_MINUTES_CHAR_BUDGET", 200_000)
+    )
     max_concurrency: int = field(
         default_factory=lambda: _env_int("AMES_MAX_CONCURRENCY", 4)
     )

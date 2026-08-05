@@ -5,16 +5,17 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
 from .config import Config
-from . import index
+from . import archive, index
 from .delivery import DeliveryError, build_sinks, deliver_all
 from .llm import LLMClient
 from .meetings import Meeting, MeetingSource
 from .pdftext import extract
 from .render import render
-from .state import State
+from .state import PHASE_OUTCOME, PHASE_PREVIEW, PHASES, State
 from .summarize import MeetingSummarizer
 from .weblink import WebLinkClient
 
@@ -78,9 +79,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="most meetings to digest in one run (default: 3)",
     )
     run.add_argument(
+        "--phase",
+        choices=[*PHASES, "both"],
+        default="both",
+        help=(
+            "which pass to run: preview (agenda + packet, before the meeting), "
+            "outcome (minutes, after it), or both (default)"
+        ),
+    )
+    run.add_argument(
         "--force",
         action="store_true",
-        help="re-digest meetings already recorded in state",
+        help="re-digest passes already recorded in state",
     )
     run.add_argument(
         "--no-state",
@@ -117,6 +127,58 @@ def _years_for_window(start: date, end: date) -> list[int]:
     return list(range(start.year, end.year + 1))
 
 
+@dataclass
+class Job:
+    """One digest to produce: a meeting and which pass to run over it."""
+
+    meeting: Meeting
+    phase: str
+
+    def __str__(self) -> str:
+        return f"{self.meeting.key} ({self.phase})"
+
+
+def _pending_phases(
+    meeting: Meeting,
+    args: argparse.Namespace,
+    state: State | None,
+    today: date,
+) -> list[str]:
+    """Which passes this meeting still needs, given what's published.
+
+    Assumes documents are already loaded — the caller decides whether a
+    meeting is worth that request.
+    """
+    wanted = PHASES if args.phase == "both" else (args.phase,)
+    pending = []
+
+    for phase in wanted:
+        if state is not None and not args.force and state.seen(meeting.key, phase):
+            continue
+
+        if phase == PHASE_PREVIEW:
+            if not meeting.has_preview_documents:
+                continue
+            # The preview is most useful before the meeting, so upcoming ones
+            # are in scope — but only once the packet is actually up. Running
+            # it early would burn the single shot state gives us.
+            if meeting.meeting_date > today and not (
+                meeting.agenda and meeting.packet_items
+            ):
+                log.debug("%s: packet not posted yet", meeting.key)
+                continue
+        elif phase == PHASE_OUTCOME:
+            # Minutes appear about a week after the meeting; until then there
+            # is simply nothing to report.
+            if not meeting.has_minutes:
+                log.debug("%s: minutes not posted yet", meeting.key)
+                continue
+
+        pending.append(phase)
+
+    return pending
+
+
 def _select(
     meetings: list[Meeting],
     args: argparse.Namespace,
@@ -124,50 +186,52 @@ def _select(
     cutoff: date,
     today: date,
     source: MeetingSource,
-) -> list[Meeting]:
+) -> list[Job]:
     """Choose what to digest, listing documents only for real candidates.
 
     Ordering matters for politeness as much as speed: the date and state
     filters are free, so they run first and keep a routine poll from listing
-    the documents of meetings that were already digested months ago.
+    the documents of meetings whose passes are all long since done.
     """
     if args.meeting:
         wanted = set(args.meeting)
         selected = [m for m in meetings if m.meeting_date in wanted]
-        missing = wanted - {m.meeting_date for m in selected}
-        for miss in sorted(missing):
+        for miss in sorted(wanted - {m.meeting_date for m in selected}):
             log.error("no meeting found on %s", miss.isoformat())
-        return [source.load_documents(m) for m in selected]
+        jobs = []
+        for meeting in selected:
+            source.load_documents(meeting)
+            jobs += [
+                Job(meeting, p) for p in _pending_phases(meeting, args, state, today)
+            ]
+        return jobs
 
     horizon = today + timedelta(days=max(args.lookahead_days, 0))
     candidates = [m for m in meetings if cutoff <= m.meeting_date <= horizon]
     if state is not None and not args.force:
-        candidates = [m for m in candidates if not state.seen(m.key)]
+        # Skip only meetings with nothing left to do in either pass.
+        candidates = [
+            m
+            for m in candidates
+            if not all(state.seen(m.key, p) for p in PHASES)
+        ]
 
     # Newest first, so a limited run covers the meeting a reader most wants.
     candidates.sort(key=lambda m: (m.meeting_date, m.label), reverse=True)
 
     limit = max(args.limit, 0) if args.limit else None
-    chosen: list[Meeting] = []
+    jobs: list[Job] = []
     for meeting in candidates:
-        if limit is not None and len(chosen) >= limit:
+        if limit is not None and len(jobs) >= limit:
             break
         source.load_documents(meeting)
+        # A folder created ahead of its posting. Skip it and look further back
+        # rather than letting it consume a slot in the limit.
         if not meeting.has_documents:
-            # A folder created ahead of the posting. Skip it and look further
-            # back rather than letting it consume a slot in the limit.
             continue
-        # The digest is most useful before the meeting, so upcoming meetings
-        # are in scope — but only once the packet is actually up. Digesting one
-        # early would burn the single shot state gives us for that meeting.
-        if meeting.meeting_date > today and not (
-            meeting.agenda and meeting.packet_items
-        ):
-            log.debug("%s is upcoming but its packet isn't posted yet", meeting.key)
-            continue
-        chosen.append(meeting)
+        jobs += [Job(meeting, p) for p in _pending_phases(meeting, args, state, today)]
 
-    return chosen
+    return jobs[:limit] if limit is not None else jobs
 
 
 def _refresh_index(cfg: Config) -> None:
@@ -237,14 +301,21 @@ def cmd_run(args: argparse.Namespace, cfg: Config) -> int:
             return 0
 
         log.info(
-            "digesting %d meeting(s): %s",
+            "%d digest(s) to produce: %s",
             len(selected),
-            ", ".join(m.meeting_date.isoformat() for m in selected),
+            ", ".join(str(j) for j in selected),
         )
 
         if args.dry_run:
-            for meeting in selected:
-                _dry_run(meeting, weblink, cfg)
+            # Both passes of a meeting share its documents, so report each
+            # meeting once. Meeting is a mutable dataclass and so unhashable —
+            # dedupe on the key it already defines for exactly this purpose.
+            seen_keys: set[str] = set()
+            for job in selected:
+                if job.meeting.key in seen_keys:
+                    continue
+                seen_keys.add(job.meeting.key)
+                _dry_run(job.meeting, weblink, cfg)
             return 0
 
         cfg.require_llm()
@@ -253,22 +324,46 @@ def cmd_run(args: argparse.Namespace, cfg: Config) -> int:
         summarizer = MeetingSummarizer(cfg, weblink, llm)
 
         failures = 0
-        for meeting in selected:
+        for job in selected:
+            meeting = job.meeting
             try:
-                digest = summarizer.run(meeting)
+                if job.phase == PHASE_PREVIEW:
+                    digest = summarizer.run_preview(meeting)
+                else:
+                    # The archive is what lets the outcome say "council
+                    # approved the thing the packet described" without paying
+                    # to summarize the packet a second time. Its absence is
+                    # survivable: run_outcome falls back to the minutes alone.
+                    digest = summarizer.run_outcome(
+                        meeting, archive.load_preview(cfg.state_dir, meeting.key)
+                    )
+
                 rendered = render(digest)
                 for line in deliver_all(rendered, cfg, sinks):
-                    log.info("%s -> %s", meeting.key, line)
+                    log.info("%s -> %s", job, line)
             except (RuntimeError, DeliveryError) as exc:
-                # One bad meeting must not abort the rest, and must not be
-                # recorded as done — the next run retries it.
-                log.error("failed to digest %s: %s", meeting.key, exc)
+                # One bad job must not abort the rest, and must not be recorded
+                # as done — the next run retries it.
+                log.error("failed to digest %s: %s", job, exc)
                 failures += 1
                 continue
 
             if state is not None:
+                if job.phase == PHASE_PREVIEW:
+                    try:
+                        archive.save_preview(
+                            cfg.state_dir,
+                            meeting.key,
+                            [i.to_archive() for i in digest.items if i.ok],
+                        )
+                    except (OSError, ValueError) as exc:
+                        # Costs the outcome pass its cross-reference, not the
+                        # digest that was just delivered.
+                        log.warning("could not archive %s: %s", meeting.key, exc)
+
                 state.record(
                     meeting.key,
+                    job.phase,
                     meeting_date=meeting.meeting_date.isoformat(),
                     board=meeting.board,
                     items=len(digest.items),
@@ -296,14 +391,19 @@ def cmd_list(args: argparse.Namespace, cfg: Config) -> int:
         for meeting in shown:
             source.load_documents(meeting)
     print(f"{cfg.board}: {len(shown)} meetings since {cutoff.isoformat()}\n")
-    print(f"{'date':<12} {'items':>5}  {'agenda':<7} {'digested':<9} when")
+    print(
+        f"{'date':<12} {'items':>5}  {'agenda':<7} {'minutes':<8} "
+        f"{'preview':<8} {'outcome':<8} when"
+    )
     for meeting in shown:
-        digested = "yes" if state.seen(meeting.key) else "-"
-        agenda = "yes" if meeting.agenda else "-"
         when = "upcoming" if meeting.meeting_date > today else "past"
         print(
             f"{meeting.meeting_date.isoformat():<12} "
-            f"{len(meeting.packet_items):>5}  {agenda:<7} {digested:<9} {when}"
+            f"{len(meeting.packet_items):>5}  "
+            f"{'yes' if meeting.agenda else '-':<7} "
+            f"{'yes' if meeting.has_minutes else '-':<8} "
+            f"{'done' if state.seen(meeting.key, PHASE_PREVIEW) else '-':<8} "
+            f"{'done' if state.seen(meeting.key, PHASE_OUTCOME) else '-':<8} {when}"
         )
     return 0
 
@@ -338,6 +438,7 @@ def main(argv: list[str] | None = None) -> int:
         ("lookahead_days", 10),
         ("meeting", None),
         ("limit", 3),
+        ("phase", "both"),
         ("force", False),
         ("no_state", False),
         ("dry_run", False),
