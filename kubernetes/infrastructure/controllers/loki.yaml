@@ -29,6 +29,29 @@ spec:
       auth_enabled: false
       commonConfig:
         replication_factor: 1
+      limits_config:
+        # Loki's default list, plus `pod` as a last resort. loki-canary pushes
+        # straight to the gateway (`-labelname=pod -labelvalue=$(POD_NAME)`)
+        # instead of going through Alloy, so its streams carry only `pod` and
+        # `stream` — none of the labels below — and every canary line landed
+        # under `service_name="unknown_service"` in Grafana. The list is
+        # ordered and first-match-wins, so appending `pod` leaves every
+        # Alloy-shipped stream (which always has `app`) untouched.
+        discover_service_name:
+          - service
+          - app
+          - application
+          - app_name
+          - name
+          - app_kubernetes_io_name
+          - container
+          - container_name
+          - k8s_container_name
+          - component
+          - workload
+          - job
+          - k8s_job_name
+          - pod
       storage:
         type: filesystem
       schemaConfig:
