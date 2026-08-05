@@ -50,8 +50,11 @@ A run then:
    three trees (`meetings.py`). Any side may be missing. Discovery lists
    folders only; a meeting's documents are listed lazily, after the date and
    digest-state filters, so a routine poll that finds nothing new costs 9
-   requests rather than one per meeting per tree. That is what makes hourly
-   polling reasonable to point at a city government's server. Two
+   requests rather than one per meeting per tree — the difference between
+   frequent polling being reasonable to point at a city government's server
+   and not. Six of those nine only walk the fixed folder hierarchy
+   (`Clerk Files` → tree → year), which changes at most yearly and is the
+   obvious next thing to cache if the schedule gets tighter still. Two
    folder-naming variants appear in the archive and are both handled:
    multi-day meetings (`2025 02040506` — February 4, 5, and 6, keyed to the
    first day) and labeled special sessions (`2026 0324 Tax Levy`), which can
