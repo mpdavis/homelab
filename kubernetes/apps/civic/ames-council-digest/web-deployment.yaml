@@ -14,6 +14,20 @@ spec:
       labels:
         app: ames-council-digest-web
     spec:
+      securityContext:
+        # The image already defaults to uid 101, but pinning it makes the
+        # non-root posture a policy rather than a property of the image tag.
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        # The CronJob writes as uid/gid 1000. Those files land world-readable
+        # under the default umask, so nginx can read them today — this grants
+        # group access as well, so a tighter umask upstream can't quietly turn
+        # every digest into a 403. supplementalGroups rather than fsGroup: the
+        # PVC is mounted read-only, and fsGroup invites the kubelet to manage
+        # volume ownership, which is pointless on NFS and risky on a read-only
+        # mount. Group membership is the whole ask.
+        supplementalGroups: [1000]
       containers:
         - name: nginx
           # nginx-unprivileged listens on 8080 and runs as uid 101 without
