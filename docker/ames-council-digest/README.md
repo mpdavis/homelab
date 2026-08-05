@@ -27,7 +27,11 @@ A run then:
 
 1. **Discovers** meetings by date, pairing each agenda folder with its packet
    folder (`meetings.py`). Either side may be missing — packets are often
-   posted after the agenda. Two folder-naming variants appear in the archive
+   posted after the agenda. Discovery lists folders only; a meeting's documents
+   are listed lazily, after the date and digest-state filters, so a routine
+   poll that finds nothing new costs 6 requests rather than one per meeting
+   per tree. That is what makes hourly polling reasonable to point at a city
+   government's server. Two folder-naming variants appear in the archive
    and are both handled: multi-day meetings (`2025 02040506` — February 4, 5,
    and 6, keyed to the first day) and labeled special sessions
    (`2026 0324 Tax Levy`), which can fall on the same date as that day's

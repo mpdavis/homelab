@@ -44,6 +44,9 @@ class Meeting:
     packet_master: Entry | None = None
     packet_items: list[Entry] = field(default_factory=list)
     packet_folder_id: int | None = None
+    # False until MeetingSource.load_documents has listed this meeting's
+    # folders, so an unexamined meeting is never mistaken for an empty one.
+    documents_loaded: bool = False
 
     @property
     def key(self) -> str:
@@ -111,11 +114,14 @@ class MeetingSource:
         return self.client.year_folders(parent)
 
     def discover(self, years: list[int]) -> list[Meeting]:
-        """Return every meeting in the given years, oldest first.
+        """Return every meeting folder in the given years, oldest first.
 
-        Document listings are fetched eagerly — a meeting with no documents yet
-        (an empty folder created ahead of the posting) is dropped, since there
-        is nothing to summarize.
+        Only the folders — listing each meeting's documents costs one request
+        per meeting per tree, which is the bulk of a run's traffic against the
+        city's server. Callers narrow by date and digest state first, then call
+        :meth:`load_documents` on what actually survives. A meeting comes back
+        from here with no documents attached and ``has_documents`` False; that
+        means "not looked at yet", not "empty".
         """
         agenda_years = self._agenda_year_folders()
         packet_years = self._packet_year_folders()
@@ -140,11 +146,6 @@ class MeetingSource:
                     ),
                 )
                 meeting.agenda_folder_id = folder.entry_id
-                docs = _documents(self.client, folder.entry_id)
-                # An agenda folder holds a single master PDF; if the clerk ever
-                # posts several, prefer the master and keep the rest as items.
-                master, extra = _split_master(docs)
-                meeting.agenda = master or (extra[0] if extra else None)
 
         for year in years:
             folder_id = packet_years.get(year)
@@ -160,12 +161,28 @@ class MeetingSource:
                     ),
                 )
                 meeting.packet_folder_id = folder.entry_id
-                master, items = _split_master(_documents(self.client, folder.entry_id))
-                meeting.packet_master = master
-                meeting.packet_items = items
 
-        return [
-            m
-            for _, m in sorted(meetings.items(), key=lambda kv: kv[0])
-            if m.has_documents
-        ]
+        return [m for _, m in sorted(meetings.items(), key=lambda kv: kv[0])]
+
+    def load_documents(self, meeting: Meeting) -> Meeting:
+        """Fetch the document listings for one meeting. Idempotent."""
+        if meeting.documents_loaded:
+            return meeting
+
+        if meeting.agenda_folder_id is not None:
+            # An agenda folder holds a single master PDF; if the clerk ever
+            # posts several, prefer the master and keep the rest as items.
+            master, extra = _split_master(
+                _documents(self.client, meeting.agenda_folder_id)
+            )
+            meeting.agenda = master or (extra[0] if extra else None)
+
+        if meeting.packet_folder_id is not None:
+            master, items = _split_master(
+                _documents(self.client, meeting.packet_folder_id)
+            )
+            meeting.packet_master = master
+            meeting.packet_items = items
+
+        meeting.documents_loaded = True
+        return meeting

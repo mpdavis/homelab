@@ -1,8 +1,13 @@
-# Daily check for newly posted Ames City Council agendas and packets.
+# Hourly check for newly posted Ames City Council agendas and packets.
 #
-# A run with nothing new costs only a handful of folder listings — the model is
-# only called for meetings not already in the state file on the PVC — so daily
-# is cheap and catches a packet the morning after the clerk posts it.
+# A run with nothing new costs 6 folder listings against the city's server and
+# zero model calls — meetings already in the state file on the PVC are filtered
+# out before their documents are ever listed. That puts hourly polling at ~144
+# requests/day. A new meeting adds 2 listings, and only then does it cost
+# tokens (~$1.40, see the README).
+#
+# :17 rather than :00 — nothing depends on the exact minute, and it keeps this
+# off the top-of-hour spike that every other scheduled poller lands on.
 #
 # Delivery is `file`: each digest lands on the PVC as Markdown + HTML. Add the
 # ntfy or smtp sink to AMES_DELIVERY below once a destination is settled on.
@@ -14,20 +19,22 @@ metadata:
   name: ames-council-digest
 spec:
   suspend: false
-  schedule: "0 7 * * *"
+  schedule: "17 * * * *"
   timeZone: ${TZ}
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
-  # A missed window (node down, cluster upgrade) should just wait for tomorrow
-  # rather than fire late; the meeting will still be there.
-  startingDeadlineSeconds: 3600
+  # A missed window (node down, cluster upgrade) should wait for the next hour
+  # rather than fire late into the following one; the meeting will still be
+  # there. Kept well under the hourly period for that reason.
+  startingDeadlineSeconds: 600
   jobTemplate:
     spec:
       backoffLimit: 2
-      # ~40 packet items at concurrency 4 takes several minutes; this bounds a
-      # wedged gateway without cutting a healthy run short.
-      activeDeadlineSeconds: 3600
+      # A cold run digesting the 3-meeting limit takes ~15 minutes. Capping
+      # below the hourly period means a wedged gateway can't still be holding
+      # the Forbid lock when the next run is due.
+      activeDeadlineSeconds: 2700
       ttlSecondsAfterFinished: 86400
       template:
         spec:
