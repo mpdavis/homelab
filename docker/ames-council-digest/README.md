@@ -25,24 +25,67 @@ Clerk Files/Council Packet/<Year>/<YYYY MMDD>/         one PDF per agenda item
 Clerk Files/Minutes/City Council/<Year>/<YYYY MMDD>/   the summary minutes
 ```
 
-## Two passes per meeting
+## One page per meeting, in two passes
 
-Those documents arrive at different times, so each meeting is digested twice:
+Those documents arrive at different times, so each meeting is digested twice —
+but both passes write the **same page**. A meeting has one URL, whose content
+grows once the minutes land:
 
-| Pass | Source | Answers |
+| Pass | Source | What it does to the page |
 |---|---|---|
-| `preview` | agenda + packet | what council is about to consider |
-| `outcome` | minutes (~a week later) | what council actually did |
+| `preview` | agenda + packet | writes it: what council is about to consider |
+| `outcome` | minutes (~a week later) | updates it in place with what council did |
+
+The page itself:
+
+```
+# City Council — July 28, 2026
+Minutes · Agenda · Full packet
+
+## Notable Topics          bullets — the at-a-glance read
+## Additional Reading      the major and notable items, one bullet each
+## Public input            hearings and comment periods
+## Everything else         the consent agenda in aggregate
+## After the meeting       added by the outcome pass, for business the packet
+                           did not anticipate — public forum, referrals
+### Every item in this packet
+```
 
 The outcome pass reads the minutes — which carry motions, movers, vote tallies,
-and named dissents (`5-1, Gartin dissenting`) — and reports decisions in terms
-of what each item *was*, using the preview's item summaries as context. Those
-are archived as JSON when the preview runs (`archive.py`), so the outcome never
-re-summarizes the packet to rediscover something already computed. If the
-archive is missing, the outcome is still written from the minutes alone.
+and named dissents (`5-1, Gartin dissenting`) — and returns one update per
+**Additional Reading** bullet. Each is appended to its bullet in red, so the
+forecast and the record are distinguishable at a glance:
+
+> - **Water rate increase** — Staff recommends a 6% increase to residential
+>   water rates, raising the average bill by $3.40/month.
+>   <span style="color:#b42318">**Update:** Approved 5-1, Gartin dissenting.</span>
+
+Bullets are matched by their bolded label, not by position: `merge.py` extracts
+the labels, the model must echo them back, and a label it reorders or invents
+fails to match and leaves that bullet reading `Not recorded in the minutes` —
+rather than stapling one item's vote onto another. A bullet the minutes are
+genuinely silent about gets that same line, which is honest: silence is a real
+outcome when an item is pulled, deferred, or never reached.
+
+The page's Markdown and the per-item summaries behind it are archived as JSON
+when the preview runs (`archive.py`), so the outcome pass edits prose that is
+already correct instead of paying to regenerate it — and never re-summarizes the
+packet to rediscover something already computed. If the archive has no page (no
+preview ever ran, or it predates this format), the outcome pass writes the whole
+page from the minutes alone.
 
 The two passes are tracked separately in state: a meeting whose preview is done
 still has an outcome pending until its minutes appear. `--phase` runs just one.
+
+Digests written before the one-page format left the outcome in a separate
+`<meeting>-outcome.html`. Those are still found and still linked, folded into
+their meeting's row on the index rather than appearing as a second meeting. To
+convert one, re-run both passes over it and delete the leftover:
+
+```bash
+ames-digest run --meeting 2026-07-28 --force   # ~$1.40, re-summarizes the packet
+rm /data/digests/city-council-2026-07-28-outcome.{md,html}
+```
 
 A run then:
 
@@ -66,10 +109,11 @@ A run then:
    text (`pdftext.py`), and asks the model for 2–4 sentences plus a
    significance rating of `routine` / `notable` / `major` (`summarize.py`).
 4. **Reduces** (preview): hands the agenda plus every item summary to one final
-   call that writes the reader-facing digest, and archives the item summaries
-   for the outcome pass.
-5. **Reports** (outcome): one call over the minutes plus the archived item
-   summaries, producing decisions, votes, and what was deferred.
+   call that writes the reader-facing page, and archives that page and the item
+   summaries for the outcome pass.
+5. **Updates** (outcome): one call over the minutes plus the archived page,
+   returning an outcome and vote per Additional Reading bullet, which `merge.py`
+   splices into the page (`summarize.py`). The page is rewritten in place.
 6. **Renders** Markdown, HTML, and plain text (`render.py`), then hands them to
    the configured delivery sinks (`delivery.py`).
 7. **Records** the pass in a state file so the next run skips it.
@@ -90,7 +134,7 @@ stays a configuration choice. `AMES_DELIVERY` names the active sinks:
 
 | Sink | Needs | Behavior |
 |---|---|---|
-| `file` | — | writes `<meeting>.md` and `<meeting>.html` to `AMES_OUTPUT_DIR` |
+| `file` | — | writes `<meeting>.md` and `<meeting>.html` to `AMES_OUTPUT_DIR`; the outcome pass overwrites both |
 | `stdout` | — | prints the Markdown digest |
 | `ntfy` | `NTFY_URL`, `NTFY_TOPIC` | pushes to an ntfy topic |
 | `smtp` | `SMTP_HOST`, `MAIL_FROM`, `MAIL_TO` | sends a multipart HTML email |

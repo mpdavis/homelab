@@ -91,8 +91,8 @@ class NtfySink:
             headers["Authorization"] = f"Bearer {cfg.ntfy_token}"
 
         url = f"{cfg.ntfy_url.rstrip('/')}/{cfg.ntfy_topic}"
-        # ntfy truncates very long messages; the "short version" section is the
-        # part that belongs on a phone anyway.
+        # ntfy truncates very long messages; Notable Topics leads the page and
+        # is the part that belongs on a phone anyway.
         resp = httpx.post(
             url, content=rendered.text[:3800].encode("utf-8"), headers=headers, timeout=30
         )
