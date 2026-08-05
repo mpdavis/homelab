@@ -75,6 +75,11 @@
         icon: mdi-airplane
         href: https://trek.${DOMAIN}
         description: Travel planning
+- Civic:
+    - Council Digest:
+        icon: mdi-gavel
+        href: https://council.${DOMAIN}
+        description: Ames city council meeting digests
 - Infrastructure:
     - Authentik:
         icon: authentik.png
