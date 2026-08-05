@@ -123,32 +123,51 @@ def _select(
     state: State | None,
     cutoff: date,
     today: date,
+    source: MeetingSource,
 ) -> list[Meeting]:
+    """Choose what to digest, listing documents only for real candidates.
+
+    Ordering matters for politeness as much as speed: the date and state
+    filters are free, so they run first and keep a routine poll from listing
+    the documents of meetings that were already digested months ago.
+    """
     if args.meeting:
         wanted = set(args.meeting)
         selected = [m for m in meetings if m.meeting_date in wanted]
         missing = wanted - {m.meeting_date for m in selected}
         for miss in sorted(missing):
             log.error("no meeting found on %s", miss.isoformat())
-        return selected
+        return [source.load_documents(m) for m in selected]
 
-    # The digest is most useful before the meeting, so upcoming meetings are in
-    # scope — but only once the packet is actually up. A folder created ahead of
-    # the posting holds nothing worth summarizing, and digesting it early would
-    # burn the one shot state gives us for that meeting.
     horizon = today + timedelta(days=max(args.lookahead_days, 0))
-    candidates = [
-        m
-        for m in meetings
-        if cutoff <= m.meeting_date <= horizon
-        and (m.meeting_date <= today or (m.agenda and m.packet_items))
-    ]
+    candidates = [m for m in meetings if cutoff <= m.meeting_date <= horizon]
     if state is not None and not args.force:
         candidates = [m for m in candidates if not state.seen(m.key)]
 
     # Newest first, so a limited run covers the meeting a reader most wants.
     candidates.sort(key=lambda m: (m.meeting_date, m.label), reverse=True)
-    return candidates[: max(args.limit, 0)] if args.limit else candidates
+
+    limit = max(args.limit, 0) if args.limit else None
+    chosen: list[Meeting] = []
+    for meeting in candidates:
+        if limit is not None and len(chosen) >= limit:
+            break
+        source.load_documents(meeting)
+        if not meeting.has_documents:
+            # A folder created ahead of the posting. Skip it and look further
+            # back rather than letting it consume a slot in the limit.
+            continue
+        # The digest is most useful before the meeting, so upcoming meetings
+        # are in scope — but only once the packet is actually up. Digesting one
+        # early would burn the single shot state gives us for that meeting.
+        if meeting.meeting_date > today and not (
+            meeting.agenda and meeting.packet_items
+        ):
+            log.debug("%s is upcoming but its packet isn't posted yet", meeting.key)
+            continue
+        chosen.append(meeting)
+
+    return chosen
 
 
 def _refresh_index(cfg: Config) -> None:
@@ -211,7 +230,7 @@ def cmd_run(args: argparse.Namespace, cfg: Config) -> int:
         meetings = source.discover(_years_for_window(cutoff, horizon))
         log.info("discovered %d meetings for %s", len(meetings), cfg.board)
 
-        selected = _select(meetings, args, state, cutoff, today)
+        selected = _select(meetings, args, state, cutoff, today, source)
         if not selected:
             log.info("no new meetings to digest")
             _refresh_index(cfg)
@@ -271,8 +290,11 @@ def cmd_list(args: argparse.Namespace, cfg: Config) -> int:
         source = MeetingSource(weblink, cfg.root_folder_id, cfg.board)
         # Include the rest of the current year so scheduled meetings show up.
         meetings = source.discover(_years_for_window(cutoff, date(today.year, 12, 31)))
-
-    shown = [m for m in meetings if m.meeting_date >= cutoff]
+        shown = [m for m in meetings if m.meeting_date >= cutoff]
+        # Unlike a routine run, this is a human asking what's there — the item
+        # counts are the point, so pay for the listings within the window.
+        for meeting in shown:
+            source.load_documents(meeting)
     print(f"{cfg.board}: {len(shown)} meetings since {cutoff.isoformat()}\n")
     print(f"{'date':<12} {'items':>5}  {'agenda':<7} {'digested':<9} when")
     for meeting in shown:
