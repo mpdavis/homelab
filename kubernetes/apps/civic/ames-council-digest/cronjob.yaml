@@ -1,17 +1,26 @@
-# Hourly check for newly posted Ames City Council agendas and packets.
+# Ten-minute check for newly posted Ames City Council agendas, packets, and
+# minutes.
 #
 # Each meeting is digested twice: once from the agenda and packet before it
-# happens, and again from the minutes about a week later. Hourly polling is
+# happens, and again from the minutes about a week later. Frequent polling is
 # what makes both land promptly without anyone watching for them.
 #
-# A run with nothing new costs 9 folder listings against the city's server and
-# zero model calls — meetings whose passes are all done are filtered out before
-# their documents are ever listed. That puts hourly polling at ~216
-# requests/day. A new meeting adds 3 listings, and only then does it cost
-# tokens: ~$1.40 for the packet pass, a few cents for the minutes (README).
+# COST OF THIS CADENCE: a run with nothing new costs 9 folder listings against
+# the city's server and zero model calls — meetings whose passes are all done
+# are filtered out before their documents are ever listed. At 144 runs/day that
+# is ~1,300 requests/day, ~21x the original daily schedule, essentially all of
+# it re-reading folders that change a few times a week. It is roughly one
+# request a minute against a public municipal server: not abusive, but the
+# waste is real. Six of those nine listings only walk the fixed folder
+# hierarchy (Clerk Files -> tree -> year), which changes at most yearly and
+# could be cached on the PVC to bring a no-op run down to 3. Worth doing if
+# this cadence outlives the "for now".
 #
-# :17 rather than :00 — nothing depends on the exact minute, and it keeps this
-# off the top-of-hour spike that every other scheduled poller lands on.
+# A new meeting adds 3 listings, and only then does it cost tokens: ~$1.40 for
+# the packet pass, a few cents for the minutes (README).
+#
+# :07 past rather than :00 — nothing depends on the exact minute, and it keeps
+# this off the wall-clock boundary every other scheduled poller lands on.
 #
 # Delivery is `file`: each digest lands on the PVC as Markdown + HTML. Add the
 # ntfy or smtp sink to AMES_DELIVERY below once a destination is settled on.
@@ -23,22 +32,25 @@ metadata:
   name: ames-council-digest
 spec:
   suspend: false
-  schedule: "17 * * * *"
+  schedule: "7-57/10 * * * *"
   timeZone: ${TZ}
+  # A cold run digesting the 3-meeting limit takes ~15 minutes, longer than the
+  # period — so runs will sometimes overlap their successor. Forbid means the
+  # next firing is skipped rather than piling a second run onto the same PVC
+  # state file. That is the intended behavior, not an error to alert on.
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
-  # A missed window (node down, cluster upgrade) should wait for the next hour
-  # rather than fire late into the following one; the meeting will still be
-  # there. Kept well under the hourly period for that reason.
-  startingDeadlineSeconds: 600
+  # A missed window (node down, cluster upgrade) should wait for the next slot
+  # rather than fire late into it; the meeting will still be there.
+  startingDeadlineSeconds: 300
   jobTemplate:
     spec:
       backoffLimit: 2
-      # A cold run digesting the 3-meeting limit takes ~15 minutes. Capping
-      # below the hourly period means a wedged gateway can't still be holding
-      # the Forbid lock when the next run is due.
-      activeDeadlineSeconds: 2700
+      # Bounds a wedged gateway. Generous against the ~15-minute cold run, but
+      # every minute it is held is a skipped firing, so it is far tighter than
+      # it was on the hourly schedule.
+      activeDeadlineSeconds: 1800
       ttlSecondsAfterFinished: 86400
       template:
         spec:
