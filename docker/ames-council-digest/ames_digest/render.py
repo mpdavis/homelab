@@ -65,11 +65,24 @@ def _pretty_date(digest: MeetingDigest) -> str:
 
 
 def subject_line(digest: MeetingDigest) -> str:
-    return f"{digest.meeting.display_name} — {_pretty_date(digest)}"
+    suffix = " — what council decided" if digest.is_outcome else ""
+    return f"{digest.meeting.display_name} — {_pretty_date(digest)}{suffix}"
+
+
+def filename_stem(digest: MeetingDigest) -> str:
+    """Output basename. The outcome sits beside its preview, not over it."""
+    return (
+        f"{digest.meeting.key}-outcome" if digest.is_outcome else digest.meeting.key
+    )
 
 
 def _source_line(digest: MeetingDigest) -> str:
     links = []
+    if digest.is_outcome:
+        links.append(f"[Minutes]({digest.minutes_url})")
+        # Relative link: the preview is the sibling file the web server already
+        # serves, so this works both on disk and over HTTP.
+        links.append(f"[Before the meeting]({digest.meeting.key}.html)")
     if digest.agenda_url:
         links.append(f"[Agenda]({digest.agenda_url})")
     if digest.packet_url:
@@ -103,10 +116,15 @@ def _appendix(digest: MeetingDigest) -> list[str]:
 
 def _footer(digest: MeetingDigest) -> str:
     usage = digest.usage
+    scope = (
+        "from the official summary minutes"
+        if digest.is_outcome
+        else f"{len(digest.items)} packet items"
+    )
     return (
         f"Generated {digest.generated_at.strftime('%Y-%m-%d %H:%M')} by "
         f"ames-council-digest using {digest.model} · "
-        f"{len(digest.items)} packet items · "
+        f"{scope} · "
         f"{usage.calls} model calls, "
         f"{usage.input_tokens:,} in / {usage.output_tokens:,} out tokens · "
         "Summaries are machine-generated — verify against the source documents "
@@ -149,5 +167,5 @@ def render(digest: MeetingDigest) -> RenderedDigest:
         markdown=markdown_text,
         html=html,
         text=digest.body_markdown.strip(),
-        filename_stem=digest.meeting.key,
+        filename_stem=filename_stem(digest),
     )
