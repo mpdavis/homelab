@@ -42,7 +42,10 @@
 # Issuer sidesteps the mutation; Flux prunes the old one, since the
 # infrastructure Kustomization sets prune: true.
 
-# Bootstrap only: exists solely to sign the CA below.
+# Signs the CA below. "Bootstrap" describes when it matters, not how long it
+# is needed: the CA renews 30 days before its 10-year expiry and is re-signed
+# through this Issuer, so it has to outlive the CA it created. Deleting it once
+# the chain is up would leave that renewal with nothing to sign it.
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
@@ -98,6 +101,19 @@ spec:
   secretName: bitwarden-tls-certs
   duration: 8760h # 1y — see RESIDUAL RISK above
   renewBefore: 720h # 30d
+  # Stated rather than inherited, matching the CA above. RSA 2048 is already
+  # cert-manager's default for an unset privateKey, so this changes nothing
+  # today — but its privateKey defaults do move (rotationPolicy flipped from
+  # Never to Always in v1.18), and a manifest that silently tracks them is the
+  # same class of surprise this file exists to fix. rotationPolicy is left
+  # unset deliberately: Always is both the current default and what is wanted
+  # here, since a renewed leaf should not carry the old key forward.
+  #
+  # RSA against an ECDSA CA is not a mismatch — a leaf's own key type is
+  # independent of the algorithm that signs it.
+  privateKey:
+    algorithm: RSA
+    size: 2048
   issuerRef:
     name: bitwarden-sdk-server-ca
     kind: Issuer
