@@ -5,3 +5,7 @@ resources:
   - pvc.yaml
   - external-secret.yaml
   - cronjob.yaml
+  - web-configmap.yaml
+  - web-deployment.yaml
+  - web-service.yaml
+  - web-ingressroute.yaml

@@ -19,6 +19,7 @@ from typing import Protocol
 
 import httpx
 
+from . import index
 from .config import Config
 from .render import RenderedDigest
 
@@ -37,7 +38,11 @@ class Sink(Protocol):
 
 
 class FileSink:
-    """Write Markdown and HTML next to each other in the output directory."""
+    """Write Markdown and HTML next to each other in the output directory.
+
+    Also refreshes ``index.html``, which is what the digest web server serves
+    as its landing page.
+    """
 
     name = "file"
 
@@ -47,7 +52,8 @@ class FileSink:
         html_path = cfg.output_dir / f"{rendered.filename_stem}.html"
         md_path.write_text(rendered.markdown, encoding="utf-8")
         html_path.write_text(rendered.html, encoding="utf-8")
-        return f"wrote {md_path} and {html_path.name}"
+        count = index.rebuild(cfg.output_dir)
+        return f"wrote {md_path} and {html_path.name} (index: {count} digests)"
 
 
 class StdoutSink:

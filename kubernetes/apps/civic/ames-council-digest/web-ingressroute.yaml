@@ -1,0 +1,22 @@
+# nginx serves these files with no auth of its own, so the route carries the
+# Authentik forward-auth middleware — the same posture as the other apps that
+# bring no login with them. The underlying documents are public records; to
+# publish the digests openly, drop the middlewares block (and switch the Gatus
+# check in gatus.yaml from *auth-conditions to *open-conditions).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ames-council-digest-web
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`council.${DOMAIN}`)
+      kind: Rule
+      middlewares:
+        - name: authentik-forward-auth
+          namespace: authentik
+      services:
+        - name: ames-council-digest-web
+          port: 80
+  tls: {}

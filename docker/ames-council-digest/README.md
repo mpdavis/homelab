@@ -65,6 +65,22 @@ stays a configuration choice. `AMES_DELIVERY` names the active sinks:
 Adding another (a transactional email API, a mailing list, a webhook) means
 writing one class and registering it in `delivery.py`'s `SINKS`.
 
+## Reading the digests
+
+The `file` sink also regenerates `index.html` — a landing page linking every
+digest, newest first. It is rebuilt by scanning the output directory rather
+than tracked in state, so a digest restored from backup or written before the
+index existed still appears. Titles are read back out of each digest's
+`<title>`, so the index cannot drift from the pages it links.
+
+An nginx Deployment (`kubernetes/apps/civic/ames-council-digest/web-*.yaml`)
+mounts the same PVC read-only and serves that directory at
+`council.mpdavis.com`, behind Authentik forward-auth. Markdown is served as
+`text/plain` so it renders in the browser instead of downloading.
+
+`ames-digest index` rebuilds the page on demand without any model calls —
+useful to bootstrap a fresh volume or after moving files around.
+
 ## Configuration
 
 Everything is environment-driven; nothing needs a rebuild to change.
@@ -101,6 +117,9 @@ an unsupported ID fails fast with a `ModelError` rather than retrying.
 ```bash
 # What meetings exist, and which have been digested?
 ames-digest list
+
+# Rebuild the web server's index page from what's on disk
+ames-digest index
 
 # Digest anything new from the last 30 days (the CronJob's behavior)
 ames-digest run

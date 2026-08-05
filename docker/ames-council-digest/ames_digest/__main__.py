@@ -8,6 +8,7 @@ import sys
 from datetime import date, datetime, timedelta
 
 from .config import Config
+from . import index
 from .delivery import DeliveryError, build_sinks, deliver_all
 from .llm import LLMClient
 from .meetings import Meeting, MeetingSource
@@ -96,6 +97,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="comma-separated sinks, overriding $AMES_DELIVERY (file,stdout,ntfy,smtp)",
     )
 
+    sub.add_parser(
+        "index",
+        help="rebuild the index page from the digests on disk (no model calls)",
+    )
+
     listing = sub.add_parser("list", help="show known meetings and their digest state")
     listing.add_argument(
         "--since-days",
@@ -145,6 +151,24 @@ def _select(
     return candidates[: max(args.limit, 0)] if args.limit else candidates
 
 
+def _refresh_index(cfg: Config) -> None:
+    """Keep the web server's landing page current even on a no-op run.
+
+    The file sink rebuilds the index whenever it writes a digest, but a run
+    with nothing new never reaches it — and on a fresh volume that would leave
+    the server with no index at all until the first meeting lands.
+    """
+    if "file" not in cfg.delivery:
+        return
+    try:
+        cfg.output_dir.mkdir(parents=True, exist_ok=True)
+        count = index.rebuild(cfg.output_dir)
+        log.debug("index refreshed (%d digests)", count)
+    except OSError as exc:
+        # Cosmetic; never fail a run over it.
+        log.warning("could not refresh the index page: %s", exc)
+
+
 def _dry_run(meeting: Meeting, weblink: WebLinkClient, cfg: Config) -> None:
     print(f"\n{meeting}")
     docs = []
@@ -190,6 +214,7 @@ def cmd_run(args: argparse.Namespace, cfg: Config) -> int:
         selected = _select(meetings, args, state, cutoff, today)
         if not selected:
             log.info("no new meetings to digest")
+            _refresh_index(cfg)
             return 0
 
         log.info(
@@ -278,6 +303,11 @@ def main(argv: list[str] | None = None) -> int:
     command = args.command or "run"
     if command == "list":
         return cmd_list(args, cfg)
+    if command == "index":
+        cfg.output_dir.mkdir(parents=True, exist_ok=True)
+        count = index.rebuild(cfg.output_dir)
+        print(f"indexed {count} digest(s) in {cfg.output_dir}")
+        return 0
 
     # `run` is the default when no subcommand is given; argparse hasn't filled
     # its defaults in that case, so supply them.
