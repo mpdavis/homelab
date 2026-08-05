@@ -32,7 +32,7 @@ spec:
         - name: nginx
           # nginx-unprivileged listens on 8080 and runs as uid 101 without
           # needing a root-owned master process.
-          image: nginxinc/nginx-unprivileged:1.29-alpine
+          image: nginxinc/nginx-unprivileged:1.31-alpine
           ports:
             - containerPort: 8080
               name: http
