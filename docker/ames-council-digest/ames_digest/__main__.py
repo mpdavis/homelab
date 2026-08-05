@@ -8,9 +8,14 @@ import sys
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from .config import Config
 from . import archive, index
-from .delivery import DeliveryError, build_sinks, deliver_all
+from .config import Config
+from .delivery import (
+    DeliveryError,
+    build_sinks,
+    deliver_all,
+    gateway_prices,
+)
 from .llm import LLMClient
 from .meetings import Meeting, MeetingSource
 from .pdftext import extract
@@ -245,7 +250,7 @@ def _refresh_index(cfg: Config) -> None:
         return
     try:
         cfg.output_dir.mkdir(parents=True, exist_ok=True)
-        count = index.rebuild(cfg.output_dir)
+        count = index.rebuild(cfg.output_dir, cfg.state_dir, gateway_prices(cfg))
         log.debug("index refreshed (%d digests)", count)
     except OSError as exc:
         # Cosmetic; never fail a run over it.
@@ -369,6 +374,8 @@ def cmd_run(args: argparse.Namespace, cfg: Config) -> int:
                     items=len(digest.items),
                     input_tokens=digest.usage.input_tokens,
                     output_tokens=digest.usage.output_tokens,
+                    calls=digest.usage.calls,
+                    model=digest.model,
                 )
                 state.save()
 
@@ -427,8 +434,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_list(args, cfg)
     if command == "index":
         cfg.output_dir.mkdir(parents=True, exist_ok=True)
-        count = index.rebuild(cfg.output_dir)
-        print(f"indexed {count} digest(s) in {cfg.output_dir}")
+        count = index.rebuild(cfg.output_dir, cfg.state_dir, gateway_prices(cfg))
+        print(f"indexed {count} meeting(s) in {cfg.output_dir}")
         return 0
 
     # `run` is the default when no subcommand is given; argparse hasn't filled

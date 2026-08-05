@@ -63,6 +63,32 @@ def _migrate(payload: dict) -> dict[str, dict]:
 
 
 @dataclass
+class Totals:
+    """Cumulative model usage across every digest this volume has produced."""
+
+    digests: int = 0
+    meetings: int = 0
+    previews: int = 0
+    outcomes: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    calls: int = 0
+    # Records written before calls were tracked contribute tokens but no call
+    # count, so the total would otherwise read as an undercount with no
+    # explanation.
+    records_missing_calls: int = 0
+
+    @property
+    def total_tokens(self) -> int:
+        return self.input_tokens + self.output_tokens
+
+    def cost(self, input_per_mtok: float, output_per_mtok: float) -> float:
+        return (
+            self.input_tokens * input_per_mtok + self.output_tokens * output_per_mtok
+        ) / 1_000_000
+
+
+@dataclass
 class State:
     path: Path
     processed: dict[str, dict]
@@ -90,6 +116,33 @@ class State:
             "digested_at": datetime.now().astimezone().isoformat(timespec="seconds"),
             **details,
         }
+
+    def totals(self) -> Totals:
+        """Sum usage over every recorded pass.
+
+        The state file is the only complete ledger — a digest's own footer
+        reports one pass, and the rendered files can be deleted without the
+        spend being undone.
+        """
+        totals = Totals(meetings=len(self.processed))
+        for phases in self.processed.values():
+            if not isinstance(phases, dict):
+                continue
+            for phase, record in phases.items():
+                if not isinstance(record, dict):
+                    continue
+                totals.digests += 1
+                if phase == PHASE_PREVIEW:
+                    totals.previews += 1
+                elif phase == PHASE_OUTCOME:
+                    totals.outcomes += 1
+                totals.input_tokens += int(record.get("input_tokens") or 0)
+                totals.output_tokens += int(record.get("output_tokens") or 0)
+                if "calls" in record:
+                    totals.calls += int(record.get("calls") or 0)
+                else:
+                    totals.records_missing_calls += 1
+        return totals
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)

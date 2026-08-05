@@ -26,6 +26,16 @@ def _env_int(name: str, default: int) -> int:
         raise ValueError(f"{name} must be an integer, got {raw!r}") from exc
 
 
+def _env_float(name: str) -> float | None:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number, got {raw!r}") from exc
+
+
 def _env_list(name: str, default: list[str]) -> list[str]:
     raw = os.environ.get(name, "").strip()
     if not raw:
@@ -95,6 +105,24 @@ class Config:
     delivery: list[str] = field(
         default_factory=lambda: _env_list("AMES_DELIVERY", ["file", "stdout"])
     )
+
+    # Optional, and unset by default: the index page shows a spend estimate only
+    # when both rates are supplied. Gateway prices change and vary by model, so
+    # baking numbers into the image would ship a figure that quietly goes stale
+    # and reads as authoritative.
+    price_input_per_mtok: float | None = field(
+        default_factory=lambda: _env_float("AMES_PRICE_INPUT_PER_MTOK")
+    )
+    price_output_per_mtok: float | None = field(
+        default_factory=lambda: _env_float("AMES_PRICE_OUTPUT_PER_MTOK")
+    )
+
+    @property
+    def prices_configured(self) -> bool:
+        return (
+            self.price_input_per_mtok is not None
+            and self.price_output_per_mtok is not None
+        )
 
     ntfy_url: str = field(default_factory=lambda: _env("NTFY_URL", ""))
     ntfy_topic: str = field(default_factory=lambda: _env("NTFY_TOPIC", ""))

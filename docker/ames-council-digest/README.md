@@ -115,6 +115,22 @@ mounts the same PVC read-only and serves that directory at
 `ames-digest index` rebuilds the page on demand without any model calls —
 useful to bootstrap a fresh volume or after moving files around.
 
+### Usage counters
+
+The index also carries a KPI row of cumulative model usage — tokens in/out,
+digests produced, model calls — summed from the state file, which is the only
+complete ledger. A digest's own footer reports one pass, and rendered files can
+be deleted without the spend being undone.
+
+Set both `AMES_PRICE_*_PER_MTOK` to add a spend estimate. They are unset by
+default deliberately: gateway prices change and vary by model, so a figure
+baked into the image would go stale while still reading as authoritative.
+
+Records written before call tracking existed contribute tokens but no call
+count. The tile is omitted until there is a real figure, and the total is
+marked with `+` while any such records remain, rather than silently
+undercounting.
+
 ## Configuration
 
 Everything is environment-driven; nothing needs a rebuild to change.
@@ -132,6 +148,8 @@ Everything is environment-driven; nothing needs a rebuild to change.
 | `AMES_ITEM_CHAR_BUDGET` | `120000` | extracted characters sent per item |
 | `AMES_AGENDA_CHAR_BUDGET` | `200000` | extracted characters sent for the agenda |
 | `AMES_MINUTES_CHAR_BUDGET` | `200000` | extracted characters sent for the minutes |
+| `AMES_PRICE_INPUT_PER_MTOK` | — | $/M input tokens; enables the spend estimate |
+| `AMES_PRICE_OUTPUT_PER_MTOK` | — | $/M output tokens; enables the spend estimate |
 | `AMES_MAX_CONCURRENCY` | `4` | parallel item summaries |
 | `AMES_STATE_DIR` | `/data/state` | where `processed.json` lives |
 | `AMES_OUTPUT_DIR` | `/data/digests` | where the `file` sink writes |
