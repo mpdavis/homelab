@@ -61,7 +61,7 @@ spec:
             fsGroup: 1000
           containers:
             - name: ames-council-digest
-              image: ghcr.io/mpdavis/ames-council-digest:1.0.12 # published by build-ames-council-digest.yml; renovate bumps from here
+              image: ghcr.io/mpdavis/ames-council-digest:1.0.17 # published by build-ames-council-digest.yml; renovate bumps from here
               args: ["run"]
               env:
                 - name: TZ
