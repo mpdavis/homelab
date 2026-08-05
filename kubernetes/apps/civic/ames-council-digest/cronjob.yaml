@@ -1,0 +1,90 @@
+# Daily check for newly posted Ames City Council agendas and packets.
+#
+# A run with nothing new costs only a handful of folder listings — the model is
+# only called for meetings not already in the state file on the PVC — so daily
+# is cheap and catches a packet the morning after the clerk posts it.
+#
+# Delivery is `file`: each digest lands on the PVC as Markdown + HTML. Add the
+# ntfy or smtp sink to AMES_DELIVERY below once a destination is settled on.
+#
+# To pause spend without reverting: suspend: true.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ames-council-digest
+spec:
+  suspend: false
+  schedule: "0 7 * * *"
+  timeZone: ${TZ}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  # A missed window (node down, cluster upgrade) should just wait for tomorrow
+  # rather than fire late; the meeting will still be there.
+  startingDeadlineSeconds: 3600
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      # ~40 packet items at concurrency 4 takes several minutes; this bounds a
+      # wedged gateway without cutting a healthy run short.
+      activeDeadlineSeconds: 3600
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+          containers:
+            - name: ames-council-digest
+              image: ghcr.io/mpdavis/ames-council-digest:1.0.1 # published by build-ames-council-digest.yml; renovate bumps from here
+              args: ["run"]
+              env:
+                - name: TZ
+                  value: ${TZ}
+                # Delivery sinks: file writes Markdown + HTML to the PVC.
+                # Add ntfy or smtp here once a destination is settled on.
+                - name: AMES_DELIVERY
+                  value: "file"
+                - name: AMES_LLM_BASE_URL
+                  value: "https://opencode.ai/zen/v1"
+                - name: AMES_LLM_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ames-council-digest-secrets
+                      key: llm-api-key
+                # Per-item summaries are the bulk of the tokens; the single
+                # digest call is where quality shows, so it gets the better model.
+                - name: AMES_ITEM_MODEL
+                  value: "claude-sonnet-4-5"
+                - name: AMES_DIGEST_MODEL
+                  value: "claude-sonnet-4-5"
+                - name: AMES_STATE_DIR
+                  value: /data/state
+                - name: AMES_OUTPUT_DIR
+                  value: /data/digests
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: "1"
+                  memory: 1Gi
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: ames-council-digest
+            # readOnlyRootFilesystem needs a writable /tmp for PDF buffering.
+            - name: tmp
+              emptyDir: {}

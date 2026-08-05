@@ -64,6 +64,7 @@ spec:
                       - trek.mpdavis.com
                       - birdnet.mpdavis.com
                       - proxmox.mpdavis.com
+                      - council.mpdavis.com
   values:
     resources:
       requests:
@@ -243,6 +244,12 @@ spec:
         - name: flux-ui
           group: external-auth
           url: https://flux.mpdavis.com/
+          client: *auth-client
+          headers: *auth-headers
+          conditions: *auth-conditions
+        - name: council-digest
+          group: external-auth
+          url: https://council.mpdavis.com/
           client: *auth-client
           headers: *auth-headers
           conditions: *auth-conditions
