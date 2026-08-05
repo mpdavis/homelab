@@ -37,6 +37,13 @@ class Sink(Protocol):
         """Deliver the digest and return a one-line description of where it went."""
 
 
+def gateway_prices(cfg: Config) -> tuple[float, float] | None:
+    """Gateway rates for the index's spend estimate, if both are configured."""
+    if not cfg.prices_configured:
+        return None
+    return (cfg.price_input_per_mtok, cfg.price_output_per_mtok)  # type: ignore[return-value]
+
+
 class FileSink:
     """Write Markdown and HTML next to each other in the output directory.
 
@@ -52,8 +59,8 @@ class FileSink:
         html_path = cfg.output_dir / f"{rendered.filename_stem}.html"
         md_path.write_text(rendered.markdown, encoding="utf-8")
         html_path.write_text(rendered.html, encoding="utf-8")
-        count = index.rebuild(cfg.output_dir)
-        return f"wrote {md_path} and {html_path.name} (index: {count} digests)"
+        count = index.rebuild(cfg.output_dir, cfg.state_dir, gateway_prices(cfg))
+        return f"wrote {md_path} and {html_path.name} (index: {count} meetings)"
 
 
 class StdoutSink:

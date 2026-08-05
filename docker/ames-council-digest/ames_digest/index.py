@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from .state import State, Totals
+
 log = logging.getLogger(__name__)
 
 INDEX_FILENAME = "index.html"
@@ -54,6 +56,18 @@ INDEX_TEMPLATE = """\
   .meta a {{ font-weight: 400; }}
   .md {{ color: #59636e; }}
   .empty {{ color: #59636e; font-style: italic; }}
+  /* KPI row: a handful of headline numbers is a stat row, not a chart.
+     No series hues here — the numbers wear text tokens and the surface
+     carries the grouping. */
+  .kpis {{ display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }}
+  .kpi {{ flex: 1 1 130px; background: #f6f8fa; border: 1px solid #e4e8ec;
+          border-radius: 8px; padding: 10px 12px; }}
+  .kpi .label {{ color: #59636e; font-size: 11px; line-height: 1.3; }}
+  /* Proportional figures: tabular-nums is for columns that must align, and
+     makes a standalone display number look loose. */
+  .kpi .value {{ font-size: 19px; font-weight: 600; margin-top: 2px;
+                 letter-spacing: -0.01em; }}
+  .kpi .sub {{ color: #59636e; font-size: 11px; margin-top: 1px; }}
   footer {{ margin-top: 24px; border-top: 1px solid #e4e8ec; padding-top: 12px;
             color: #59636e; font-size: 12px; }}
   @media (prefers-color-scheme: dark) {{
@@ -62,6 +76,9 @@ INDEX_TEMPLATE = """\
     li, footer {{ border-color: #30363d; }}
     a {{ color: #4493f8; }}
     .sub, .meta, .empty, footer {{ color: #9198a1; }}
+    /* Dark steps are chosen against the dark surface, not flipped from light. */
+    .kpi {{ background: #0d1117; border-color: #30363d; }}
+    .kpi .label, .kpi .sub {{ color: #9198a1; }}
   }}
 </style>
 </head>
@@ -69,6 +86,7 @@ INDEX_TEMPLATE = """\
   <div class="card">
     <h1>Ames Council Digests</h1>
     <p class="sub">{count}</p>
+    {kpis}
     {body}
     <footer>Machine-generated summaries of documents published by the Ames city
     clerk. Verify against the source documents before acting on them.</footer>
@@ -182,6 +200,66 @@ def collect_meetings(output_dir: Path) -> list[MeetingRow]:
     return sorted(rows.values(), key=lambda r: r.sort_key, reverse=True)
 
 
+def compact(n: int) -> str:
+    """Auto-compact a count: 1,284 / 12.9K / 4.21M.
+
+    The K cutoff is 999,500 rather than 1,000,000 so a value that would round
+    up to "1000.0K" rolls over to "1.00M" instead.
+    """
+    if n < 10_000:
+        return f"{n:,}"
+    if n < 999_500:
+        return f"{n / 1_000:.1f}K"
+    return f"{n / 1_000_000:.2f}M"
+
+
+def _tile(label: str, value: str, sub: str = "") -> str:
+    sub_html = f'<div class="sub">{html.escape(sub)}</div>' if sub else ""
+    return (
+        '      <div class="kpi">'
+        f'<div class="label">{html.escape(label)}</div>'
+        f'<div class="value">{html.escape(value)}</div>'
+        f"{sub_html}</div>"
+    )
+
+
+def render_kpis(totals: Totals | None, prices: tuple[float, float] | None) -> str:
+    """The KPI row. A handful of headline numbers — a stat row, not a chart."""
+    if totals is None or not totals.digests:
+        return ""
+
+    # Four tiles is the most that fits the card on one row; the input/output
+    # split rides along as secondary text rather than earning tiles of its own.
+    tiles = [
+        _tile(
+            "Tokens used",
+            compact(totals.total_tokens),
+            f"{compact(totals.input_tokens)} in · {compact(totals.output_tokens)} out",
+        ),
+        _tile(
+            "Digests",
+            compact(totals.digests),
+            f"{totals.previews} preview · {totals.outcomes} outcome",
+        ),
+    ]
+
+    # Records predating call tracking contribute tokens but no call count, so a
+    # bare "0" would understate rather than inform. Omit the tile until there is
+    # something real to show, and mark the total as a floor while any remain.
+    if totals.calls:
+        suffix = "+" if totals.records_missing_calls else ""
+        tiles.append(
+            _tile("Model calls", f"{compact(totals.calls)}{suffix}", "across all digests")
+        )
+
+    if prices is not None:
+        tiles.append(
+            _tile("Est. spend", f"${totals.cost(*prices):,.2f}", "at configured rates")
+        )
+
+    return '<div class="kpis">\n' + "\n".join(tiles) + "\n    </div>"
+
+
 def _links(entry: DigestEntry | None, label: str) -> str:
     if entry is None:
         return ""
@@ -192,7 +270,11 @@ def _links(entry: DigestEntry | None, label: str) -> str:
     return link
 
 
-def render_index(rows: list[MeetingRow]) -> str:
+def render_index(
+    rows: list[MeetingRow],
+    totals: Totals | None = None,
+    prices: tuple[float, float] | None = None,
+) -> str:
     if not rows:
         body = '<p class="empty">No digests yet.</p>'
         count = "Nothing published yet."
@@ -221,11 +303,34 @@ def render_index(rows: list[MeetingRow]) -> str:
         body = "<ul>\n" + "\n".join(items) + "\n    </ul>"
         count = f"{len(rows)} meeting{'s' if len(rows) != 1 else ''}"
 
-    return INDEX_TEMPLATE.format(count=html.escape(count), body=body)
+    return INDEX_TEMPLATE.format(
+        count=html.escape(count),
+        kpis=render_kpis(totals, prices),
+        body=body,
+    )
 
 
-def rebuild(output_dir: Path) -> int:
-    """Regenerate index.html from the directory's contents. Returns the count."""
+def rebuild(
+    output_dir: Path,
+    state_dir: Path | None = None,
+    prices: tuple[float, float] | None = None,
+) -> int:
+    """Regenerate index.html from the directory's contents. Returns the count.
+
+    ``state_dir`` supplies the usage ledger for the KPI row. It is optional so
+    the index can still be rebuilt from a directory of digests alone.
+    """
     rows = collect_meetings(output_dir)
-    (output_dir / INDEX_FILENAME).write_text(render_index(rows), encoding="utf-8")
+
+    totals = None
+    if state_dir is not None:
+        try:
+            totals = State.load(state_dir).totals()
+        except OSError as exc:
+            # The page is worth publishing without its counters.
+            log.warning("could not read usage totals: %s", exc)
+
+    (output_dir / INDEX_FILENAME).write_text(
+        render_index(rows, totals, prices), encoding="utf-8"
+    )
     return len(rows)
