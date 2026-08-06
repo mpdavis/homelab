@@ -3,7 +3,7 @@
 # Anthropic-compatible model gateway (opencode zen by default), and emits a
 # short digest. Built by .github/workflows/build-ames-council-digest.yml and
 # deployed as a CronJob from kubernetes/apps/civic/ames-council-digest/.
-FROM python:3.13-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 # ca-certificates is the only runtime OS dependency — every fetch is HTTPS.
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
