@@ -83,11 +83,16 @@ Produce GitHub-flavored Markdown with exactly these sections:
 bolded labels and no sub-bullets — this is the at-a-glance read.
 
 ## Additional Reading
-3-6 bullets covering the major and notable items. Each bullet starts with a \
-bolded short label, then a sentence or two of substance including the money.
+3-6 items covering the major and notable ones. Write each as a Markdown list \
+item — a "- " marker, then a bolded short label, then a sentence or two of \
+substance including the money. Exactly like this:
+
+- **Water rate increase** — Staff recommends a 6% increase to residential \
+water rates, raising the average bill by $3.40/month.
+
 If there are fewer than three non-routine items, use however many exist.
-Give every bullet a distinct label. After the meeting, what council decided is \
-attached to each bullet by its label, so two bullets sharing one label lose an \
+Give every item a distinct label. After the meeting, what council decided is \
+attached to each one by its label, so two items sharing one label lose an \
 outcome between them.
 
 ## Public input
@@ -485,7 +490,20 @@ class MeetingSummarizer:
             if isinstance(entry, dict)
         }
         matched, total, body = merge.apply_updates(preview.body, updates)
-        if total and matched < total:
+        if not total:
+            # The failure this guard used to skip: `total` is falsy exactly when
+            # the splice did nothing at all, so the one case worth shouting about
+            # was the one case that logged nothing. The page still gets its
+            # "After the meeting" section, which is why it looks fine until you
+            # notice no bullet carries an outcome.
+            log.warning(
+                "%s: no %r bullets found in the preview page — it keeps its "
+                "pre-meeting text and every outcome lands in %r instead",
+                meeting.key,
+                merge.ADDITIONAL_READING,
+                merge.AFTER_THE_MEETING,
+            )
+        elif matched < total:
             # Every bullet still gets an update line; the unmatched ones just say
             # "not recorded", which is indistinguishable on the page from a real
             # silence in the minutes. Worth seeing in the logs.
