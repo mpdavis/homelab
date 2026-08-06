@@ -1,0 +1,143 @@
+name: Auto-Update PR Branches
+
+# Merges the current `main` into every open PR that has auto-merge enabled and
+# has fallen behind. Without this, auto-merge is a trap: the branch ruleset sets
+# `strict_required_status_checks_policy` ("require branches to be up to date"),
+# so the moment ANY PR merges, every other PR is stale and its queued auto-merge
+# stops — GitHub will not update the branch for you. The PR then sits there
+# looking armed while nothing happens until somebody clicks "Update branch".
+#
+# The up-to-date requirement is load-bearing and must NOT be relaxed to fix this:
+# it is what forces deploy-health-gate.yml to re-run against the new (deploying)
+# `main`, which is how merges get serialized by deploy health. So instead of
+# dropping the requirement, we satisfy it automatically.
+#
+# Scope is deliberately narrow — only PRs whose author already opted in via
+# auto-merge. A PR without auto-merge is somebody's work in progress; silently
+# merging main into it (and re-triggering its reviewers) is not our business.
+#
+# Conflicts (mergeStateStatus DIRTY) are reported, never resolved. Resolving a
+# real conflict is a judgment call, and doing it unattended on a GitOps repo
+# that reconciles straight into the cluster is exactly the wrong place to guess.
+#
+# WHY A PAT (BRANCH_UPDATE_TOKEN): the default GITHUB_TOKEN cannot help here on
+# two counts. It lacks the contents:write on the head repo that update-branch
+# requires, and — the fatal one — pushes made with it do not trigger workflows.
+# The branch would advance while deploy-health-gate never re-ran on the new head,
+# leaving the PR wedged on "Expected — Waiting for status" with no way to clear
+# it but another push. Rather than create that state, this workflow no-ops with a
+# warning when the secret is absent. See .github/workflows/README.md for setup.
+#
+# Overlap with Renovate: Renovate's default `rebaseWhen: "auto"` resolves to
+# `behind-base-branch` for any PR it is automerging, so it already refreshes its
+# own stale branches — but only on its next scheduled run (up to ~an hour), and
+# not at all for a branch it considers externally modified. This reacts within
+# seconds of the merge, and covers human PRs, which Renovate never touches.
+
+on:
+  push:
+    branches: [main]
+  # Arming auto-merge on a PR that is ALREADY behind has no other trigger — main
+  # is not going to move again just because you clicked the button, so without
+  # this the PR would sit armed and stale until the next unrelated merge.
+  # pull_request_target (not pull_request) because secrets are needed and nothing
+  # from the PR's branch is ever checked out or executed here.
+  pull_request_target:
+    types: [auto_merge_enabled]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# A newer merge to main supersedes this run — its own run does the same work
+# against a newer base, so finishing this one first would just be redundant
+# branch updates and duplicated CI on the same PRs.
+concurrency:
+  group: auto-update-branch
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.BRANCH_UPDATE_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Update stale auto-merge PR branches
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::BRANCH_UPDATE_TOKEN is not set — skipping. Auto-merge PRs will stay behind main until updated by hand. See .github/workflows/README.md."
+            exit 0
+          fi
+
+          # Only PRs that opted in via auto-merge, and only real ones (drafts
+          # cannot merge anyway, so updating them is pure CI churn).
+          prs="$(gh pr list --state open --limit 50 \
+            --json number,isDraft,autoMergeRequest \
+            --jq '.[] | select(.isDraft | not) | select(.autoMergeRequest != null) | .number' \
+            | tr '\n' ' ')"
+
+          if [ -z "${prs// /}" ]; then
+            echo "No open PRs with auto-merge enabled — nothing to update."
+            exit 0
+          fi
+
+          echo "Auto-merge PRs to consider: $prs"
+          updated=0
+          conflicted=""
+
+          for pr in $prs; do
+            # GitHub computes mergeability lazily and reports UNKNOWN until the
+            # background job finishes — which it always is right after a push to
+            # main invalidated it. Poll rather than misread UNKNOWN as "fine".
+            state=""
+            sha=""
+            for _ in 1 2 3 4 5 6 7 8; do
+              read -r state sha < <(gh pr view "$pr" \
+                --json mergeStateStatus,headRefOid \
+                --jq '"\(.mergeStateStatus) \(.headRefOid)"')
+              [ "$state" != "UNKNOWN" ] && break
+              sleep 5
+            done
+
+            case "$state" in
+              BEHIND)
+                echo "PR #$pr is behind main — merging main in."
+                # expected_head_sha makes this a no-op if the branch moved while
+                # we were polling, instead of racing the author's own push.
+                if gh api --method PUT "repos/$GH_REPO/pulls/$pr/update-branch" \
+                     -f "expected_head_sha=$sha" >/dev/null; then
+                  echo "  updated #$pr"
+                  updated=$((updated + 1))
+                else
+                  echo "::warning::Could not update PR #$pr (head moved, or the token lacks contents:write on the head repo)."
+                fi
+                ;;
+              DIRTY)
+                echo "::warning::PR #$pr conflicts with main — resolve it by hand; auto-merge will not fire."
+                conflicted="$conflicted #$pr"
+                ;;
+              UNKNOWN | "")
+                # Empty means the lookup itself failed; UNKNOWN means GitHub is
+                # still computing. Either way, guessing is worse than waiting for
+                # the next merge (or a workflow_dispatch) to try again.
+                echo "::warning::PR #$pr mergeability unresolved (state='$state') — skipped this round."
+                ;;
+              *)
+                echo "PR #$pr is $state — already up to date with main, nothing to do."
+                ;;
+            esac
+          done
+
+          {
+            echo "### Auto-update PR branches"
+            echo
+            echo "- Considered: auto-merge PR(s) $prs"
+            echo "- Updated: $updated"
+            if [ -n "$conflicted" ]; then
+              echo "- ⚠️ Conflicting (need manual resolution):$conflicted"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
