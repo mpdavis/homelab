@@ -64,24 +64,17 @@ spec:
           containers:
             - name: ames-council-digest
               # Published by build-ames-council-digest.yml, tagged 1.0.<run_number>.
+              # Only main publishes, so every tag in the registry is reviewed,
+              # merged code and a Renovate bump can be taken on its face.
               #
-              # PIN ONLY TAGS BUILT FROM main. That workflow also builds and
-              # pushes on pull requests (deliberately, so image-pin-check can
-              # pass before the image PR merges), so the registry carries tags
-              # whose source was never merged — and Renovate, which just reads
-              # the tag list, will happily bump to one. That is how 1.0.17
-              # landed here: it came off renovate/python-3.x (PR #358, open),
-              # carrying an unreviewed python:3.13 -> 3.14 base image jump.
-              # 1.0.18 is the same branch.
+              # That was not always true: pull requests used to push too, and
+              # 1.0.17 reached this line off an open Renovate branch carrying an
+              # unreviewed python:3.13 -> 3.14 jump. Tags below 1.0.28 predate
+              # the fix and carry no such guarantee.
               #
-              # 1.0.16 is the newest build from main (6756311, "Show cumulative
-              # token usage"), still on python:3.13-slim-bookworm. Lower number
-              # than what this line held, same code, minus the surprise upgrade.
-              #
-              # Check before accepting a bump PR:
-              #   gh run list --workflow build-ames-council-digest.yml \
-              #     --json number,event,headBranch,headSha
-              # and take the highest number whose event is `push` on main.
+              # An image change and a bump to this line can no longer ride in
+              # one PR — image-pin-check would resolve a tag main has not built
+              # yet. Merge the image, then take Renovate's bump.
               image: ghcr.io/mpdavis/ames-council-digest:1.0.28
               args: ["run"]
               env:
