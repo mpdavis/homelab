@@ -75,7 +75,13 @@ spec:
               # An image change and a bump to this line can no longer ride in
               # one PR — image-pin-check would resolve a tag main has not built
               # yet. Merge the image, then take Renovate's bump.
-              image: ghcr.io/mpdavis/ames-council-digest:1.0.28
+              #
+              # 1.0.31 is the main build of f2fdc16 (#377), where post-meeting
+              # outcomes actually attach to the page. The bump before it landed
+              # on 1.0.28 (#376) — a real main build, but of 2ce461d, one commit
+              # too early to carry that. 1.0.29 and 1.0.30 are branch builds of
+              # the same fix, published before #375 shut that door; skip them.
+              image: ghcr.io/mpdavis/ames-council-digest:1.0.31
               args: ["run"]
               env:
                 - name: TZ
