@@ -75,7 +75,7 @@ spec:
               # An image change and a bump to this line can no longer ride in
               # one PR — image-pin-check would resolve a tag main has not built
               # yet. Merge the image, then take Renovate's bump.
-              image: ghcr.io/mpdavis/ames-council-digest:1.0.28
+              image: ghcr.io/mpdavis/ames-council-digest:1.0.31
               args: ["run"]
               env:
                 - name: TZ
