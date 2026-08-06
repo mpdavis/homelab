@@ -91,16 +91,31 @@ def _section(lines: list[str], title: str) -> tuple[int, int] | None:
     return None
 
 
+def _bullet_text(line: str) -> str | None:
+    """A bullet's content, or None if this line does not open one.
+
+    "Bullet" is what the prompt calls these; what the model actually emits is
+    only sometimes a Markdown list. Left to itself it writes each one as a bare
+    paragraph opening with the bolded label — no ``-`` in sight — and requiring
+    the list marker silently found nothing to attach outcomes to. The label is
+    what identifies an item here, so the label is what this looks for.
+    """
+    match = BULLET_RE.match(line)
+    if match:
+        return match.group(1).strip()
+    stripped = line.strip()
+    return stripped if LABEL_RE.match(stripped) else None
+
+
 def _bullets(lines: list[str], start: int, end: int) -> list[Bullet]:
-    starts = [i for i in range(start, end) if BULLET_RE.match(lines[i])]
+    starts = [i for i in range(start, end) if _bullet_text(lines[i]) is not None]
     bullets = []
     for n, first in enumerate(starts):
         stop = starts[n + 1] if n + 1 < len(starts) else end
         while stop > first + 1 and not lines[stop - 1].strip():
             stop -= 1
-        match = BULLET_RE.match(lines[first])
-        assert match is not None  # `first` came from the same pattern
-        text = match.group(1).strip()
+        text = _bullet_text(lines[first])
+        assert text is not None  # `first` came from the same predicate
         labelled = LABEL_RE.match(text)
         # A bullet the model wrote without its bolded label still needs an
         # identity; its opening words are the best one available.

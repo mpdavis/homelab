@@ -70,14 +70,12 @@ spec:
               # That was not always true: pull requests used to push too, and
               # 1.0.17 reached this line off an open Renovate branch carrying an
               # unreviewed python:3.13 -> 3.14 jump. Tags below 1.0.28 predate
-              # the fix and carry no such guarantee — 1.0.22 is one of them
-              # (built from the single-page PR branch; its digest code is
-              # identical to the merge, only the base image differs).
+              # the fix and carry no such guarantee.
               #
               # An image change and a bump to this line can no longer ride in
               # one PR — image-pin-check would resolve a tag main has not built
               # yet. Merge the image, then take Renovate's bump.
-              image: ghcr.io/mpdavis/ames-council-digest:1.0.22
+              image: ghcr.io/mpdavis/ames-council-digest:1.0.28
               args: ["run"]
               env:
                 - name: TZ
