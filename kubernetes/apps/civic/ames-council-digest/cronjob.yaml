@@ -82,7 +82,7 @@ spec:
               #   gh run list --workflow build-ames-council-digest.yml \
               #     --json number,event,headBranch,headSha
               # and take the highest number whose event is `push` on main.
-              image: ghcr.io/mpdavis/ames-council-digest:1.0.22
+              image: ghcr.io/mpdavis/ames-council-digest:1.0.28
               args: ["run"]
               env:
                 - name: TZ
