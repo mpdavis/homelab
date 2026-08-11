@@ -82,11 +82,16 @@ class PreviewArchive:
         fresh listing, what did we summarize for this document, and from which
         version of it. Items with no usable entry id are dropped rather than
         collected under 0 — they cannot be matched to a listing row anyway.
+
+        ``bool`` is excluded explicitly because it is a subclass of ``int``: a
+        stray ``true`` in a hand-edited archive would otherwise key itself under
+        1 and shadow a real entry, which is the one failure here that is silent
+        rather than merely absent.
         """
         keyed = {}
         for item in self.items:
             entry_id = item.get("entry_id")
-            if isinstance(entry_id, int) and entry_id:
+            if isinstance(entry_id, int) and not isinstance(entry_id, bool) and entry_id:
                 keyed[entry_id] = item
         return keyed
 
