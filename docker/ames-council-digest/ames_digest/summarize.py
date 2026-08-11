@@ -19,7 +19,7 @@ import json
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 
 from . import merge
@@ -35,6 +35,14 @@ log = logging.getLogger(__name__)
 
 SIGNIFICANCE_LEVELS = ("routine", "notable", "major")
 
+# Bounds on model-supplied strings that land in the archive. These are not
+# validation so much as blast radius: the fields below are rendered into fixed
+# furniture — a grid cell, a mono kicker — where a runaway value would break the
+# layout rather than merely read badly.
+MAX_FACTS = 3
+MAX_FACT_CHARS = 60
+MAX_SHORT_CHARS = 80
+
 ITEM_SYSTEM = """\
 You summarize agenda-item documents for a city council meeting in Ames, Iowa, \
 for an engaged resident who has not read the packet.
@@ -49,11 +57,27 @@ addresses, contractor or applicant names, deadlines, vote requirements.
 change orders under normal thresholds), say so plainly and keep it to one line.
 - Write plainly. No marketing language, no editorializing about whether \
 something is good or bad.
+- Every field is independent prose. Do not repeat the summary's sentences in \
+"why_it_matters", and do not restate the staff recommendation in the summary.
+- A field the document does not support is an empty string. An empty field is \
+always correct; a guessed one is not.
 
 Respond with a single JSON object and nothing else:
 {"summary": "2-4 sentences, or 1 sentence if routine",
  "significance": "routine" | "notable" | "major",
- "amount": "the headline dollar figure as a short string, or null"}
+ "amount": "the headline dollar figure as a short string, or null",
+ "item_number": "the agenda item number as printed, e.g. \\"14\\" or \\"27a\\", \
+or an empty string",
+ "item_type": "what kind of action this is, in title case: \\"Resolution\\", \
+\\"Ordinance, second reading\\", \\"Public hearing\\", \\"Motion\\", \
+\\"Consent\\", \\"Staff report\\", or whatever the document itself calls it",
+ "why_it_matters": "1-2 sentences on the consequence for residents — what \
+changes, who is affected, what it costs them. Empty string for routine items",
+ "staff_recommendation": "one sentence stating what staff recommends council \
+do, in staff's own terms, or an empty string if the document makes none",
+ "facts": [{"label": "2-3 words, title case", "value": "a short phrase"}],
+ "source_page": "the page number printed on the document where this item \
+begins, as a string, or an empty string if the document shows none"}
 
 Significance guidance:
 - "routine": consent-agenda housekeeping with no policy choice.
@@ -61,6 +85,14 @@ Significance guidance:
 notice — contracts, rezonings, fee changes, new programs.
 - "major": large spending, tax or utility rate changes, major land use \
 decisions, or anything contested or precedent-setting.
+
+"facts" guidance:
+- At most three, chosen for this item rather than from a fixed list. They fill \
+a small metadata grid read at a glance, so both halves stay short.
+- Good labels: "Affects", "Cost to city", "Location", "Applicant", \
+"Effective", "Term". Good values: "Ward 3 residents", "$1.2M over 5 years", \
+"321 State Ave".
+- Omit a fact rather than padding it with a vague value. An empty list is fine.
 """
 
 DIGEST_SYSTEM = """\
@@ -200,16 +232,40 @@ MINUTES_ONLY_SYSTEM = MINUTES_ONLY_SYSTEM.format(
 
 @dataclass
 class ItemSummary:
-    """A single packet item after fetch, extract, and summarize."""
+    """A single packet item after fetch, extract, and summarize.
 
+    The docket addresses these fields individually — the card's kicker, its
+    "why it matters" paragraph, its 3-up metadata grid — so they are stored
+    apart rather than fused into one block of prose. ``summary`` is the item's
+    plain-language description and nothing else.
+    """
+
+    # --- identity, from the repository listing ------------------------------
     code: str
     title: str
     entry_id: int
     url: str
-    pages: int | None = None
+    page_count: int | None = None
+    # The document's own last-modified time, carried so a later run can tell a
+    # revised packet item from one it has already paid to summarize.
+    last_modified: datetime | None = None
+
+    # --- the model's reading of the document --------------------------------
     summary: str = ""
     significance: str = "routine"
     amount: str | None = None
+    # The agenda's numbering ("14"), which is not `code` — that is the
+    # Laserfiche filename prefix ("A001") and exists even when the agenda
+    # numbers the item differently or not at all.
+    item_number: str = ""
+    item_type: str = ""
+    why_it_matters: str = ""
+    staff_recommendation: str = ""
+    # Per-item labelled values for the metadata grid. A list, not fixed
+    # columns: which facts are worth showing differs item to item.
+    facts: list[dict[str, str]] = field(default_factory=list)
+    source_page: str = ""
+
     skipped: str | None = None
 
     @property
@@ -217,7 +273,12 @@ class ItemSummary:
         return self.skipped is None and bool(self.summary)
 
     def to_archive(self) -> dict:
-        """Everything the outcome pass needs to rebuild this item.
+        """The whole record, which is what makes the archive the durable artifact.
+
+        Everything the model was paid to extract is written back, not just the
+        fields the current page happens to render: re-rendering must be free,
+        and a field dropped here can only be recovered by re-summarizing the
+        packet.
 
         Skipped items are archived too, and with their reason: the page's
         appendix lists every item in the packet, and that list has to survive
@@ -225,30 +286,46 @@ class ItemSummary:
         landed.
         """
         return {
+            "entry_id": self.entry_id,
             "code": self.code,
             "title": self.title,
-            "entry_id": self.entry_id,
             "url": self.url,
-            "pages": self.pages,
+            "page_count": self.page_count,
+            "last_modified": (
+                self.last_modified.isoformat() if self.last_modified else None
+            ),
             "summary": self.summary,
             "significance": self.significance,
             "amount": self.amount,
+            "item_number": self.item_number,
+            "item_type": self.item_type,
+            "why_it_matters": self.why_it_matters,
+            "staff_recommendation": self.staff_recommendation,
+            "facts": [dict(fact) for fact in self.facts],
+            "source_page": self.source_page,
             "skipped": self.skipped,
         }
 
     @classmethod
     def from_archive(cls, payload: dict) -> "ItemSummary":
         amount = payload.get("amount")
-        pages = payload.get("pages")
+        page_count = payload.get("page_count")
         return cls(
             code=str(payload.get("code") or ""),
             title=str(payload.get("title") or ""),
             entry_id=int(payload.get("entry_id") or 0),
             url=str(payload.get("url") or ""),
-            pages=int(pages) if isinstance(pages, int) else None,
+            page_count=int(page_count) if isinstance(page_count, int) else None,
+            last_modified=_parse_timestamp(str(payload.get("last_modified") or "")),
             summary=str(payload.get("summary") or ""),
             significance=str(payload.get("significance") or "routine"),
             amount=str(amount) if amount else None,
+            item_number=str(payload.get("item_number") or ""),
+            item_type=str(payload.get("item_type") or ""),
+            why_it_matters=str(payload.get("why_it_matters") or ""),
+            staff_recommendation=str(payload.get("staff_recommendation") or ""),
+            facts=_coerce_facts(payload.get("facts")),
+            source_page=str(payload.get("source_page") or ""),
             skipped=str(payload["skipped"]) if payload.get("skipped") else None,
         )
 
@@ -312,14 +389,69 @@ def _parse_timestamp(raw: str) -> datetime | None:
         return None
 
 
-def _coerce_summary(payload: dict) -> tuple[str, str, str | None]:
-    summary = str(payload.get("summary") or "").strip()
-    significance = str(payload.get("significance") or "routine").strip().lower()
+def _text(value: object, limit: int | None = None) -> str:
+    """A model-supplied string, whitespace-collapsed, or "" for anything else.
+
+    The model occasionally answers a string field with null, a number, or a
+    nested object. None of those are worth failing an item over — the docket
+    renders an absent field as absent.
+    """
+    if value is None or isinstance(value, (dict, list, bool)):
+        return ""
+    text = " ".join(str(value).split())
+    if text.lower() in ("null", "none", "n/a"):
+        return ""
+    return text[:limit].strip() if limit else text
+
+
+def _coerce_facts(raw: object) -> list[dict[str, str]]:
+    """The metadata grid's labelled values, dropping anything half-formed.
+
+    Capped because this is model output that lands in the durable archive, and
+    the grid it feeds shows three; a model that returns forty would be storing
+    the summary a second time in list form.
+    """
+    if not isinstance(raw, list):
+        return []
+    facts = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        label = _text(entry.get("label"), MAX_FACT_CHARS)
+        value = _text(entry.get("value"), MAX_FACT_CHARS)
+        # Half a fact renders as a labelled blank or an unlabelled orphan.
+        if label and value:
+            facts.append({"label": label, "value": value})
+    return facts[:MAX_FACTS]
+
+
+def _coerce_summary(payload: dict) -> dict:
+    """Validate the model's item JSON into the fields :class:`ItemSummary` owns.
+
+    Every field defaults rather than raises. A model that returns half an
+    object should cost that item its detail, not its place on the page — the
+    keys here are exactly the ``ItemSummary`` fields the model supplies, so the
+    caller can apply them wholesale.
+    """
+    significance = _text(payload.get("significance")).lower()
     if significance not in SIGNIFICANCE_LEVELS:
         significance = "routine"
-    amount = payload.get("amount")
-    amount = str(amount).strip() if amount not in (None, "", "null") else None
-    return summary, significance, amount
+
+    amount = _text(payload.get("amount"), MAX_SHORT_CHARS)
+
+    return {
+        "summary": _text(payload.get("summary")),
+        "significance": significance,
+        # Distinct from the string fields: nothing downstream should render an
+        # empty amount as a dollar sign with no figure after it.
+        "amount": amount or None,
+        "item_number": _text(payload.get("item_number"), MAX_SHORT_CHARS),
+        "item_type": _text(payload.get("item_type"), MAX_SHORT_CHARS),
+        "why_it_matters": _text(payload.get("why_it_matters")),
+        "staff_recommendation": _text(payload.get("staff_recommendation")),
+        "facts": _coerce_facts(payload.get("facts")),
+        "source_page": _text(payload.get("source_page"), MAX_SHORT_CHARS),
+    }
 
 
 class MeetingSummarizer:
@@ -336,7 +468,8 @@ class MeetingSummarizer:
             title=item.title,
             entry_id=item.entry_id,
             url=self.weblink.viewer_url(item.entry_id),
-            pages=item.page_count,
+            page_count=item.page_count,
+            last_modified=item.last_modified,
         )
 
         try:
@@ -361,18 +494,17 @@ class MeetingSummarizer:
                 model=self.cfg.item_model,
                 system=ITEM_SYSTEM,
                 prompt=prompt,
-                max_tokens=800,
+                max_tokens=1200,
             )
-            summary, significance, amount = _coerce_summary(_parse_json_object(raw))
+            fields = _coerce_summary(_parse_json_object(raw))
         except (LLMError, ValueError, json.JSONDecodeError) as exc:
             log.warning("item %s summarization failed: %s", item.entry_id, exc)
             result.skipped = f"summarization failed: {exc}"
             return result
 
-        result.summary = summary
-        result.significance = significance
-        result.amount = amount
-        return result
+        # `replace` over setattr so an unknown key is a TypeError here rather
+        # than a field silently invented on the instance.
+        return replace(result, **fields)
 
     def _item_prompt(self, item: Entry, text: str, truncated: bool) -> str:
         header = [f"Agenda item: {item.name}"]

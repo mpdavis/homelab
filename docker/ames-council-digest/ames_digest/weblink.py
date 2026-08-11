@@ -9,8 +9,10 @@ the public COA repository:
 
 The listing response carries a positional ``data`` array per entry whose
 columns are described once by ``colTypes``; :func:`_zip_columns` turns that
-back into a dict so callers can read page counts and the curated
-"Document Description" field the clerk's office fills in per packet item.
+back into a dict so callers can read page counts, the curated
+"Document Description" field the clerk's office fills in per packet item, and
+each entry's last-modified time — the hidden column that reveals a packet
+document revised after we summarized it.
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from typing import Iterator
 
 import httpx
@@ -44,6 +46,26 @@ ITEM_CODE_RE = re.compile(r"^([A-Z]{1,3}\d{2,3})\s*[-–]\s*(.*)$", re.DOTALL)
 # sorts first. It duplicates the individual items, so we treat it separately.
 MASTER_PREFIX = "~Master"
 
+# Listing timestamps are the repository's local wall time in unpadded US format:
+# "8/7/2026 8:25:02 PM". They are only ever compared against other values from
+# the same listing, so they stay naive rather than being guessed into a zone.
+LISTING_TIME_FORMATS = ("%m/%d/%Y %I:%M:%S %p", "%m/%d/%Y %I:%M %p", "%m/%d/%Y")
+
+
+def _parse_listing_datetime(raw: object) -> datetime | None:
+    """Read a listing's date column, tolerating a shape we have not seen."""
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    # Collapses the non-breaking space some rows carry before AM/PM.
+    text = " ".join(raw.split())
+    for fmt in LISTING_TIME_FORMATS:
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    log.debug("unparseable listing timestamp %r", raw)
+    return None
+
 
 @dataclass(frozen=True)
 class Entry:
@@ -55,6 +77,11 @@ class Entry:
     extension: str
     page_count: int | None = None
     description: str = ""
+    # When the clerk last touched this document. The packet is not final when it
+    # first appears — documents are revised in place, often without the item
+    # count changing — so this is the only signal that what we summarized is no
+    # longer what the repository serves.
+    last_modified: datetime | None = None
 
     @property
     def is_folder(self) -> bool:
@@ -195,6 +222,7 @@ class WebLinkClient:
                         extension=(row.get("extension") or "").lower(),
                         page_count=page_count if isinstance(page_count, int) else None,
                         description=(cols.get("f_Document Description") or "").strip(),
+                        last_modified=_parse_listing_datetime(cols.get("LastModified")),
                     )
                 )
 
