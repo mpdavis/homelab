@@ -320,8 +320,38 @@ run against a long backlog doesn't spend the whole year's budget at once.
 ## Local development
 
 ```bash
-uv venv && uv pip install -e .
+uv venv && uv pip install -e ".[dev]"
 AMES_STATE_DIR=./state AMES_OUTPUT_DIR=./digests \
 AMES_LLM_API_KEY=sk-... \
   python -m ames_digest run --meeting 2026-07-28 --no-state
 ```
+
+## Tests
+
+```bash
+pytest            # from docker/ames-council-digest
+```
+
+The suite is pure: no network, no model gateway, no PDFs pulled off the city's
+server. Everything expensive is stubbed at its seam — a fake HTTP client replays
+canned Laserfiche listings, PDFs are generated in-process, and no test calls a
+model — so the whole thing runs in well under a second and gates the image build
+rather than trailing it (`.github/workflows/build-ames-council-digest.yml`).
+
+What it covers is the logic that decides things, which is where the bugs are and
+where the money is:
+
+| File | What it pins down |
+|---|---|
+| `test_agenda.py` | outline coercion, and the fuzzy agenda↔packet join — one-to-one assignment, boilerplate not counting as similarity, both orphan directions, determinism |
+| `test_summarize.py` | weight derivation, item coercion, archive round-trip, and `apply_outline` ordering and field precedence |
+| `test_merge.py` | splicing outcomes into the page — label matching, bullets the model wrote as bare paragraphs, and re-runs replacing rather than stacking |
+| `test_selection.py` | which passes a run spends money on, and which meetings never cost a listing |
+| `test_archive.py`, `test_state.py` | the two things whose loss costs a re-summarized packet: degrading on corrupt files, migrating v1 state, refusing unsafe keys |
+| `test_weblink.py` | folder-name parsing, listing column mapping, and paging |
+| `test_render.py`, `test_index.py` | what reaches the page and the landing page, including that nothing published becomes invisible |
+| `test_llm.py`, `test_pdftext.py`, `test_config.py`, `test_delivery.py`, `test_meetings.py` | response parsing and the retry loop, scan detection, env parsing, sink behavior, meeting identity |
+
+Model prompts are not tested — they are not deterministic and a test asserting
+their wording would only pin the prompt to itself. What *is* tested is every
+path a model response takes after it arrives, including the malformed ones.

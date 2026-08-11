@@ -1,6 +1,7 @@
 name: Build Ames Council Digest Image
 
-# Builds docker/ames-council-digest into ghcr.io/mpdavis/ames-council-digest.
+# Runs the package's unit tests, then builds docker/ames-council-digest into
+# ghcr.io/mpdavis/ames-council-digest.
 # Tags are semver (1.0.<run_number>) so the CronJob pins a real tag
 # (image-pin-check) and Renovate's kubernetes manager can open bump PRs — the
 # image is never referenced as :latest.
@@ -41,7 +42,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The suite is pure — no network, no model gateway, no PDFs off the city's
+  # server — so it runs in seconds and gates the image rather than trailing it.
+  # `build` needs it, which means a red test stops main from publishing a tag
+  # Renovate would later offer the cluster.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install the package and its test dependencies
+        working-directory: docker/ames-council-digest
+        run: pip install -e ".[dev]"
+
+      - name: Run unit tests
+        working-directory: docker/ames-council-digest
+        run: pytest -q
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     env:
       # The single gate on publishing. Covers workflow_dispatch too: dispatching

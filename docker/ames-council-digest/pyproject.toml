@@ -9,6 +9,9 @@ dependencies = [
     "markdown>=3.5,<4",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=8,<10"]
+
 [project.scripts]
 ames-digest = "ames_digest.__main__:main"
 
@@ -18,3 +21,11 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["ames_digest*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# tests/ is not a package, so conftest's helpers import by bare name. rootdir
+# insertion is what makes `from conftest import item` work from any test file.
+addopts = "--import-mode=importlib"
+pythonpath = ["tests"]
+filterwarnings = ["error"]
