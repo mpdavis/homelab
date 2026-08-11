@@ -85,7 +85,8 @@ def filename_stem(digest: MeetingDigest) -> str:
     return digest.meeting.key
 
 
-def _source_line(digest: MeetingDigest) -> str:
+def _subtitle(digest: MeetingDigest) -> str:
+    """The line under the title: when and where, then the source documents."""
     links = []
     if digest.minutes_url:
         links.append(f"[Minutes]({digest.minutes_url})")
@@ -93,15 +94,22 @@ def _source_line(digest: MeetingDigest) -> str:
         links.append(f"[Agenda]({digest.agenda_url})")
     if digest.packet_url:
         links.append(f"[Full packet]({digest.packet_url})")
-    return " · ".join(links)
+    # One dot-separated run rather than two lines: the template's subtitle is a
+    # single <p>, and the docket's stacked header arrives with the web
+    # templates in phase 4 — which do not share this email renderer.
+    return " · ".join(p for p in (digest.agenda.venue, *links) if p)
 
 
 def _appendix(digest: MeetingDigest) -> list[str]:
     """A linked index of every packet item, so nothing is invisible."""
-    if not digest.items:
+    orphans = digest.agenda.orphans
+    if not digest.items and not orphans:
         return []
 
-    lines = ["", "---", "", "### Every item in this packet", ""]
+    lines = ["", "---", ""]
+
+    if digest.items:
+        lines += ["### Every item in this packet", ""]
     for item in digest.items:
         label = f"**{item.code}** " if item.code else ""
         note = ""
@@ -117,6 +125,18 @@ def _appendix(digest: MeetingDigest) -> list[str]:
             if item.amount:
                 note = f" — _{item.significance}, {item.amount}_"
         lines.append(f"- {label}[{item.title}]({item.url}){note}")
+
+    if orphans:
+        # The other half of the appendix's promise. Plenty of agenda business
+        # never produces a packet document — proclamations, public forum,
+        # council referrals — and a title with no PDF is still a title the
+        # reader is entitled to see.
+        lines += ["", "### On the agenda, with no packet document", ""]
+        for entry in orphans:
+            number = f"**{entry.item_number}** " if entry.item_number else ""
+            note = f" — _{entry.section}_" if entry.section else ""
+            lines.append(f"- {number}{entry.title}{note}")
+
     return lines
 
 
@@ -151,7 +171,7 @@ def _footer(digest: MeetingDigest) -> str:
 
 def render(digest: MeetingDigest) -> RenderedDigest:
     title = subject_line(digest)
-    source = _source_line(digest)
+    source = _subtitle(digest)
 
     md_parts = [f"# {title}", ""]
     if source:

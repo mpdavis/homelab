@@ -44,7 +44,10 @@ ARCHIVE_DIRNAME = "meetings"
 # added the per-document `last_modified` a re-run needs to tell a revised packet
 # item from one already paid for. Nothing reads v2 items: the service is not
 # live, so the old shape is simply re-summarized rather than migrated.
-ARCHIVE_VERSION = 3
+# v4 added the segmented agenda — the meeting's time and place, and its items in
+# printed order including the ones no packet document matched. The outcome pass
+# reads it back rather than paying to segment the agenda a second time.
+ARCHIVE_VERSION = 4
 
 # Meeting keys are already slugs, but this file name reaches the filesystem —
 # refuse anything that could climb out of the archive directory.
@@ -56,6 +59,10 @@ class PreviewArchive:
     """What the preview pass left behind for the outcome pass to build on."""
 
     items: list[dict] = field(default_factory=list)
+    # The segmented agenda, stored raw and deserialized by the caller so this
+    # module keeps knowing nothing about the shape of what it persists. Empty
+    # for an archive written before v4, or for a meeting with no agenda.
+    agenda: dict = field(default_factory=dict)
     # Empty for a v1 archive, or when no preview ever ran. Both mean the same
     # thing to the caller: there is no page to update, so write one.
     body: str = ""
@@ -95,6 +102,7 @@ def save_preview(
     key: str,
     items: list[dict],
     *,
+    agenda: dict,
     body: str,
     usage: Usage,
     model: str,
@@ -107,6 +115,7 @@ def save_preview(
         "version": ARCHIVE_VERSION,
         "key": key,
         "items": items,
+        "agenda": agenda,
         "body": body,
         "model": model,
         "generated_at": generated_at,
@@ -177,8 +186,11 @@ def load_preview(state_dir: Path, key: str) -> PreviewArchive:
             key,
         )
 
+    agenda = payload.get("agenda")
+
     return PreviewArchive(
         items=[i for i in items if isinstance(i, dict)],
+        agenda=agenda if isinstance(agenda, dict) else {},
         body=body if isinstance(body, str) else "",
         usage=_usage(payload),
         model=str(payload.get("model") or ""),

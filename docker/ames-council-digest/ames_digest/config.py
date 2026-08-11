@@ -94,6 +94,18 @@ class Config:
         default_factory=lambda: _env_int("AMES_MAX_CONCURRENCY", 4)
     )
 
+    # --- Meeting furniture -------------------------------------------------
+    # Where and when the board meets, used when the agenda PDF does not print
+    # it. These belong beside `board`: change the board and these change with
+    # it, which is what makes them a per-body fallback rather than a constant.
+    # Ames City Council meets Tuesdays at 6:00 PM in City Hall.
+    meeting_time: str = field(
+        default_factory=lambda: _env("AMES_MEETING_TIME", "6:00 PM")
+    )
+    meeting_location: str = field(
+        default_factory=lambda: _env("AMES_MEETING_LOCATION", "City Hall, 515 Clark Ave")
+    )
+
     # --- Output and delivery ----------------------------------------------
     state_dir: Path = field(
         default_factory=lambda: Path(_env("AMES_STATE_DIR", "/data/state"))
