@@ -6,11 +6,14 @@ name: Image Pin Check
 # by resolving every newly added `image:` reference against its registry. No LLM,
 # no secrets — just the public OCI manifest API.
 
+# Deliberately NOT filtered on `paths: kubernetes/**`. This is a REQUIRED status
+# check on main's ruleset, and a required check that does not run leaves the PR
+# blocked forever waiting for a verdict that never arrives. Running it everywhere
+# costs ~5s on PRs that touch no manifests: verify-image-pins.py finds no added
+# `image:` lines and exits 0 with "No image references to verify."
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    paths:
-      - 'kubernetes/**'
 
 concurrency:
   group: image-pin-check-${{ github.event.pull_request.number }}
