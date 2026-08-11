@@ -81,12 +81,12 @@ queries it from GitHub Actions). Check conventions:
 `config.endpoints` entry (correct group/conditions) *and* the hostname in the `hostAliases`
 postRenderers patch. The `add-service` skill covers this for new services.
 
-Deploy pipeline: merges are serialized by `deploy-health-gate.yml`, which requires Flux's
-`kustomization/apps/<digest>` commit status **and** the `canary/gatus` status posted by
-`deploy-canary.yml`. The canary baselines what's already failing before each deploy and only
-blames the merge for passing→failing transitions — those auto-open a revert PR; pre-existing
-failures are exempt and alert via the `GatusEndpointDown` PrometheusRule instead. Details in
-`.github/workflows/README.md`.
+Deploy pipeline: `deploy-canary.yml` verifies each merge after the fact — it waits for Flux's
+`kustomization/apps/<digest>` commit status, baselines what's already failing before the
+deploy, and only blames the merge for passing→failing transitions, which auto-open a revert
+PR; pre-existing failures are exempt and alert via the `GatusEndpointDown` PrometheusRule
+instead. Nothing blocks a merge on deploy health — the canary reports and reverts, it does not
+gate. Details in `.github/workflows/README.md`.
 
 ## Networking
 

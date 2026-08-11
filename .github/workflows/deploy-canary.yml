@@ -5,8 +5,10 @@ name: Deploy Canary
 # (kustomization/apps commit status), then polls the Gatus synthetic-monitoring
 # API (status.mpdavis.com) until every endpoint reports a healthy result
 # OBSERVED AFTER the reconcile finished (a green result from before the deploy
-# proves nothing). Posts the verdict as the `canary/gatus` commit status, which
-# deploy-health-gate.yml requires before the next PR may merge.
+# proves nothing). Posts the verdict as the `canary/gatus` commit status.
+#
+# This is a post-merge check, not a merge gate: a red canary does not block the
+# next PR, it auto-opens a revert PR against the offending commit.
 #
 # Regressions vs pre-existing failures: at workflow start (before Flux picks up
 # the commit) the canary snapshots which endpoints are ALREADY failing. Only a
@@ -86,8 +88,8 @@ jobs:
                      or (($r.timestamp | sub("\\.[0-9]+"; "") | fromdate) < $t0))
             | "\($e.group)/\($e.name)" ]'
 
-          # Post pending immediately: other PRs' deploy-health-gate runs see the
-          # context on main HEAD and wait for it instead of racing a missing one.
+          # Post pending immediately so the commit shows a canary in flight
+          # rather than no verdict at all while Flux catches up.
           post_status pending "Waiting for Flux to deploy this commit"
 
           # --- Phase 0: baseline — what is ALREADY failing before this deploy?

@@ -275,9 +275,8 @@ Gatus as env vars — Gatus expands `${VAR}` in its config.
    blamed on the merge (canary fails, a revert PR auto-opens); pre-existing failures are
    exempt so a chronically red service doesn't spawn revert PRs per merge or freeze the queue
 
-`deploy-health-gate.yml` requires both the Flux status and the canary status on the current
-`main` before any PR can merge, and surfaces an informational report of already-failing
-endpoints on every PR.
+The canary is a post-merge check, not a gate: nothing blocks a PR on the health of the
+previous deploy. A bad merge is caught by the canary's verdict and its auto-opened revert PR.
 
 ## GPU Setup
 
