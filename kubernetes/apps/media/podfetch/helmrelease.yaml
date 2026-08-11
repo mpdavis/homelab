@@ -27,7 +27,7 @@ spec:
           main:
             image:
               repository: samuel19982/podfetch
-              tag: v5.2.2
+              tag: v5.2.3
             env:
               TZ: ${TZ}
               POLLING_INTERVAL: "60"
