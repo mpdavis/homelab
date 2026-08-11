@@ -3,9 +3,15 @@
 A meeting has one page, written before the meeting and updated after it. The
 outcome pass therefore needs two things the preview already computed: the page's
 Markdown, so it can splice outcomes into the bullets rather than rewrite them,
-and the per-item summaries, so it can say "council approved *this*, the thing
-the packet described". Re-deriving either would mean re-downloading and
+and the per-item records, so it can say "council approved *this*, the thing the
+packet described". Re-deriving either would mean re-downloading and
 re-summarizing the whole packet at full token cost.
+
+Each item is stored whole, not trimmed to what today's page renders, and carries
+the entry id and last-modified time of the document it was read from. That makes
+this file the answer to "what did we summarize, and from which version" — the
+question a later run has to ask, because the clerk revises packet documents in
+place after we have already digested them.
 
 So each preview writes a small JSON sidecar next to the state file. It lives in
 the state directory rather than the output directory because it is pipeline
@@ -33,7 +39,12 @@ log = logging.getLogger(__name__)
 ARCHIVE_DIRNAME = "meetings"
 # v1 stored the item summaries alone, because the outcome pass wrote its own
 # separate page and had nothing to merge into.
-ARCHIVE_VERSION = 2
+# v2 added the page body, so the outcome pass could splice rather than rewrite.
+# v3 widened each item from summary/significance/amount to the full record, and
+# added the per-document `last_modified` a re-run needs to tell a revised packet
+# item from one already paid for. Nothing reads v2 items: the service is not
+# live, so the old shape is simply re-summarized rather than migrated.
+ARCHIVE_VERSION = 3
 
 # Meeting keys are already slugs, but this file name reaches the filesystem —
 # refuse anything that could climb out of the archive directory.
@@ -55,6 +66,22 @@ class PreviewArchive:
     @property
     def has_page(self) -> bool:
         return bool(self.body.strip())
+
+    def by_entry_id(self) -> dict[int, dict]:
+        """The archived items keyed by the repository entry they came from.
+
+        ``items`` stays a list because agenda order is part of the record and a
+        dict on disk would lose it. This is the lookup that order costs: given a
+        fresh listing, what did we summarize for this document, and from which
+        version of it. Items with no usable entry id are dropped rather than
+        collected under 0 — they cannot be matched to a listing row anyway.
+        """
+        keyed = {}
+        for item in self.items:
+            entry_id = item.get("entry_id")
+            if isinstance(entry_id, int) and entry_id:
+                keyed[entry_id] = item
+        return keyed
 
 
 def _path(state_dir: Path, key: str) -> Path:

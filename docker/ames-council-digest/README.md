@@ -67,12 +67,18 @@ rather than stapling one item's vote onto another. A bullet the minutes are
 genuinely silent about gets that same line, which is honest: silence is a real
 outcome when an item is pulled, deferred, or never reached.
 
-The page's Markdown and the per-item summaries behind it are archived as JSON
+The page's Markdown and the per-item records behind it are archived as JSON
 when the preview runs (`archive.py`), so the outcome pass edits prose that is
 already correct instead of paying to regenerate it — and never re-summarizes the
 packet to rediscover something already computed. If the archive has no page (no
 preview ever ran, or it predates this format), the outcome pass writes the whole
 page from the minutes alone.
+
+Each archived item is stored whole rather than trimmed to what today's page
+renders, and carries the `entry_id` and `last_modified` of the document it was
+read from. That makes the archive the answer to "what did we summarize, and from
+which version of the document" — the question that matters because the clerk
+revises packet documents in place after we have already digested them.
 
 The two passes are tracked separately in state: a meeting whose preview is done
 still has an outcome pending until its minutes appear. `--phase` runs just one.
@@ -106,11 +112,15 @@ A run then:
 2. **Selects** the passes each meeting still needs — preview, outcome, or both
    — based on what's published and what state already records.
 3. **Maps** (preview): fetches every packet item PDF concurrently, extracts its
-   text (`pdftext.py`), and asks the model for 2–4 sentences plus a
-   significance rating of `routine` / `notable` / `major` (`summarize.py`).
+   text (`pdftext.py`), and asks the model for a structured record of the item
+   (`summarize.py`): a 2–4 sentence summary, a significance rating of
+   `routine` / `notable` / `major`, the agenda number and item type, why it
+   matters, the staff recommendation, a short list of labelled facts, and the
+   source page. The fields are stored apart rather than fused into one block of
+   prose, because the page addresses each of them individually.
 4. **Reduces** (preview): hands the agenda plus every item summary to one final
-   call that writes the reader-facing page, and archives that page and the item
-   summaries for the outcome pass.
+   call that writes the reader-facing page, and archives that page and the full
+   item records for the outcome pass.
 5. **Updates** (outcome): one call over the minutes plus the archived page,
    returning an outcome and vote per Additional Reading bullet, which `merge.py`
    splices into the page (`summarize.py`). The page is rewritten in place.
