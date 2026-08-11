@@ -11,12 +11,19 @@ gateways differ on which one they read; each ignores the other. This is not
 belt-and-braces: zen's ``/messages`` reads ``x-api-key`` specifically and
 answers "Missing API key" to a Bearer-only request, even though its docs show
 Bearer for the OpenAI-shaped endpoints.
+
+Reading a response back is the client's business too: every prompt in this
+package asks for a JSON object and gets one wrapped in whatever the model felt
+like saying, so :func:`parse_json_object` and :func:`text_field` live here
+rather than in any one caller.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import random
+import re
 import time
 from dataclasses import dataclass, field
 
@@ -30,6 +37,33 @@ RETRYABLE_STATUS = {408, 409, 429, 500, 502, 503, 504, 529}
 
 class LLMError(RuntimeError):
     """A request failed after exhausting retries."""
+
+
+def parse_json_object(raw: str) -> dict:
+    """Pull a JSON object out of a model response that may be fenced or chatty."""
+    text = raw.strip()
+    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
+    if fence:
+        text = fence.group(1).strip()
+    start, end = text.find("{"), text.rfind("}")
+    if start == -1 or end <= start:
+        raise ValueError("no JSON object in response")
+    return json.loads(text[start : end + 1])
+
+
+def text_field(value: object, limit: int | None = None) -> str:
+    """A model-supplied string, whitespace-collapsed, or "" for anything else.
+
+    The model occasionally answers a string field with null, a number, or a
+    nested object. None of those are worth failing an item over — the docket
+    renders an absent field as absent.
+    """
+    if value is None or isinstance(value, (dict, list, bool)):
+        return ""
+    text = " ".join(str(value).split())
+    if text.lower() in ("null", "none", "n/a"):
+        return ""
+    return text[:limit].strip() if limit else text
 
 
 @dataclass

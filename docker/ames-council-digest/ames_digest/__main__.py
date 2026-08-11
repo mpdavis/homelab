@@ -363,6 +363,7 @@ def cmd_run(args: argparse.Namespace, cfg: Config) -> int:
                             cfg.state_dir,
                             meeting.key,
                             [i.to_archive() for i in digest.items],
+                            agenda=digest.agenda.to_archive(),
                             body=digest.body_markdown,
                             usage=digest.usage,
                             model=digest.model,

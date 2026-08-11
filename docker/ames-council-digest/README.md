@@ -40,7 +40,7 @@ The page itself:
 
 ```
 # City Council — July 28, 2026
-Minutes · Agenda · Full packet
+6:00 PM · City Hall, 515 Clark Ave · Minutes · Agenda · Full packet
 
 ## Notable Topics          bullets — the at-a-glance read
 ## Additional Reading      the major and notable items, one bullet each
@@ -49,6 +49,7 @@ Minutes · Agenda · Full packet
 ## After the meeting       added by the outcome pass, for business the packet
                            did not anticipate — public forum, referrals
 ### Every item in this packet
+### On the agenda, with no packet document
 ```
 
 The outcome pass reads the minutes — which carry motions, movers, vote tallies,
@@ -67,12 +68,13 @@ rather than stapling one item's vote onto another. A bullet the minutes are
 genuinely silent about gets that same line, which is honest: silence is a real
 outcome when an item is pulled, deferred, or never reached.
 
-The page's Markdown and the per-item records behind it are archived as JSON
-when the preview runs (`archive.py`), so the outcome pass edits prose that is
-already correct instead of paying to regenerate it — and never re-summarizes the
-packet to rediscover something already computed. If the archive has no page (no
-preview ever ran, or it predates this format), the outcome pass writes the whole
-page from the minutes alone.
+The page's Markdown, the segmented agenda, and the per-item records behind them
+are archived as JSON when the preview runs (`archive.py`), so the outcome pass
+edits prose that is already correct instead of paying to regenerate it — and
+never re-summarizes the packet, or re-segments the agenda, to rediscover
+something already computed. If the archive has no page (no preview ever ran, or
+it predates this format), the outcome pass writes the whole page from the
+minutes alone.
 
 Each archived item is stored whole rather than trimmed to what today's page
 renders, and carries the `entry_id` and `last_modified` of the document it was
@@ -118,21 +120,79 @@ A run then:
    matters, the staff recommendation, a short list of labelled facts, and the
    source page. The fields are stored apart rather than fused into one block of
    prose, because the page addresses each of them individually.
-4. **Reduces** (preview): hands the agenda plus every item summary to one final
-   call that writes the reader-facing page, and archives that page and the full
-   item records for the outcome pass.
-5. **Updates** (outcome): one call over the minutes plus the archived page,
+4. **Segments** (preview): one call over the agenda PDF returns the meeting's
+   own structure as data (`agenda.py`) — see below.
+5. **Reduces** (preview): hands the segmented agenda plus every item summary to
+   one final call that writes the reader-facing page, and archives that page,
+   the outline, and the full item records for the outcome pass.
+6. **Updates** (outcome): one call over the minutes plus the archived page,
    returning an outcome and vote per Additional Reading bullet, which `merge.py`
    splices into the page (`summarize.py`). The page is rewritten in place.
-6. **Renders** Markdown, HTML, and plain text (`render.py`), then hands them to
+7. **Renders** Markdown, HTML, and plain text (`render.py`), then hands them to
    the configured delivery sinks (`delivery.py`).
-7. **Records** the pass in a state file so the next run skips it.
+8. **Records** the pass in a state file so the next run skips it.
+
+## The agenda is the meeting's structure
+
+The packet is a bag of PDFs named by Laserfiche code — `A001`, `A002` — which
+is a filename artifact, not the agenda's numbering, and sorting by it is not the
+order council takes items up. Everything structural lives in the agenda PDF and
+nowhere else: the printed item numbers, the section headings, which items ride
+the consent agenda, and the meeting's time and place. Until it was segmented,
+that PDF was dumped into the reduce prompt as raw text, so none of it survived
+as data.
+
+One call per meeting now reads the agenda and returns it as records —
+`{item_number, title, item_type, section}` in printed order, plus the time and
+location for the page header. A pure string-similarity pass then joins that
+outline to the packet (`agenda.py`), scoring each pair on token overlap and
+character similarity, taking the best-scoring pairs first, and assigning
+one-to-one.
+
+The join has to be fuzzy, and both failure directions are real. On the
+2026-07-28 meeting — 40 agenda entries, 39 packet PDFs — the codes are offset by
+one (item 1 is a presentation with no document), `A005` does not exist, and the
+same water-monitoring agreement was uploaded twice as `A018` and `A019` against
+a single agenda entry. Neither side is a permutation of the other, so nothing is
+resolved by dropping it:
+
+| | Behavior |
+|---|---|
+| Agenda entry with no packet PDF | stays in the outline as an orphan, listed under **On the agenda, with no packet document** — proclamations, public forum, and council referrals never produce a document |
+| Packet PDF with no agenda entry | keeps its full record and lands after the ordered items, still linked in the packet appendix |
+
+The match rate is logged every run (`agenda match: 38 of 40 …`). If segmentation
+fails or the agenda is missing entirely, the run degrades rather than aborts:
+items keep their Laserfiche order and take their weight from significance alone.
+
+### Weight
+
+Card treatment is driven by `weight`, which is **not** a rename of
+`significance`. Significance has three values and is the model's opinion of a
+document; weight has four and is a structural property of the meeting, derived
+once from significance plus the agenda's own sectioning and then persisted:
+
+| `significance` | on the consent agenda | elsewhere |
+|---|---|---|
+| `major` | `consent` | `major` |
+| `notable` | `consent` | `standard` |
+| `routine` | `consent` | `routine` |
+
+Consent membership outranks significance — an item passed in a block without
+discussion reads as one line however interesting its document is. It is derived
+at digest time and never recomputed at render time, so a page re-rendered a year
+later looks the way it did. There is deliberately no override file.
 
 A typical regular meeting is ~40 packet items and ~600 pages, measured at ~294k
 input / 33k output tokens. On zen's `claude-sonnet-4-5` ($3/$15 per M) that is
 roughly **$1.40 per meeting**, or ~$55/year across ~40 meetings. Pointing
 `AMES_ITEM_MODEL` at `claude-haiku-4-5` ($1/$5) cuts it to about a third, since
 per-item summaries are ~95% of the spend.
+
+That measurement predates agenda segmentation, which adds one call over the
+agenda text — ~12k characters in, an item list out. It is well inside the noise
+of a 40-item packet, and it partly pays for itself: the reduce call now receives
+the ordered outline instead of the raw agenda dump it used to be handed.
 
 Items whose PDFs are scans with no text layer are reported by title in the
 digest's appendix rather than silently dropped — there is no OCR in the image.
@@ -195,6 +255,8 @@ Everything is environment-driven; nothing needs a rebuild to change.
 | `AMES_WEBLINK_REPO` | `COA` | Laserfiche repository name |
 | `AMES_ROOT_FOLDER_ID` | `236500` | the `Clerk Files` folder |
 | `AMES_BOARD` | `City Council` | board or commission to track |
+| `AMES_MEETING_TIME` | `6:00 PM` | fallback when the agenda does not print a start time |
+| `AMES_MEETING_LOCATION` | `City Hall, 515 Clark Ave` | fallback when the agenda does not print a place |
 | `AMES_LLM_BASE_URL` | `https://opencode.ai/zen/v1` | Anthropic-compatible gateway |
 | `AMES_LLM_API_KEY` | — | gateway key (or `OPENCODE_API_KEY`) |
 | `AMES_ITEM_MODEL` | `claude-sonnet-4-5` | model for per-item summaries |
@@ -209,8 +271,15 @@ Everything is environment-driven; nothing needs a rebuild to change.
 | `AMES_OUTPUT_DIR` | `/data/digests` | where the `file` sink writes |
 | `AMES_DELIVERY` | `file,stdout` | comma-separated sink names |
 
+`AMES_MEETING_TIME` and `AMES_MEETING_LOCATION` belong beside `AMES_BOARD`:
+change the board and these change with it, which is what makes them a per-body
+fallback rather than a constant. They are used only when the agenda PDF does not
+print the value itself.
+
 Per-item summaries dominate token spend, so `AMES_ITEM_MODEL` is worth pointing
 at something cheap; `AMES_DIGEST_MODEL` is a single call and worth spending on.
+It now covers two calls — the agenda segmentation and the final digest — but
+both are single calls over text already downloaded, against ~40 item calls.
 Any gateway speaking the Anthropic Messages API works — `api.anthropic.com` or
 a local bridge just needs a different `AMES_LLM_BASE_URL`.
 

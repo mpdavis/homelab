@@ -1,14 +1,19 @@
 """Map-reduce summarization of a council meeting.
 
-Map: every packet item PDF is fetched, text-extracted, and reduced to a few
-sentences plus a significance rating. Items run concurrently because each is an
-independent network round trip followed by an independent model call.
+Segment: one call reads the agenda PDF and returns the meeting's structure as
+data — items in printed order, their numbers, their section headings, and the
+time and place. A pure similarity pass then joins that outline to the packet
+(see :mod:`ames_digest.agenda`), which is what turns a bag of PDFs sorted by
+Laserfiche filename into a docket in the order council will take it up.
 
-Reduce: the agenda (which supplies the meeting's structure — consent agenda,
-public hearings, ordinances) and every item summary are handed to one final
-call that writes the reader-facing digest.
+Map: every packet item PDF is fetched, text-extracted, and reduced to a
+structured record. Items run concurrently because each is an independent
+network round trip followed by an independent model call.
 
-Update: once the minutes are published, a third call reads them against that
+Reduce: the agenda outline and every item summary are handed to one final call
+that writes the reader-facing digest.
+
+Update: once the minutes are published, a further call reads them against that
 same page and returns what council did to each of its bullets. The page is
 edited in place rather than rewritten — see :mod:`ames_digest.merge`.
 """
@@ -17,15 +22,16 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 
+from . import agenda as agenda_mod
 from . import merge
+from .agenda import AgendaOutline
 from .archive import PreviewArchive
 from .config import Config
-from .llm import LLMClient, LLMError, Usage
+from .llm import LLMClient, LLMError, Usage, parse_json_object, text_field
 from .meetings import Meeting
 from .pdftext import extract
 from .state import PHASE_OUTCOME, PHASE_PREVIEW
@@ -34,6 +40,29 @@ from .weblink import Entry, WebLinkClient
 log = logging.getLogger(__name__)
 
 SIGNIFICANCE_LEVELS = ("routine", "notable", "major")
+
+# What the card looks like, which is a structural property of the meeting: where
+# the item sits on the agenda and how much of the page it earns. Deliberately
+# not a rename of `significance` — that has three values and is the model's
+# opinion of the document, this has four and is derived from that opinion plus
+# the agenda's own sectioning. Derived once and persisted, never recomputed at
+# render time, so a page re-rendered a year later looks the way it did.
+WEIGHT_LEVELS = ("major", "standard", "routine", "consent")
+_WEIGHT_BY_SIGNIFICANCE = {"major": "major", "notable": "standard", "routine": "routine"}
+
+
+def derive_weight(significance: str, *, consent: bool) -> str:
+    """The card weight for an item. Consent membership outranks significance.
+
+    An item riding the consent agenda is by definition being passed as a block
+    without discussion, and reads as one line in a list however interesting its
+    document is. Hand-correction is deliberately deferred — there is no override
+    file, and this is the only place weight is decided.
+    """
+    if consent:
+        return "consent"
+    return _WEIGHT_BY_SIGNIFICANCE.get(significance, "routine")
+
 
 # Bounds on model-supplied strings that land in the archive. These are not
 # validation so much as blast radius: the fields below are rendered into fixed
@@ -266,6 +295,13 @@ class ItemSummary:
     facts: list[dict[str, str]] = field(default_factory=list)
     source_page: str = ""
 
+    # --- the agenda's reading of where this item sits -----------------------
+    # The heading the agenda printed above it ("CONSENT AGENDA", "HEARINGS"),
+    # empty for an item no agenda entry matched.
+    section: str = ""
+    # Card weight, derived once by `derive_weight` and stored. See WEIGHT_LEVELS.
+    weight: str = "routine"
+
     skipped: str | None = None
 
     @property
@@ -303,6 +339,8 @@ class ItemSummary:
             "staff_recommendation": self.staff_recommendation,
             "facts": [dict(fact) for fact in self.facts],
             "source_page": self.source_page,
+            "section": self.section,
+            "weight": self.weight,
             "skipped": self.skipped,
         }
 
@@ -326,6 +364,8 @@ class ItemSummary:
             staff_recommendation=str(payload.get("staff_recommendation") or ""),
             facts=_coerce_facts(payload.get("facts")),
             source_page=str(payload.get("source_page") or ""),
+            section=str(payload.get("section") or ""),
+            weight=str(payload.get("weight") or "routine"),
             skipped=str(payload["skipped"]) if payload.get("skipped") else None,
         )
 
@@ -339,6 +379,10 @@ class MeetingDigest:
     # kind decides what the page links to and how the footer reads.
     kind: str = PHASE_PREVIEW
     items: list[ItemSummary] = field(default_factory=list)
+    # The meeting's own structure: time, place, and the agenda entries in
+    # printed order — including the ones no packet document was found for,
+    # which the page still has to show.
+    agenda: AgendaOutline = field(default_factory=AgendaOutline)
     agenda_url: str | None = None
     packet_url: str | None = None
     minutes_url: str | None = None
@@ -368,18 +412,6 @@ class MeetingDigest:
         )
 
 
-def _parse_json_object(raw: str) -> dict:
-    """Pull a JSON object out of a model response that may be fenced or chatty."""
-    text = raw.strip()
-    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
-    if fence:
-        text = fence.group(1).strip()
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end <= start:
-        raise ValueError("no JSON object in response")
-    return json.loads(text[start : end + 1])
-
-
 def _parse_timestamp(raw: str) -> datetime | None:
     """Read an archived ISO timestamp back, tolerating one that never wrote."""
     try:
@@ -387,21 +419,6 @@ def _parse_timestamp(raw: str) -> datetime | None:
     except ValueError:
         log.debug("unparseable archived timestamp %r", raw)
         return None
-
-
-def _text(value: object, limit: int | None = None) -> str:
-    """A model-supplied string, whitespace-collapsed, or "" for anything else.
-
-    The model occasionally answers a string field with null, a number, or a
-    nested object. None of those are worth failing an item over — the docket
-    renders an absent field as absent.
-    """
-    if value is None or isinstance(value, (dict, list, bool)):
-        return ""
-    text = " ".join(str(value).split())
-    if text.lower() in ("null", "none", "n/a"):
-        return ""
-    return text[:limit].strip() if limit else text
 
 
 def _coerce_facts(raw: object) -> list[dict[str, str]]:
@@ -417,8 +434,8 @@ def _coerce_facts(raw: object) -> list[dict[str, str]]:
     for entry in raw:
         if not isinstance(entry, dict):
             continue
-        label = _text(entry.get("label"), MAX_FACT_CHARS)
-        value = _text(entry.get("value"), MAX_FACT_CHARS)
+        label = text_field(entry.get("label"), MAX_FACT_CHARS)
+        value = text_field(entry.get("value"), MAX_FACT_CHARS)
         # Half a fact renders as a labelled blank or an unlabelled orphan.
         if label and value:
             facts.append({"label": label, "value": value})
@@ -433,25 +450,95 @@ def _coerce_summary(payload: dict) -> dict:
     keys here are exactly the ``ItemSummary`` fields the model supplies, so the
     caller can apply them wholesale.
     """
-    significance = _text(payload.get("significance")).lower()
+    significance = text_field(payload.get("significance")).lower()
     if significance not in SIGNIFICANCE_LEVELS:
         significance = "routine"
 
-    amount = _text(payload.get("amount"), MAX_SHORT_CHARS)
+    amount = text_field(payload.get("amount"), MAX_SHORT_CHARS)
 
     return {
-        "summary": _text(payload.get("summary")),
+        "summary": text_field(payload.get("summary")),
         "significance": significance,
         # Distinct from the string fields: nothing downstream should render an
         # empty amount as a dollar sign with no figure after it.
         "amount": amount or None,
-        "item_number": _text(payload.get("item_number"), MAX_SHORT_CHARS),
-        "item_type": _text(payload.get("item_type"), MAX_SHORT_CHARS),
-        "why_it_matters": _text(payload.get("why_it_matters")),
-        "staff_recommendation": _text(payload.get("staff_recommendation")),
+        "item_number": text_field(payload.get("item_number"), MAX_SHORT_CHARS),
+        "item_type": text_field(payload.get("item_type"), MAX_SHORT_CHARS),
+        "why_it_matters": text_field(payload.get("why_it_matters")),
+        "staff_recommendation": text_field(payload.get("staff_recommendation")),
         "facts": _coerce_facts(payload.get("facts")),
-        "source_page": _text(payload.get("source_page"), MAX_SHORT_CHARS),
+        "source_page": text_field(payload.get("source_page"), MAX_SHORT_CHARS),
     }
+
+
+def apply_outline(
+    outline: AgendaOutline, items: list[ItemSummary]
+) -> tuple[AgendaOutline, list[ItemSummary]]:
+    """Join the agenda to the packet: order the items and stamp their weight.
+
+    Returns the outline with each entry flagged matched or not, and the items in
+    agenda order. Both failure directions are kept visible rather than resolved
+    away:
+
+    * an agenda entry with no packet PDF stays in the outline as an orphan, for
+      the page's appendix to list — much agenda business (proclamations, public
+      forum, council referrals) never produces a document at all;
+    * a packet PDF no agenda entry claimed keeps its record and lands after the
+      ordered items, in the Laserfiche order it already had.
+
+    Every item comes back weighted, including when there is no outline to match
+    against — weight is not optional, and an unsegmented meeting still has to
+    render.
+    """
+    def unplaced(item: ItemSummary) -> ItemSummary:
+        """Weigh an item the agenda did not place, on its own evidence alone."""
+        consent = bool(agenda_mod.CONSENT_RE.search(item.item_type))
+        return replace(item, weight=derive_weight(item.significance, consent=consent))
+
+    if not outline.items:
+        # No agenda, or segmentation failed. The item pass may still have read
+        # "Consent" off the document itself, which is the only consent signal
+        # left once the agenda's sectioning is gone.
+        return outline, [unplaced(item) for item in items]
+
+    matching = agenda_mod.match(outline.items, items)
+    log.info(
+        "agenda match: %d of %d agenda items matched a packet document "
+        "(%d agenda entries with no PDF, %d PDFs not on the agenda)",
+        matching.matched,
+        len(outline.items),
+        len(matching.unmatched_agenda),
+        len(matching.unmatched_packet),
+    )
+    for index in matching.unmatched_agenda:
+        log.debug("no packet document for: %s", outline.items[index].title[:80])
+    for index in matching.unmatched_packet:
+        log.debug("no agenda entry for: %s", items[index].title[:80])
+
+    ordered: list[ItemSummary] = []
+    for a_index, entry in enumerate(outline.items):
+        p_index = matching.by_agenda.get(a_index)
+        if p_index is None:
+            continue
+        item = items[p_index]
+        ordered.append(
+            replace(
+                item,
+                # The agenda is authoritative for numbering — that is the whole
+                # point of segmenting it — but the document's own item_type is
+                # usually the more precise of the two ("Ordinance, second
+                # reading" against a bare "Ordinance"), so it wins where it has
+                # an opinion.
+                item_number=entry.item_number or item.item_number,
+                item_type=item.item_type or entry.item_type,
+                section=entry.section,
+                weight=derive_weight(item.significance, consent=entry.is_consent),
+            )
+        )
+
+    ordered += [unplaced(items[index]) for index in matching.unmatched_packet]
+
+    return outline.with_matches(set(matching.by_agenda)), ordered
 
 
 class MeetingSummarizer:
@@ -496,7 +583,7 @@ class MeetingSummarizer:
                 prompt=prompt,
                 max_tokens=1200,
             )
-            fields = _coerce_summary(_parse_json_object(raw))
+            fields = _coerce_summary(parse_json_object(raw))
         except (LLMError, ValueError, json.JSONDecodeError) as exc:
             log.warning("item %s summarization failed: %s", item.entry_id, exc)
             result.skipped = f"summarization failed: {exc}"
@@ -519,10 +606,77 @@ class MeetingSummarizer:
             )
         return "\n".join(header) + "\n\n--- DOCUMENT TEXT ---\n" + text
 
+    # --- segment -----------------------------------------------------------
+
+    def segment_agenda(self, meeting: Meeting, agenda_text: str) -> AgendaOutline:
+        """Read the agenda's own structure out of its text.
+
+        Never raises. A meeting whose agenda is missing, unreadable, or whose
+        segmentation the model fumbles falls back to an empty outline: the
+        packet still summarizes, the items still render, they simply keep their
+        Laserfiche order and take their weight from significance alone.
+        """
+        outline = AgendaOutline()
+        if agenda_text.strip():
+            try:
+                raw = self.llm.complete(
+                    model=self.cfg.digest_model,
+                    system=agenda_mod.AGENDA_SYSTEM,
+                    prompt=(
+                        f"Meeting: {meeting.display_name}, "
+                        f"{meeting.meeting_date.strftime('%B %-d, %Y')}\n\n"
+                        "--- AGENDA TEXT ---\n" + agenda_text.strip()
+                    ),
+                    max_tokens=8000,
+                )
+                outline = agenda_mod.coerce_outline(parse_json_object(raw))
+                log.info(
+                    "agenda segmented into %d items%s",
+                    len(outline.items),
+                    f" ({outline.venue})" if outline.venue else "",
+                )
+            except (LLMError, ValueError, json.JSONDecodeError) as exc:
+                log.warning("agenda segmentation failed for %s: %s", meeting.key, exc)
+
+        # The board's regular time and place. Council meets at 6:00 PM in City
+        # Hall week in and week out, so an agenda that omits it is a printing
+        # quirk rather than a different meeting — but a guessed value is still
+        # configuration, not something to bake into the prompt.
+        return replace(
+            outline,
+            meeting_time=outline.meeting_time or self.cfg.meeting_time,
+            location=outline.location or self.cfg.meeting_location,
+        )
+
     # --- reduce ------------------------------------------------------------
 
+    def _outline_lines(self, outline: AgendaOutline) -> list[str]:
+        """The segmented agenda, as the reduce call's view of the meeting.
+
+        This replaces the raw agenda dump the reduce used to get. It is shorter
+        and it is ordered, and the section headings tell the model which items
+        are consent-agenda block business — which is exactly the distinction
+        the "Everything else" section rests on.
+        """
+        lines = ["--- AGENDA ---"]
+        if outline.venue:
+            lines.append(outline.venue)
+        section = None
+        for item in outline.items:
+            if item.section != section:
+                section = item.section
+                lines.append(f"\n[{section or 'No section heading'}]")
+            number = f"{item.item_number}. " if item.item_number else "- "
+            kind = f"  ({item.item_type})" if item.item_type else ""
+            lines.append(f"{number}{item.title}{kind}")
+        return lines
+
     def compose_digest(
-        self, meeting: Meeting, agenda_text: str, items: list[ItemSummary]
+        self,
+        meeting: Meeting,
+        agenda_text: str,
+        items: list[ItemSummary],
+        outline: AgendaOutline | None = None,
     ) -> str:
         lines = [
             f"Meeting: {meeting.display_name}, "
@@ -530,7 +684,9 @@ class MeetingSummarizer:
             "",
         ]
 
-        if agenda_text.strip():
+        if outline is not None and outline.items:
+            lines += self._outline_lines(outline) + [""]
+        elif agenda_text.strip():
             lines += ["--- AGENDA ---", agenda_text.strip(), ""]
 
         summarized = [i for i in items if i.ok]
@@ -538,8 +694,10 @@ class MeetingSummarizer:
             lines.append("--- ITEM SUMMARIES ---")
             for item in summarized:
                 amount = f" [{item.amount}]" if item.amount else ""
+                number = f"{item.item_number}. " if item.item_number else ""
                 lines.append(
-                    f"\n[{item.significance.upper()}]{amount} {item.title}\n{item.summary}"
+                    f"\n[{item.significance.upper()}]{amount} {number}{item.title}"
+                    f"\n{item.summary}"
                 )
 
         skipped = [i for i in items if not i.ok]
@@ -610,7 +768,7 @@ class MeetingSummarizer:
             max_tokens=3000,
         )
         try:
-            payload = _parse_json_object(raw)
+            payload = parse_json_object(raw)
         except (ValueError, json.JSONDecodeError) as exc:
             # Not recorded in state, so the next run retries rather than leaving
             # the page permanently stuck on its pre-meeting text.
@@ -716,13 +874,20 @@ class MeetingSummarizer:
                 "unreadable or absent"
             )
 
-        body = self.compose_digest(meeting, agenda_text, items)
+        # Segment after the packet, not before: the item pass reads each
+        # document's own printed item number, which corroborates the title
+        # match. One extra call over text already downloaded for the reduce.
+        outline = self.segment_agenda(meeting, agenda_text)
+        outline, items = apply_outline(outline, items)
+
+        body = self.compose_digest(meeting, agenda_text, items, outline)
 
         return MeetingDigest(
             meeting=meeting,
             body_markdown=body,
             kind=PHASE_PREVIEW,
             items=items,
+            agenda=outline,
             agenda_url=agenda_url,
             packet_url=(
                 self.weblink.viewer_url(meeting.packet_master.entry_id)
@@ -772,6 +937,10 @@ class MeetingSummarizer:
             body_markdown=body,
             kind=PHASE_OUTCOME,
             items=items,
+            # Read back rather than re-segmented: the agenda has not changed
+            # since the preview, and the outcome pass must not pay a second
+            # time to rediscover the same structure.
+            agenda=AgendaOutline.from_archive(preview.agenda),
             agenda_url=(
                 self.weblink.viewer_url(meeting.agenda.entry_id)
                 if meeting.agenda
