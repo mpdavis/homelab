@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 
 import pytest
@@ -333,14 +334,23 @@ class TestSelectiveResummarization:
     """#421: a revision pays for the documents that moved, not the whole packet."""
 
     def _summarizer(self, monkeypatch):
+        """A summarizer whose item pass is free, recording what it was asked for.
+
+        Items are summarized on a thread pool, so this records *completion*
+        order, which is a race. Assertions below sort it: what matters is which
+        documents were paid for, not which thread finished first. The order of
+        the returned items is a separate guarantee, tested on its own.
+        """
         from ames_digest.config import Config
         from ames_digest.summarize import MeetingSummarizer
 
         summarizer = MeetingSummarizer(Config(), object(), object())
         summarized = []
+        lock = threading.Lock()
 
         def fake(entry):
-            summarized.append(entry.entry_id)
+            with lock:
+                summarized.append(entry.entry_id)
             return ItemSummary(code=entry.item_code or "", title=entry.title,
                                entry_id=entry.entry_id, url="u",
                                summary=f"fresh {entry.entry_id}")
@@ -362,7 +372,7 @@ class TestSelectiveResummarization:
         from ames_digest.summarize import Reuse
         summarizer, summarized = self._summarizer(monkeypatch)
         items = summarizer._summarize_packet(self._packet(1, 2, 3), None)
-        assert summarized == [1, 2, 3]
+        assert sorted(summarized) == [1, 2, 3]
         assert all(i.summary.startswith("fresh") for i in items)
 
     def test_only_changed_documents_are_summarized(self, monkeypatch):
@@ -381,6 +391,25 @@ class TestSelectiveResummarization:
         reuse = Reuse(items={2: self._archived(2)})
         items = summarizer._summarize_packet(self._packet(1, 2, 3), reuse)
         assert [i.entry_id for i in items] == [1, 2, 3]
+
+    @pytest.mark.parametrize("run", range(5))
+    def test_order_survives_the_thread_pool(self, monkeypatch, run):
+        # Items are summarized concurrently, so which thread finishes first is a
+        # race — but the list handed back is what `apply_outline` reorders and
+        # what the appendix falls back to, so it has to be packet order every
+        # time. Repeated because a scheduling bug here would be intermittent.
+        from ames_digest.summarize import Reuse
+        summarizer, _ = self._summarizer(monkeypatch)
+        packet = self._packet(*range(20))
+        reuse = Reuse(items={n: self._archived(n) for n in range(0, 20, 3)})
+        items = summarizer._summarize_packet(packet, reuse)
+        assert [i.entry_id for i in items] == list(range(20))
+
+    def test_each_document_is_summarized_exactly_once(self, monkeypatch):
+        summarizer, summarized = self._summarizer(monkeypatch)
+        summarizer._summarize_packet(self._packet(*range(20)), None)
+        assert sorted(summarized) == list(range(20))
+        assert len(summarized) == len(set(summarized))
 
     def test_a_removed_document_simply_is_not_there(self, monkeypatch):
         from ames_digest.summarize import Reuse
@@ -412,7 +441,7 @@ class TestSelectiveResummarization:
         packet = self._packet(*range(33))
         reuse = Reuse(items={n: self._archived(n) for n in range(3, 33)})
         summarizer._summarize_packet(packet, reuse)
-        assert summarized == [0, 1, 2]
+        assert sorted(summarized) == [0, 1, 2]
 
     def test_empty_packet(self, monkeypatch):
         summarizer, _ = self._summarizer(monkeypatch)
