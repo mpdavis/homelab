@@ -335,8 +335,15 @@ pytest            # from docker/ames-council-digest
 The suite is pure: no network, no model gateway, no PDFs pulled off the city's
 server. Everything expensive is stubbed at its seam — a fake HTTP client replays
 canned Laserfiche listings, PDFs are generated in-process, and no test calls a
-model — so the whole thing runs in well under a second and gates the image build
-rather than trailing it (`.github/workflows/build-ames-council-digest.yml`).
+model — so the whole thing runs in well under a second.
+
+It is a **required check** on `main`
+(`.github/workflows/ames-council-digest-tests.yml`), so a red suite blocks the
+merge rather than merely annotating it. That workflow deliberately carries no
+`paths` filter: a required check has to report on every pull request, because
+one that is skipped never reports and GitHub waits on it forever. The image
+build keeps its own `paths` filter and lives separately, which is why the two
+are not one workflow.
 
 What it covers is the logic that decides things, which is where the bugs are and
 where the money is:
