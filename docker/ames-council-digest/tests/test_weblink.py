@@ -11,7 +11,7 @@ from ames_digest.weblink import (
     ENTRY_TYPE_FOLDER,
     Entry,
     WebLinkClient,
-    _parse_listing_datetime,
+    parse_listing_datetime,
     _zip_columns,
     parse_meeting_folder,
 )
@@ -53,27 +53,27 @@ class TestParseMeetingFolder:
 
 class TestParseListingDatetime:
     def test_full_timestamp(self):
-        assert _parse_listing_datetime("8/7/2026 8:25:02 PM") == datetime(
+        assert parse_listing_datetime("8/7/2026 8:25:02 PM") == datetime(
             2026, 8, 7, 20, 25, 2
         )
 
     def test_without_seconds(self):
-        assert _parse_listing_datetime("8/7/2026 8:25 PM") == datetime(2026, 8, 7, 20, 25)
+        assert parse_listing_datetime("8/7/2026 8:25 PM") == datetime(2026, 8, 7, 20, 25)
 
     def test_date_only(self):
-        assert _parse_listing_datetime("8/7/2026") == datetime(2026, 8, 7)
+        assert parse_listing_datetime("8/7/2026") == datetime(2026, 8, 7)
 
     def test_non_breaking_space_before_the_meridiem(self):
-        assert _parse_listing_datetime("8/7/2026 8:25:02\xa0PM") == datetime(
+        assert parse_listing_datetime("8/7/2026 8:25:02\xa0PM") == datetime(
             2026, 8, 7, 20, 25, 2
         )
 
     def test_am_is_not_pm(self):
-        assert _parse_listing_datetime("8/7/2026 8:25:02 AM").hour == 8
+        assert parse_listing_datetime("8/7/2026 8:25:02 AM").hour == 8
 
     @pytest.mark.parametrize("raw", [None, "", "   ", 42, "not a date", "2026-08-07"])
     def test_unparseable_yields_none(self, raw):
-        assert _parse_listing_datetime(raw) is None
+        assert parse_listing_datetime(raw) is None
 
 
 class TestZipColumns:

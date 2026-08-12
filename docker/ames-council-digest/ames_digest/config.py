@@ -6,9 +6,14 @@ a different model gateway, or a scratch output directory without a rebuild.
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+log = logging.getLogger(__name__)
 
 
 def _env(name: str, default: str) -> str:
@@ -105,6 +110,48 @@ class Config:
     meeting_location: str = field(
         default_factory=lambda: _env("AMES_MEETING_LOCATION", "City Hall, 515 Clark Ave")
     )
+
+    # --- Freshness and spend guardrails ------------------------------------
+    # How long a meeting's folders must sit unchanged before it is digested.
+    # The 2026-08-11 packet uploaded over 67 minutes; digesting mid-burst
+    # guarantees rework. 0 disables the wait.
+    quiet_period_minutes: int = field(
+        default_factory=lambda: _env_int("AMES_QUIET_PERIOD_MINUTES", 120)
+    )
+    # Most revisions to pay for on one pass, after its original digest.
+    revision_cap: int = field(
+        default_factory=lambda: _env_int("AMES_REVISION_CAP", 5)
+    )
+    # Listing timestamps are the repository's local wall time with no zone
+    # attached, so measuring how old one is requires knowing which clock wrote
+    # it. Ames is Central. Only the quiet period depends on this — change
+    # detection compares strings and needs no timezone at all.
+    repo_timezone: str = field(
+        default_factory=lambda: _env("AMES_REPO_TIMEZONE", "America/Chicago")
+    )
+
+    @property
+    def quiet_period(self) -> timedelta:
+        return timedelta(minutes=max(self.quiet_period_minutes, 0))
+
+    def repo_now(self) -> datetime:
+        """Now, as naive wall time on the repository's clock.
+
+        Naive on purpose: it is compared against listing stamps, which are
+        themselves naive. A misconfigured zone degrades the quiet period rather
+        than breaking the run — see `freshness.Policy.settled`.
+        """
+        try:
+            zone = ZoneInfo(self.repo_timezone)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            log.warning(
+                "unknown AMES_REPO_TIMEZONE %r (%s); falling back to this "
+                "machine's local time, which may skew the quiet period",
+                self.repo_timezone,
+                exc,
+            )
+            return datetime.now()
+        return datetime.now(zone).replace(tzinfo=None)
 
     # --- Output and delivery ----------------------------------------------
     state_dir: Path = field(

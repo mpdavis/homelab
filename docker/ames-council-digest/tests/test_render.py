@@ -191,6 +191,18 @@ class TestFooter:
     def test_carries_the_machine_generated_caveat(self):
         assert "machine-generated" in render(digest()).markdown
 
+    def test_a_revised_page_says_so(self):
+        out = render(digest(revision=2))
+        assert "rebuilt after 2 source revisions" in out.markdown
+
+    def test_one_revision_reads_singular(self):
+        markdown = render(digest(revision=1)).markdown
+        assert "rebuilt after 1 source revision" in markdown
+        assert "revisions" not in markdown
+
+    def test_an_unrevised_page_says_nothing_about_revisions(self):
+        assert "rebuilt" not in render(digest()).markdown
+
 
 class TestHtmlAndText:
     def test_phase_meta_tag_records_which_pass_wrote_the_page(self):

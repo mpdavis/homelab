@@ -194,3 +194,88 @@ class TestCost:
 
     def test_zero_usage(self):
         assert Totals().cost(3.0, 15.0) == 0.0
+
+
+class TestFreshnessFields:
+    """v3: the fingerprint and manifest a pass was recorded with."""
+
+    def test_v2_records_survive_untouched(self, tmp_path):
+        # v3 is purely additive. The absence of `folders` is itself the signal
+        # that this record predates fingerprinting.
+        state = write_state(tmp_path, {
+            "version": 2,
+            "processed": {KEY: {PHASE_PREVIEW: {"input_tokens": 100}}},
+        })
+        assert state.seen(KEY, PHASE_PREVIEW)
+        assert state.entry(KEY, PHASE_PREVIEW)["input_tokens"] == 100
+        assert "folders" not in state.entry(KEY, PHASE_PREVIEW)
+
+    def test_v1_migrates_all_the_way_forward(self, tmp_path):
+        state = write_state(tmp_path, {
+            "version": 1, "processed": {KEY: {"input_tokens": 100}},
+        })
+        assert state.seen(KEY, PHASE_PREVIEW)
+
+    def test_current_version_written(self, tmp_path):
+        state = State.load(tmp_path)
+        state.record(KEY, PHASE_PREVIEW, folders={"packet": "x"})
+        state.save()
+        assert json.loads((tmp_path / STATE_FILENAME).read_text())["version"] == 3
+
+    def test_entry_returns_the_record(self, tmp_path):
+        state = State.load(tmp_path)
+        state.record(KEY, PHASE_PREVIEW, folders={"packet": "x"})
+        assert state.entry(KEY, PHASE_PREVIEW)["folders"] == {"packet": "x"}
+
+    def test_entry_is_none_for_a_pass_that_never_ran(self, tmp_path):
+        assert State.load(tmp_path).entry(KEY, PHASE_OUTCOME) is None
+        assert State.load(tmp_path).entry("nonexistent") is None
+
+    def test_entry_ignores_a_malformed_record(self, tmp_path):
+        state = write_state(tmp_path, {
+            "version": 3, "processed": {KEY: {PHASE_PREVIEW: "not a dict"}},
+        })
+        assert state.entry(KEY, PHASE_PREVIEW) is None
+
+    def test_fingerprint_and_manifest_round_trip(self, tmp_path):
+        state = State.load(tmp_path)
+        state.record(
+            KEY, PHASE_PREVIEW,
+            folders={"packet": "8/11/2026 2:16:54 PM"},
+            documents={"7": {"mod": "8/11/2026 2:12:00 PM", "pages": 3}},
+        )
+        state.save()
+        record = State.load(tmp_path).entry(KEY, PHASE_PREVIEW)
+        assert record["folders"]["packet"] == "8/11/2026 2:16:54 PM"
+        assert record["documents"]["7"]["pages"] == 3
+
+
+class TestRefresh:
+    def test_re_baselines_without_claiming_a_digest_happened(self, tmp_path):
+        state = State.load(tmp_path)
+        state.record(KEY, PHASE_PREVIEW, folders={"packet": "old"}, documents={})
+        digested_at = state.entry(KEY, PHASE_PREVIEW)["digested_at"]
+
+        assert state.refresh(
+            KEY, PHASE_PREVIEW,
+            folders={"packet": "new"}, documents={"1": {"mod": "m"}},
+        )
+        record = state.entry(KEY, PHASE_PREVIEW)
+        assert record["folders"] == {"packet": "new"}
+        assert record["documents"] == {"1": {"mod": "m"}}
+        assert record["digested_at"] == digested_at
+        assert record["rechecked_at"]
+
+    def test_refreshing_a_pass_that_never_ran_does_nothing(self, tmp_path):
+        state = State.load(tmp_path)
+        assert not state.refresh(KEY, PHASE_PREVIEW, folders={}, documents={})
+        assert state.entry(KEY, PHASE_PREVIEW) is None
+
+    def test_survives_a_save_and_reload(self, tmp_path):
+        state = State.load(tmp_path)
+        state.record(KEY, PHASE_PREVIEW, folders={"packet": "old"}, documents={})
+        state.refresh(KEY, PHASE_PREVIEW, folders={"packet": "new"}, documents={})
+        state.save()
+        assert State.load(tmp_path).entry(KEY, PHASE_PREVIEW)["folders"] == {
+            "packet": "new"
+        }

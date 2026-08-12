@@ -23,7 +23,14 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 STATE_FILENAME = "processed.json"
-STATE_VERSION = 2
+# v2 split each meeting's record by pass (preview/outcome).
+# v3 added the freshness fields — the folder fingerprint and document manifest
+# observed when the pass ran, plus its revision history. A v2 record has no
+# `folders` key and is therefore fingerprint-unknown: it is re-digested once to
+# establish a baseline and then settles. That one-time re-spend is the honest
+# behavior, since those are exactly the digests that may have caught a packet
+# mid-upload.
+STATE_VERSION = 3
 
 PHASE_PREVIEW = "preview"
 PHASE_OUTCOME = "outcome"
@@ -43,13 +50,24 @@ def _migrate(payload: dict) -> dict[str, dict]:
     if version == STATE_VERSION:
         return processed
 
+    if version == 2:
+        # Nothing to rewrite: v3 is purely additive, and the absence of a
+        # `folders` key is exactly the signal that this record predates
+        # fingerprinting and needs one more digest to establish a baseline.
+        log.info(
+            "state is v2; %d meetings have no freshness baseline and will be "
+            "re-digested once to establish one",
+            len(processed),
+        )
+        return processed
+
     if version == 1:
         migrated = {
             key: {PHASE_PREVIEW: record}
             for key, record in processed.items()
             if isinstance(record, dict)
         }
-        log.info("migrated %d state entries from v1 to v2", len(migrated))
+        log.info("migrated %d state entries from v1 to v3", len(migrated))
         return migrated
 
     # An unknown (newer) version: keep whatever is already phase-shaped rather
@@ -110,12 +128,40 @@ class State:
     def seen(self, key: str, phase: str = PHASE_PREVIEW) -> bool:
         return phase in (self.processed.get(key) or {})
 
+    def entry(self, key: str, phase: str = PHASE_PREVIEW) -> dict | None:
+        """The record for one pass, or None if it has never run."""
+        record = (self.processed.get(key) or {}).get(phase)
+        return record if isinstance(record, dict) else None
+
     def record(self, key: str, phase: str = PHASE_PREVIEW, **details: object) -> None:
         entry = self.processed.setdefault(key, {})
         entry[phase] = {
             "digested_at": datetime.now().astimezone().isoformat(timespec="seconds"),
             **details,
         }
+
+    def refresh(
+        self,
+        key: str,
+        phase: str,
+        *,
+        folders: dict[str, str],
+        documents: dict[str, dict],
+    ) -> bool:
+        """Re-baseline a pass whose folder moved but whose documents did not.
+
+        A folder can be touched with no surviving change to any document inside
+        it. Without writing the new stamp back, that meeting would fail layer 1
+        on every poll forever and pay a listing each time. Returns whether
+        anything was written, so the caller knows to save.
+        """
+        record = self.entry(key, phase)
+        if record is None:
+            return False
+        record["folders"] = dict(folders)
+        record["documents"] = dict(documents)
+        record["rechecked_at"] = datetime.now().astimezone().isoformat(timespec="seconds")
+        return True
 
     def totals(self) -> Totals:
         """Sum usage over every recorded pass.

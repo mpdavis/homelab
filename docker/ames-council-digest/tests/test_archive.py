@@ -164,3 +164,25 @@ class TestUnsafeKeys:
         archive.save_preview(tmp_path, key, [], agenda={}, body="x", usage=Usage(),
                              model="m", generated_at="")
         assert archive.load_preview(tmp_path, key).body == "x"
+
+
+class TestRevisionHistory:
+    def test_revision_round_trips(self, tmp_path):
+        assert save(tmp_path, revision=3).revision == 3
+
+    def test_defaults_to_zero(self, tmp_path):
+        assert save(tmp_path).revision == 0
+
+    @pytest.mark.parametrize("bad", [None, "3", True, 1.5])
+    def test_a_malformed_revision_reads_as_zero(self, tmp_path, bad):
+        path = tmp_path / "meetings" / f"{KEY}.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({"version": 4, "items": [], "revision": bad}))
+        assert archive.load_preview(tmp_path, KEY).revision == 0
+
+    def test_usage_is_the_pages_cumulative_total(self, tmp_path):
+        # The next pass reads its prior_usage from here, so a revision that
+        # stored only its own spend would erase the original from the footer.
+        loaded = save(tmp_path, usage=Usage(300_000, 40_000, 45), revision=1)
+        assert loaded.usage.input_tokens == 300_000
+        assert loaded.usage.calls == 45

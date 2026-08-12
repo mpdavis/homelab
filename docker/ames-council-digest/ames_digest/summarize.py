@@ -371,6 +371,29 @@ class ItemSummary:
 
 
 @dataclass
+class Reuse:
+    """What a revision may take from the previous digest instead of re-buying.
+
+    A full packet is roughly $1.40 and a typical revision touches three of
+    thirty-odd documents, so paying for the whole thing again to pick up three
+    changes is the difference between update detection being affordable and
+    being theoretical. Everything here was already paid for once and is still
+    valid, because the document it was read from has not moved.
+    """
+
+    # entry_id -> archived item record, for documents whose stamp is unchanged.
+    items: dict[int, dict] = field(default_factory=dict)
+    # The segmented agenda, reusable when the agenda PDF itself is unchanged.
+    # Matching still re-runs — it is pure and free, and the packet may have
+    # gained or lost items that the join has to place.
+    outline: AgendaOutline | None = None
+    # What previous passes on this page spent, so the footer keeps reporting
+    # the page's whole cost rather than just this revision's.
+    usage: Usage = field(default_factory=Usage)
+    revision: int = 0
+
+
+@dataclass
 class MeetingDigest:
     meeting: Meeting
     body_markdown: str
@@ -394,6 +417,9 @@ class MeetingDigest:
     # tokens would understate what the page cost by an order of magnitude.
     prior_usage: Usage = field(default_factory=Usage)
     preview_generated_at: datetime | None = None
+    # How many times this pass has been re-digested because its source
+    # documents changed. 0 for the original.
+    revision: int = 0
 
     @property
     def skipped_items(self) -> list[ItemSummary]:
@@ -839,8 +865,16 @@ class MeetingSummarizer:
             calls=self.llm.usage.calls - before.calls,
         )
 
-    def run_preview(self, meeting: Meeting) -> MeetingDigest:
-        """Digest the agenda and packet — what council is about to consider."""
+    def run_preview(
+        self, meeting: Meeting, reuse: Reuse | None = None
+    ) -> MeetingDigest:
+        """Digest the agenda and packet — what council is about to consider.
+
+        ``reuse`` turns this into a revision: the documents whose timestamps
+        have not moved keep the summaries already paid for, and only the changed
+        ones are read again. The reduce call always re-runs — it is one call,
+        and its whole job is to describe the item set as it now stands.
+        """
         before = self._usage_snapshot()
 
         agenda_text = ""
@@ -853,20 +887,14 @@ class MeetingSummarizer:
             except Exception as exc:
                 log.warning("agenda download/extract failed: %s", exc)
 
-        items: list[ItemSummary] = []
-        if meeting.packet_items:
-            log.info(
-                "summarizing %d packet items (concurrency %d)",
-                len(meeting.packet_items),
-                self.cfg.max_concurrency,
-            )
-            with ThreadPoolExecutor(max_workers=self.cfg.max_concurrency) as pool:
-                items = list(pool.map(self.summarize_item, meeting.packet_items))
-        elif meeting.packet_master:
+        packet = meeting.packet_items
+        if not packet and meeting.packet_master:
             # No per-item breakdown published — fall back to the combined packet
             # so the meeting still gets substance rather than agenda titles.
             log.info("no individual items; falling back to the combined packet")
-            items = [self.summarize_item(meeting.packet_master)]
+            packet = [meeting.packet_master]
+
+        items = self._summarize_packet(packet, reuse)
 
         if not agenda_text.strip() and not any(i.ok for i in items):
             raise RuntimeError(
@@ -877,7 +905,17 @@ class MeetingSummarizer:
         # Segment after the packet, not before: the item pass reads each
         # document's own printed item number, which corroborates the title
         # match. One extra call over text already downloaded for the reduce.
-        outline = self.segment_agenda(meeting, agenda_text)
+        if reuse is not None and reuse.outline is not None:
+            log.info("reusing the archived agenda outline; not re-segmenting")
+            outline = replace(
+                reuse.outline,
+                meeting_time=reuse.outline.meeting_time or self.cfg.meeting_time,
+                location=reuse.outline.location or self.cfg.meeting_location,
+            )
+        else:
+            outline = self.segment_agenda(meeting, agenda_text)
+        # Always re-joined, never reused: matching is pure and free, and a
+        # revision may have added or removed the very items it has to place.
         outline, items = apply_outline(outline, items)
 
         body = self.compose_digest(meeting, agenda_text, items, outline)
@@ -896,7 +934,56 @@ class MeetingSummarizer:
             ),
             usage=self._usage_since(before),
             model=self.cfg.digest_model,
+            prior_usage=reuse.usage if reuse else Usage(),
+            revision=reuse.revision if reuse else 0,
         )
+
+    def _summarize_packet(
+        self, packet: list[Entry], reuse: Reuse | None
+    ) -> list[ItemSummary]:
+        """Summarize the documents that need it; restore the rest from archive.
+
+        Items keep the packet's order regardless of which half they came from,
+        because that order is what `apply_outline` reorders and what the
+        appendix falls back to.
+        """
+        if not packet:
+            return []
+
+        archived = reuse.items if reuse else {}
+        fresh = [e for e in packet if e.entry_id not in archived]
+
+        if archived:
+            log.info(
+                "%d of %d packet items unchanged since the last digest; "
+                "summarizing %d",
+                len(packet) - len(fresh),
+                len(packet),
+                len(fresh),
+            )
+        else:
+            log.info(
+                "summarizing %d packet items (concurrency %d)",
+                len(fresh),
+                self.cfg.max_concurrency,
+            )
+
+        summarized: dict[int, ItemSummary] = {}
+        if fresh:
+            with ThreadPoolExecutor(max_workers=self.cfg.max_concurrency) as pool:
+                for entry, result in zip(fresh, pool.map(self.summarize_item, fresh)):
+                    summarized[entry.entry_id] = result
+
+        items = []
+        for entry in packet:
+            if entry.entry_id in summarized:
+                items.append(summarized[entry.entry_id])
+            else:
+                # Restored rather than re-read. `from_archive` is the same path
+                # the outcome pass uses, so a reused item is indistinguishable
+                # from a freshly summarized one downstream.
+                items.append(ItemSummary.from_archive(archived[entry.entry_id]))
+        return items
 
     def run_outcome(
         self, meeting: Meeting, preview: PreviewArchive

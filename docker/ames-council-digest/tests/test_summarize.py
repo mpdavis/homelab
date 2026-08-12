@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 
 import pytest
@@ -327,3 +328,130 @@ class TestMeetingDigest:
     def test_agenda_defaults_to_an_empty_outline(self):
         # Render reaches for digest.agenda.venue unconditionally.
         assert MeetingDigest(meeting=None, body_markdown="").agenda == AgendaOutline()
+
+
+class TestSelectiveResummarization:
+    """#421: a revision pays for the documents that moved, not the whole packet."""
+
+    def _summarizer(self, monkeypatch):
+        """A summarizer whose item pass is free, recording what it was asked for.
+
+        Items are summarized on a thread pool, so this records *completion*
+        order, which is a race. Assertions below sort it: what matters is which
+        documents were paid for, not which thread finished first. The order of
+        the returned items is a separate guarantee, tested on its own.
+        """
+        from ames_digest.config import Config
+        from ames_digest.summarize import MeetingSummarizer
+
+        summarizer = MeetingSummarizer(Config(), object(), object())
+        summarized = []
+        lock = threading.Lock()
+
+        def fake(entry):
+            with lock:
+                summarized.append(entry.entry_id)
+            return ItemSummary(code=entry.item_code or "", title=entry.title,
+                               entry_id=entry.entry_id, url="u",
+                               summary=f"fresh {entry.entry_id}")
+
+        monkeypatch.setattr(summarizer, "summarize_item", fake)
+        return summarizer, summarized
+
+    def _packet(self, *entry_ids):
+        from ames_digest.weblink import ENTRY_TYPE_DOCUMENT, Entry
+        return [Entry(n, f"A00{n} - item {n}", ENTRY_TYPE_DOCUMENT, "pdf")
+                for n in entry_ids]
+
+    def _archived(self, entry_id):
+        return ItemSummary(code=f"A00{entry_id}", title=f"item {entry_id}",
+                           entry_id=entry_id, url="u",
+                           summary=f"archived {entry_id}").to_archive()
+
+    def test_without_reuse_everything_is_summarized(self, monkeypatch):
+        from ames_digest.summarize import Reuse
+        summarizer, summarized = self._summarizer(monkeypatch)
+        items = summarizer._summarize_packet(self._packet(1, 2, 3), None)
+        assert sorted(summarized) == [1, 2, 3]
+        assert all(i.summary.startswith("fresh") for i in items)
+
+    def test_only_changed_documents_are_summarized(self, monkeypatch):
+        from ames_digest.summarize import Reuse
+        summarizer, summarized = self._summarizer(monkeypatch)
+        reuse = Reuse(items={1: self._archived(1), 3: self._archived(3)})
+        items = summarizer._summarize_packet(self._packet(1, 2, 3), reuse)
+        assert summarized == [2], "only the modified document costs a model call"
+        assert [i.summary for i in items] == [
+            "archived 1", "fresh 2", "archived 3",
+        ]
+
+    def test_packet_order_is_preserved_across_both_halves(self, monkeypatch):
+        from ames_digest.summarize import Reuse
+        summarizer, _ = self._summarizer(monkeypatch)
+        reuse = Reuse(items={2: self._archived(2)})
+        items = summarizer._summarize_packet(self._packet(1, 2, 3), reuse)
+        assert [i.entry_id for i in items] == [1, 2, 3]
+
+    @pytest.mark.parametrize("run", range(5))
+    def test_order_survives_the_thread_pool(self, monkeypatch, run):
+        # Items are summarized concurrently, so which thread finishes first is a
+        # race — but the list handed back is what `apply_outline` reorders and
+        # what the appendix falls back to, so it has to be packet order every
+        # time. Repeated because a scheduling bug here would be intermittent.
+        from ames_digest.summarize import Reuse
+        summarizer, _ = self._summarizer(monkeypatch)
+        packet = self._packet(*range(20))
+        reuse = Reuse(items={n: self._archived(n) for n in range(0, 20, 3)})
+        items = summarizer._summarize_packet(packet, reuse)
+        assert [i.entry_id for i in items] == list(range(20))
+
+    def test_each_document_is_summarized_exactly_once(self, monkeypatch):
+        summarizer, summarized = self._summarizer(monkeypatch)
+        summarizer._summarize_packet(self._packet(*range(20)), None)
+        assert sorted(summarized) == list(range(20))
+        assert len(summarized) == len(set(summarized))
+
+    def test_a_removed_document_simply_is_not_there(self, monkeypatch):
+        from ames_digest.summarize import Reuse
+        summarizer, _ = self._summarizer(monkeypatch)
+        reuse = Reuse(items={1: self._archived(1), 2: self._archived(2)})
+        items = summarizer._summarize_packet(self._packet(1), reuse)
+        assert [i.entry_id for i in items] == [1]
+
+    def test_an_added_document_is_summarized(self, monkeypatch):
+        from ames_digest.summarize import Reuse
+        summarizer, summarized = self._summarizer(monkeypatch)
+        reuse = Reuse(items={1: self._archived(1)})
+        items = summarizer._summarize_packet(self._packet(1, 9), reuse)
+        assert summarized == [9]
+        assert [i.entry_id for i in items] == [1, 9]
+
+    def test_nothing_changed_costs_no_model_call(self, monkeypatch):
+        from ames_digest.summarize import Reuse
+        summarizer, summarized = self._summarizer(monkeypatch)
+        reuse = Reuse(items={1: self._archived(1), 2: self._archived(2)})
+        summarizer._summarize_packet(self._packet(1, 2), reuse)
+        assert summarized == []
+
+    def test_the_realistic_saving(self, monkeypatch):
+        # A full packet is ~$1.40; three of thirty-three changed should cost
+        # three item calls, not thirty-three.
+        from ames_digest.summarize import Reuse
+        summarizer, summarized = self._summarizer(monkeypatch)
+        packet = self._packet(*range(33))
+        reuse = Reuse(items={n: self._archived(n) for n in range(3, 33)})
+        summarizer._summarize_packet(packet, reuse)
+        assert sorted(summarized) == [0, 1, 2]
+
+    def test_empty_packet(self, monkeypatch):
+        summarizer, _ = self._summarizer(monkeypatch)
+        assert summarizer._summarize_packet([], None) == []
+
+    def test_a_reused_item_is_indistinguishable_downstream(self, monkeypatch):
+        # It comes back through the same from_archive path the outcome pass
+        # uses, so ordering and weighting treat it like any other item.
+        from ames_digest.summarize import Reuse
+        summarizer, _ = self._summarizer(monkeypatch)
+        reuse = Reuse(items={1: self._archived(1)})
+        item = summarizer._summarize_packet(self._packet(1), reuse)[0]
+        assert item.ok and item.code == "A001" and item.title == "item 1"
