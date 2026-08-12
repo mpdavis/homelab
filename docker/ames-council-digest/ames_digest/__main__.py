@@ -8,7 +8,7 @@ import sys
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from . import archive, freshness, index
+from . import archive, freshness, index, record
 from .agenda import AgendaOutline
 from .config import Config
 from .delivery import (
@@ -489,6 +489,28 @@ def _record_pass(state: State, job: Job, digest: MeetingDigest) -> None:
     )
 
 
+def _meeting_record(cfg: Config, job: Job, digest: MeetingDigest, state: State | None) -> record.MeetingRecord:
+    prior = record.MeetingRecord.load(cfg.output_dir, digest.meeting.key)
+    previous = state.entry(digest.meeting.key, job.phase) if state else None
+    revised_at = previous.get("revised_at", []) if job.is_revision and previous else []
+    if not isinstance(revised_at, list):
+        revised_at = []
+    if job.is_revision:
+        revised_at = [
+            *revised_at,
+            digest.generated_at.isoformat(timespec="seconds"),
+        ]
+    documents = freshness.manifest(freshness.documents(digest.meeting, job.phase))
+    preview_body = archive.load_preview(cfg.state_dir, digest.meeting.key).body
+    return record.MeetingRecord.from_digest(
+        digest,
+        documents=documents,
+        revised_at=revised_at,
+        prior=prior,
+        preview_body=preview_body,
+    )
+
+
 def _dry_run(meeting: Meeting, weblink: WebLinkClient, cfg: Config) -> None:
     print(f"\n{meeting}")
     docs = []
@@ -582,7 +604,9 @@ def cmd_run(args: argparse.Namespace, cfg: Config) -> int:
                         meeting, archive.load_preview(cfg.state_dir, meeting.key)
                     )
 
+                meeting_record = _meeting_record(cfg, job, digest, state)
                 rendered = render(digest)
+                rendered.record = meeting_record
                 for line in deliver_all(rendered, cfg, sinks):
                     log.info("%s -> %s", job, line)
             except (RuntimeError, DeliveryError) as exc:

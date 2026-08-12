@@ -59,8 +59,10 @@ class FileSink:
         html_path = cfg.output_dir / f"{rendered.filename_stem}.html"
         md_path.write_text(rendered.markdown, encoding="utf-8")
         html_path.write_text(rendered.html, encoding="utf-8")
+        if rendered.record is not None:
+            rendered.record.save(cfg.output_dir)
         count = index.rebuild(cfg.output_dir, cfg.state_dir, gateway_prices(cfg))
-        return f"wrote {md_path} and {html_path.name} (index: {count} meetings)"
+        return f"wrote {md_path}, {html_path.name}, and {rendered.filename_stem}.json (index: {count} meetings)"
 
 
 class StdoutSink:

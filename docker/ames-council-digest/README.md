@@ -69,7 +69,10 @@ genuinely silent about gets that same line, which is honest: silence is a real
 outcome when an item is pulled, deferred, or never reached.
 
 The page's Markdown, the segmented agenda, and the per-item records behind them
-are archived as JSON when the preview runs (`archive.py`), so the outcome pass
+are archived as JSON when the preview runs (`archive.py`). Each delivered
+meeting also gets a versioned `<meeting>.json` record beside its Markdown and
+HTML; that record is the durable artifact and retains both the preview and
+outcome bodies, so the outcome pass
 edits prose that is already correct instead of paying to regenerate it — and
 never re-summarizes the packet, or re-segments the agenda, to rediscover
 something already computed. If the archive has no page (no preview ever ran, or
