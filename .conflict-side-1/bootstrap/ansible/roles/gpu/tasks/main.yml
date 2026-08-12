@@ -1,0 +1,46 @@
+---
+- name: Install NVIDIA driver prerequisites
+  ansible.builtin.apt:
+    name:
+      - build-essential
+      - linux-headers-{{ ansible_kernel }}
+    state: present
+
+- name: Add NVIDIA container toolkit GPG key
+  ansible.builtin.shell: |
+    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+      | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+  args:
+    creates: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+- name: Add NVIDIA container toolkit repository
+  ansible.builtin.shell: |
+    curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+      | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+      > /etc/apt/sources.list.d/nvidia-container-toolkit.list
+  args:
+    creates: /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+- name: Update apt cache after adding NVIDIA repo
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install NVIDIA drivers and container toolkit
+  ansible.builtin.apt:
+    name:
+      - nvidia-driver-570
+      - nvidia-container-toolkit
+    state: present
+
+- name: Configure containerd for NVIDIA runtime
+  ansible.builtin.command: nvidia-ctk runtime configure --runtime=containerd
+  changed_when: true
+
+- name: Verify GPU is visible
+  ansible.builtin.command: nvidia-smi
+  register: nvidia_smi
+  changed_when: false
+
+- name: Display GPU info
+  ansible.builtin.debug:
+    var: nvidia_smi.stdout_lines

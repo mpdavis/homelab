@@ -1,0 +1,10 @@
+# Selector-less Service — backed by the manual Endpoints (below), not pods.
+apiVersion: v1
+kind: Service
+metadata:
+  name: proxmox
+spec:
+  ports:
+    - name: https
+      port: 8006
+      targetPort: 8006

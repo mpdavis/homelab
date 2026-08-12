@@ -1,0 +1,198 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: alloy
+  namespace: loki
+spec:
+  interval: 30m
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+  test:
+    enable: true
+  chart:
+    spec:
+      chart: alloy
+      version: "~1.11.0"
+      sourceRef:
+        kind: HelmRepository
+        name: grafana
+        namespace: flux-system
+  values:
+    controller:
+      type: daemonset
+      # The alloy chart ships no tolerations by default; promtail ran on every
+      # node including the control plane, so carry those tolerations over.
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      volumes:
+        extra:
+          # Restart-safe loki.source.file positions (mirrors promtail's
+          # /run/promtail hostPath) so pod restarts don't re-ship whole files.
+          - name: run-alloy
+            hostPath:
+              path: /run/alloy
+              type: DirectoryOrCreate
+          # Promtail's positions file, consumed once per node via
+          # legacy_positions_file so the cutover resumes where promtail
+          # stopped instead of re-shipping whole log files.
+          - name: run-promtail
+            hostPath:
+              path: /run/promtail
+              type: DirectoryOrCreate
+    alloy:
+      storagePath: /run/alloy
+      mounts:
+        # /var/log covers /var/log/pods (real files on containerd) and
+        # /var/log/containers symlinks. /var/lib/docker/containers is a
+        # docker-ism that does not exist on k3s — not mounted.
+        varlog: true
+        dockercontainers: false
+        extra:
+          - name: run-alloy
+            mountPath: /run/alloy
+          - name: run-promtail
+            mountPath: /run/promtail
+            readOnly: true
+      configMap:
+        create: true
+        content: |
+          // Pod log collection ported 1:1 from the promtail chart's default
+          // `kubernetes-pods` scrape config so Loki label sets stay identical
+          // (app, component, container, filename, instance, job, namespace,
+          // node_name, pod, stream).
+
+          discovery.kubernetes "pods" {
+            role = "pod"
+
+            // Only discover pods scheduled on this DaemonSet pod's node —
+            // local log files are per-node, and skipping remote pods avoids
+            // noisy stat errors for paths that don't exist locally. The chart
+            // sets HOSTNAME from spec.nodeName via the downward API.
+            selectors {
+              role  = "pod"
+              field = "spec.nodeName=" + coalesce(sys.env("HOSTNAME"), constants.hostname)
+            }
+          }
+
+          discovery.relabel "pods" {
+            targets = discovery.kubernetes.pods.targets
+
+            rule {
+              source_labels = ["__meta_kubernetes_pod_controller_name"]
+              regex         = "([0-9a-z-.]+?)(-[0-9a-f]{8,10})?"
+              action        = "replace"
+              target_label  = "__tmp_controller_name"
+            }
+
+            rule {
+              source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name", "__meta_kubernetes_pod_label_app", "__tmp_controller_name", "__meta_kubernetes_pod_name"]
+              regex         = "^;*([^;]+)(;.*)?$"
+              action        = "replace"
+              target_label  = "app"
+            }
+
+            rule {
+              source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_instance", "__meta_kubernetes_pod_label_instance"]
+              regex         = "^;*([^;]+)(;.*)?$"
+              action        = "replace"
+              target_label  = "instance"
+            }
+
+            rule {
+              source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_component", "__meta_kubernetes_pod_label_component"]
+              regex         = "^;*([^;]+)(;.*)?$"
+              action        = "replace"
+              target_label  = "component"
+            }
+
+            rule {
+              source_labels = ["__meta_kubernetes_pod_node_name"]
+              action        = "replace"
+              target_label  = "node_name"
+            }
+
+            rule {
+              source_labels = ["__meta_kubernetes_namespace"]
+              action        = "replace"
+              target_label  = "namespace"
+            }
+
+            rule {
+              source_labels = ["namespace", "app"]
+              separator     = "/"
+              replacement   = "$1"
+              action        = "replace"
+              target_label  = "job"
+            }
+
+            rule {
+              source_labels = ["__meta_kubernetes_pod_name"]
+              action        = "replace"
+              target_label  = "pod"
+            }
+
+            rule {
+              source_labels = ["__meta_kubernetes_pod_container_name"]
+              action        = "replace"
+              target_label  = "container"
+            }
+
+            rule {
+              source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+              separator     = "/"
+              replacement   = "/var/log/pods/*$1/*.log"
+              action        = "replace"
+              target_label  = "__path__"
+            }
+
+            rule {
+              source_labels = ["__meta_kubernetes_pod_annotationpresent_kubernetes_io_config_hash", "__meta_kubernetes_pod_annotation_kubernetes_io_config_hash", "__meta_kubernetes_pod_container_name"]
+              separator     = "/"
+              regex         = "true/(.*)"
+              replacement   = "/var/log/pods/*$1/*.log"
+              action        = "replace"
+              target_label  = "__path__"
+            }
+          }
+
+          loki.source.file "pods" {
+            targets    = discovery.relabel.pods.output
+            forward_to = [loki.process.pods.receiver]
+
+            // One-time conversion of promtail's positions on each node:
+            // resumes at promtail's offsets (matched by path+labels) instead
+            // of re-shipping whole files. Only runs while no Alloy positions
+            // file exists yet.
+            legacy_positions_file = "/run/promtail/positions.yaml"
+
+            // REQUIRED for promtail-style wildcards: the default static
+            // resolver treats __path__ as a literal path (os.Stat fails on
+            // the asterisks); file_match enables doublestar glob expansion.
+            file_match {
+              enabled = true
+            }
+          }
+
+          loki.process "pods" {
+            // Parses the containerd CRI log header; sets the `stream` label,
+            // matching promtail's `cri: {}` pipeline stage.
+            stage.cri {}
+
+            forward_to = [loki.write.default.receiver]
+          }
+
+          loki.write "default" {
+            endpoint {
+              url = "http://loki-gateway.loki.svc.cluster.local/loki/api/v1/push"
+            }
+          }

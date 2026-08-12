@@ -1,0 +1,11 @@
+# Selector-less Service — no in-cluster pods back it. It exists only to give
+# the manual Endpoints (below) a stable name for the IngressRoute to target.
+apiVersion: v1
+kind: Service
+metadata:
+  name: birdnet
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: dispatcharr
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`dispatcharr.${DOMAIN}`)
+      kind: Rule
+      middlewares:
+        - name: authentik-forward-auth
+          namespace: authentik
+      services:
+        - name: dispatcharr
+          port: 9191
+  tls: {}

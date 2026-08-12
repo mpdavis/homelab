@@ -1,0 +1,10 @@
+# Proxmox serves its web UI over HTTPS (:8006) with a self-signed certificate.
+# Traefik would reject that upstream cert by default, so this transport tells
+# Traefik to skip verification for this backend only. Referenced by name from
+# the IngressRoute's service (scheme: https + serversTransport: proxmox).
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: proxmox
+spec:
+  insecureSkipVerify: true

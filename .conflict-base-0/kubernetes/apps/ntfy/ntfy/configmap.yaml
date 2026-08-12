@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ntfy-config
+data:
+  # ntfy reads this at /etc/ntfy/server.yml. ${DOMAIN} is resolved by Flux
+  # postBuild substitution (cluster-vars).
+  server.yml: |
+    base-url: "https://ntfy.${DOMAIN}"
+    listen-http: ":80"
+    # Traefik terminates TLS and forwards the real client IP / proto.
+    behind-proxy: true
+
+    cache-file: "/var/lib/ntfy/cache.db"
+    auth-file: "/var/lib/ntfy/user.db"
+    attachment-cache-dir: "/var/lib/ntfy/attachments"
+
+    # Locked down: nothing is readable/writable without an explicit token or
+    # ACL. Alertmanager publishes to the alerts topic with a token; your phone
+    # reads it with a token. See docs for the one-time token/ACL setup.
+    auth-default-access: "deny-all"
+
+    # Instant iOS push: forward a poll request to ntfy.sh, which delivers it
+    # via APNS. Only the message ID and a SHA256 hash of the topic URL go
+    # upstream — the device fetches the message content from this server.
+    upstream-base-url: "https://ntfy.sh"

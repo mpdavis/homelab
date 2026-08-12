@@ -1,0 +1,111 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: paperless
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: "~5.0"
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    crds: CreateReplace
+  values:
+    controllers:
+      main:
+        containers:
+          # paperless-ngx web/consumer/scheduler — single image runs all roles
+          main:
+            image:
+              repository: ghcr.io/paperless-ngx/paperless-ngx
+              tag: 2.20.15
+            env:
+              TZ: ${TZ}
+              PAPERLESS_TIME_ZONE: ${TZ}
+              # Redis broker runs as a sidecar in this same pod (localhost).
+              PAPERLESS_REDIS: redis://localhost:6379
+              # Public URL — required so paperless trusts the Traefik origin (CSRF/cookies).
+              PAPERLESS_URL: https://paperless.${DOMAIN}
+              PAPERLESS_PORT: "8000"
+              PAPERLESS_SECRET_KEY:
+                secretKeyRef:
+                  name: paperless-secrets
+                  key: secret-key
+              PAPERLESS_ADMIN_USER:
+                secretKeyRef:
+                  name: paperless-secrets
+                  key: admin-user
+              PAPERLESS_ADMIN_PASSWORD:
+                secretKeyRef:
+                  name: paperless-secrets
+                  key: admin-password
+              # --- Authentik OIDC (SSO) ---
+              # Enable allauth's OpenID Connect provider and allow social signups
+              # so an Authentik login provisions a paperless account. The local
+              # admin above stays as a break-glass login.
+              PAPERLESS_APPS: allauth.socialaccount.providers.openid_connect
+              PAPERLESS_SOCIAL_AUTO_SIGNUP: "true"
+              PAPERLESS_SOCIALACCOUNT_ALLOW_SIGNUPS: "true"
+              # Sync Authentik group membership into matching-named Paperless
+              # groups on each login (grants those groups' permissions; does not
+              # grant superuser/staff — that stays manual).
+              PAPERLESS_SOCIAL_ACCOUNT_SYNC_GROUPS: "true"
+              
+              # Helper var (not read by paperless) — sorts before the provider
+              # JSON below so Kubernetes expands $(OIDC_CLIENT_SECRET) into it,
+              # keeping the secret out of git.
+              OIDC_CLIENT_SECRET:
+                secretKeyRef:
+                  name: paperless-secrets
+                  key: oidc-client-secret
+              PAPERLESS_SOCIALACCOUNT_PROVIDERS: '{"openid_connect": {"SCOPE": ["openid", "profile", "email", "groups"], "APPS": [{"provider_id": "authentik", "name": "Authentik", "client_id": "2637be93cafb37442b1abb9bd89330fe", "secret": "$(OIDC_CLIENT_SECRET)", "settings": {"server_url": "https://iam.${DOMAIN}/application/o/paperless/.well-known/openid-configuration"}}]}}'
+          # Broker for the Celery task queue. State is ephemeral (task queue only).
+          redis:
+            image:
+              repository: docker.io/library/redis
+              tag: 8-alpine
+    service:
+      main:
+        controller: main
+        ports:
+          http:
+            port: 8000
+    persistence:
+      # SQLite DB, search index and classification model — keep local for IOPS.
+      data:
+        existingClaim: paperless-data
+        advancedMounts:
+          main:
+            main:
+              - path: /usr/src/paperless/data
+      # Stored documents (originals + archive) — bulk, on the NAS.
+      media:
+        existingClaim: paperless-media
+        advancedMounts:
+          main:
+            main:
+              - path: /usr/src/paperless/media
+      # Watched import folder — RWX so files can be dropped over the NAS share.
+      consume:
+        existingClaim: paperless-consume
+        advancedMounts:
+          main:
+            main:
+              - path: /usr/src/paperless/consume
+      # Document exports.
+      export:
+        existingClaim: paperless-export
+        advancedMounts:
+          main:
+            main:
+              - path: /usr/src/paperless/export

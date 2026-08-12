@@ -1,0 +1,63 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: listenarr
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: "~5.0"
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    crds: CreateReplace
+  values:
+    controllers:
+      main:
+        containers:
+          main:
+            image:
+              # Only canary prereleases are published so far (no stable tag yet).
+              repository: ghcr.io/listenarrs/listenarr
+              tag: canary-1.1.0
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+            env:
+              TZ: ${TZ}
+    defaultPodOptions:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+    service:
+      main:
+        controller: main
+        ports:
+          http:
+            port: 4545
+    persistence:
+      config:
+        existingClaim: listenarr
+        globalMounts:
+          - path: /app/config
+      # The shared media NFS export. Configure Listenarr's library path to
+      # /media/audiobooks and download path to /media/downloads in the web UI
+      # (matches where qbittorrent/the *arr apps read & write).
+      media:
+        type: nfs
+        server: ${NAS_IP}
+        path: ${NAS_DATA_PATH}/media
+        globalMounts:
+          - path: /media

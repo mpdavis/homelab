@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: open-webui
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`ai.${DOMAIN}`)
+      kind: Rule
+      middlewares:
+        - name: authentik-forward-auth
+          namespace: authentik
+      services:
+        - name: open-webui
+          port: 8080
+  tls: {}

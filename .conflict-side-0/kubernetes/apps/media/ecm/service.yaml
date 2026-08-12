@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecm
+spec:
+  selector:
+    app: ecm
+  ports:
+    - port: 6100
+      targetPort: http
+      name: http
+    - port: 6101
+      targetPort: mcp
+      name: mcp

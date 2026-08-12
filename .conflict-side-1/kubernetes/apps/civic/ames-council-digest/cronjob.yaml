@@ -1,0 +1,133 @@
+# Ten-minute check for newly posted Ames City Council agendas, packets, and
+# minutes.
+#
+# Each meeting gets one page, written twice: once from the agenda and packet
+# before it happens, and again from the minutes about a week later, which
+# updates that same page in place rather than adding a second one. Frequent
+# polling is what makes both land promptly without anyone watching for them.
+#
+# COST OF THIS CADENCE: a run with nothing new costs 9 folder listings against
+# the city's server and zero model calls — meetings whose passes are all done
+# are filtered out before their documents are ever listed. At 144 runs/day that
+# is ~1,300 requests/day, ~21x the original daily schedule, essentially all of
+# it re-reading folders that change a few times a week. It is roughly one
+# request a minute against a public municipal server: not abusive, but the
+# waste is real. Six of those nine listings only walk the fixed folder
+# hierarchy (Clerk Files -> tree -> year), which changes at most yearly and
+# could be cached on the PVC to bring a no-op run down to 3. Worth doing if
+# this cadence outlives the "for now".
+#
+# A new meeting adds 3 listings, and only then does it cost tokens: ~$1.40 for
+# the packet pass, a few cents for the minutes (README).
+#
+# :07 past rather than :00 — nothing depends on the exact minute, and it keeps
+# this off the wall-clock boundary every other scheduled poller lands on.
+#
+# Delivery is `file`: each meeting's page lands on the PVC as Markdown + HTML,
+# and the outcome pass overwrites both. Add the ntfy or smtp sink to
+# AMES_DELIVERY below once a destination is settled on.
+#
+# To pause spend without reverting: suspend: true.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ames-council-digest
+spec:
+  suspend: false
+  schedule: "7-57/10 * * * *"
+  timeZone: ${TZ}
+  # A cold run digesting the 3-meeting limit takes ~15 minutes, longer than the
+  # period — so runs will sometimes overlap their successor. Forbid means the
+  # next firing is skipped rather than piling a second run onto the same PVC
+  # state file. That is the intended behavior, not an error to alert on.
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  # A missed window (node down, cluster upgrade) should wait for the next slot
+  # rather than fire late into it; the meeting will still be there.
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      # Bounds a wedged gateway. Generous against the ~15-minute cold run, but
+      # every minute it is held is a skipped firing, so it is far tighter than
+      # it was on the hourly schedule.
+      activeDeadlineSeconds: 1800
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+          containers:
+            - name: ames-council-digest
+              # Published by build-ames-council-digest.yml, tagged 1.0.<run_number>.
+              # Only main publishes, so every tag in the registry is reviewed,
+              # merged code and a Renovate bump can be taken on its face.
+              #
+              # That was not always true: pull requests used to push too, and
+              # 1.0.17 reached this line off an open Renovate branch carrying an
+              # unreviewed python:3.13 -> 3.14 jump. Tags below 1.0.28 predate
+              # the fix and carry no such guarantee.
+              #
+              # An image change and a bump to this line can no longer ride in
+              # one PR — image-pin-check would resolve a tag main has not built
+              # yet. Merge the image, then take Renovate's bump.
+              #
+              # 1.0.31 is the main build of f2fdc16 (#377), where post-meeting
+              # outcomes actually attach to the page. The bump before it landed
+              # on 1.0.28 (#376) — a real main build, but of 2ce461d, one commit
+              # too early to carry that. 1.0.29 and 1.0.30 are branch builds of
+              # the same fix, published before #375 shut that door; skip them.
+              image: ghcr.io/mpdavis/ames-council-digest:1.0.43
+              args: ["run"]
+              env:
+                - name: TZ
+                  value: ${TZ}
+                # Delivery sinks: file writes Markdown + HTML to the PVC.
+                # Add ntfy or smtp here once a destination is settled on.
+                - name: AMES_DELIVERY
+                  value: "file"
+                - name: AMES_LLM_BASE_URL
+                  value: "https://opencode.ai/zen/v1"
+                - name: AMES_LLM_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ames-council-digest-secrets
+                      key: llm-api-key
+                # Per-item summaries are the bulk of the tokens; the single
+                # digest call is where quality shows, so it gets the better model.
+                - name: AMES_ITEM_MODEL
+                  value: "claude-sonnet-4-5"
+                - name: AMES_DIGEST_MODEL
+                  value: "claude-sonnet-4-5"
+                - name: AMES_STATE_DIR
+                  value: /data/state
+                - name: AMES_OUTPUT_DIR
+                  value: /data/digests
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: "1"
+                  memory: 1Gi
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: ames-council-digest
+            # readOnlyRootFilesystem needs a writable /tmp for PDF buffering.
+            - name: tmp
+              emptyDir: {}

@@ -1,0 +1,228 @@
+name: Deploy Canary
+
+# After every merge to main, verify the deploy actually serves traffic — not
+# just that Flux applied it. Waits for Flux to report this commit reconciled
+# (kustomization/apps commit status), then polls the Gatus synthetic-monitoring
+# API (status.mpdavis.com) until every endpoint reports a healthy result
+# OBSERVED AFTER the reconcile finished (a green result from before the deploy
+# proves nothing). Posts the verdict as the `canary/gatus` commit status.
+#
+# This is a post-merge check, not a merge gate: a red canary does not block the
+# next PR, it auto-opens a revert PR against the offending commit.
+#
+# Regressions vs pre-existing failures: at workflow start (before Flux picks up
+# the commit) the canary snapshots which endpoints are ALREADY failing. Only a
+# pass→fail transition is blamed on this merge — it fails the canary and
+# auto-opens a revert PR. Endpoints that were already red are ignored (their
+# noise channel is the GatusEndpointDown alert, and the gate's informational
+# health report shows them on every PR), so a chronically broken service
+# neither spawns a revert PR per merge nor freezes the merge queue. Flip side:
+# once a breakage lands on main (its revert PR ignored), later merges baseline
+# it as pre-existing — the one revert PR from the offending merge is the paper
+# trail.
+#
+# workflow_dispatch re-runs the canary against current main HEAD — use it to
+# recover from a flake without reverting anything.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write # push the revert branch
+  pull-requests: write # open the revert PR
+  statuses: write # post the canary/gatus commit status
+
+# A newer merge supersedes any in-flight canary — its own run takes over.
+concurrency:
+  group: deploy-canary
+  cancel-in-progress: true
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      SHA: ${{ github.sha }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      GATUS_URL: https://status.mpdavis.com
+      CONTEXT: canary/gatus
+      # Flux polls git + reconciles on 10m intervals (no webhook receiver), so
+      # merge → reconciled is routinely 10-20m before anything is wrong.
+      FLUX_TIMEOUT_SECONDS: "1800"
+      # Gatus checks every 60s; 10 minutes of polling gives a transiently red
+      # endpoint several cycles to recover before we call the deploy bad.
+      GATUS_TIMEOUT_SECONDS: "600"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # revert needs the commit's parents
+
+      - name: Wait for Flux, then verify service health via Gatus
+        id: canary
+        run: |
+          set -euo pipefail
+
+          post_status() { # <state> <description (github rejects >140 chars)>
+            gh api "repos/$REPO/statuses/$SHA" -f state="$1" -f context="$CONTEXT" \
+              -f description="${2:0:138}" -f target_url="$RUN_URL" >/dev/null
+          }
+          fail() { # <short description for commit status> <reason for revert PR>
+            post_status failure "$1"
+            echo "reason=$2" >> "$GITHUB_OUTPUT"
+            echo "::error::$2"
+            exit 1
+          }
+          fetch_statuses() {
+            curl -fsS --max-time 20 "$GATUS_URL/api/v1/endpoints/statuses?page=1&pageSize=20"
+          }
+          # Endpoints whose LATEST result is missing or failing, as a JSON
+          # array of "group/name". With $t0 > 0, a result older than t0 also
+          # counts as failing (stale ≠ verified).
+          failing_filter='[ .[] | . as $e | ($e.results | last) as $r
+            | select($r == null
+                     or ($r.success | not)
+                     or (($r.timestamp | sub("\\.[0-9]+"; "") | fromdate) < $t0))
+            | "\($e.group)/\($e.name)" ]'
+
+          # Post pending immediately so the commit shows a canary in flight
+          # rather than no verdict at all while Flux catches up.
+          post_status pending "Waiting for Flux to deploy this commit"
+
+          # --- Phase 0: baseline — what is ALREADY failing before this deploy?
+          # Flux won't pick this commit up for minutes, so "now" is pre-deploy.
+          baseline='[]'
+          baseline_ok=false
+          for _ in 1 2 3; do
+            if body="$(fetch_statuses)"; then
+              baseline="$(echo "$body" | jq -c --argjson t0 0 "$failing_filter")"
+              baseline_ok=true
+              break
+            fi
+            sleep 10
+          done
+          if [ "$baseline_ok" = "true" ]; then
+            echo "Baseline (pre-existing failures, exempt from the verdict): $baseline"
+          else
+            echo "::warning::Could not fetch a baseline from Gatus — every post-deploy failure will count as a regression."
+          fi
+
+          # --- Phase 1: wait for Flux to reconcile this exact commit ---------
+          deadline=$(( $(date +%s) + FLUX_TIMEOUT_SECONDS ))
+          while true; do
+            # A newer merge owns the canary now (concurrency usually cancels us
+            # first, but don't rely on it). Its statuses on the old SHA are
+            # inert — the gate only ever inspects main HEAD.
+            head="$(gh api "repos/$REPO/commits/main" --jq .sha)"
+            if [ "$head" != "$SHA" ]; then
+              post_status error "Superseded by newer commit ${head:0:8}"
+              echo "Superseded by $head — exiting without a verdict."
+              exit 0
+            fi
+
+            status="$(gh api "repos/$REPO/commits/$SHA/status")"
+            # notification-controller posts contexts as kustomization/<name>/<digest>;
+            # apps is last in the dependsOn chain, so its success means the whole
+            # infra→apps reconciliation finished for this revision.
+            apps="$(echo "$status" | jq -r '
+              [.statuses[] | select(.context | startswith("kustomization/apps/")) | .state] | first // "missing"')"
+
+            if echo "$status" | jq -e '.statuses[] | select(.context | startswith("kustomization/")) | select(.state=="failure" or .state=="error")' >/dev/null; then
+              echo "$status" | jq -r '.statuses[] | "  \(.context) = \(.state)"'
+              fail "Flux deploy failed" "Flux reported a failing Kustomization status for this commit"
+            fi
+
+            [ "$apps" = "success" ] && break
+
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              fail "Timed out waiting for Flux deploy" "Flux did not report this commit reconciled within ${FLUX_TIMEOUT_SECONDS}s"
+            fi
+            echo "  apps=$apps — waiting for Flux..."
+            sleep 30
+          done
+
+          T0="$(date +%s)"
+          post_status pending "Deploy reconciled — verifying service health"
+          echo "Flux reconciled $SHA. Requiring every baseline-passing endpoint to be green with a result newer than $(date -u -d "@$T0" +%FT%TZ)."
+
+          # --- Phase 2: no endpoint may go passing → failing -----------------
+          deadline=$(( T0 + GATUS_TIMEOUT_SECONDS ))
+          gatus_reachable=false
+          regressions='["no data received from Gatus"]'
+          while true; do
+            # pageSize paginates each endpoint's recent results; only the
+            # latest matters here. curl failures just retry — Gatus itself may
+            # be restarting as part of this very deploy.
+            if body="$(fetch_statuses)"; then
+              gatus_reachable=true
+              failing="$(echo "$body" | jq -c --argjson t0 "$T0" "$failing_filter")"
+              # A failing endpoint that was NOT failing in the baseline is a
+              # regression caused by this deploy. (An endpoint this deploy
+              # newly added has no baseline entry — it must come up green.)
+              regressions="$(echo "$failing" | jq -c --argjson base "$baseline" \
+                'map(select(. as $k | ($base | index($k)) | not))')"
+              if [ "$(echo "$regressions" | jq length)" -eq 0 ]; then
+                preexisting="$(echo "$failing" | jq -r 'join(", ")')"
+                if [ -n "$preexisting" ]; then
+                  post_status success "Healthy (ignoring pre-existing failures: $preexisting)"
+                  echo "::warning::Canary passed while ignoring pre-existing failures: $preexisting"
+                else
+                  post_status success "All Gatus endpoints healthy post-deploy"
+                  echo "All endpoints report fresh, healthy results."
+                fi
+                echo "Canary passed."
+                exit 0
+              fi
+              echo "  regressions not yet fresh+green: $(echo "$regressions" | jq -r 'join(", ")')"
+            else
+              echo "  Gatus API unreachable (may be restarting) — retrying..."
+            fi
+
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              if [ "$gatus_reachable" = "false" ] && [ "$baseline_ok" = "false" ]; then
+                # Gatus was unreachable before AND after the deploy — this
+                # merge didn't break it, so opening a revert PR would be noise.
+                # Still a failure: deploying blind is not a verified deploy.
+                # Fix Gatus (or its ingress), then re-run via workflow_dispatch.
+                echo "skip_revert=true" >> "$GITHUB_OUTPUT"
+                fail "Gatus unreachable before and after deploy" "Gatus API was unreachable both before and after the deploy — cannot verify service health (not reverting: the outage predates this merge)"
+              fi
+              rlist="$(echo "$regressions" | jq -r 'join(", ")')"
+              fail "Regressions after deploy: $rlist" "Endpoints went from passing to failing after this deploy (still red ${GATUS_TIMEOUT_SECONDS}s after reconcile): $rlist"
+            fi
+            sleep 30
+          done
+
+      - name: Open revert PR
+        if: failure() && steps.canary.outputs.skip_revert != 'true'
+        env:
+          REASON: ${{ steps.canary.outputs.reason }}
+        run: |
+          set -euo pipefail
+          branch="revert-${SHA::8}"
+
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "Branch $branch already exists — revert PR was presumably already opened. Skipping."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Branch from the bad commit itself (not main HEAD) so a racing newer
+          # merge can't change what we revert.
+          git switch -c "$branch" "$SHA"
+          if [ "$(git rev-list --parents -n 1 "$SHA" | wc -w)" -gt 2 ]; then
+            git revert --no-edit -m 1 "$SHA"
+          else
+            git revert --no-edit "$SHA"
+          fi
+          git push origin "$branch"
+
+          subject="$(git log --format=%s -n 1 "$SHA")"
+          gh pr create --base main --head "$branch" \
+            --title "Revert ${SHA::8}: deploy canary failed" \
+            --body "$(printf 'The deploy canary failed for %s (`%s`).\n\n**Reason:** %s\n\nCanary run: %s\n\nMerging this PR rolls the cluster back. If the failure was a flake, close this PR and re-run the canary via workflow_dispatch instead.' "$SHA" "$subject" "${REASON:-see canary run log}" "$RUN_URL")"

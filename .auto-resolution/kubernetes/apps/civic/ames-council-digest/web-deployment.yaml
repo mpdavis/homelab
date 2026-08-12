@@ -1,0 +1,88 @@
+# Serves the digests the CronJob writes to the shared PVC. Read-only: nothing
+# here generates content, so a crash or a bad config can never cost a digest.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ames-council-digest-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ames-council-digest-web
+  template:
+    metadata:
+      labels:
+        app: ames-council-digest-web
+    spec:
+      securityContext:
+        # The image already defaults to uid 101, but pinning it makes the
+        # non-root posture a policy rather than a property of the image tag.
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        # The CronJob writes as uid/gid 1000. Those files land world-readable
+        # under the default umask, so nginx can read them today — this grants
+        # group access as well, so a tighter umask upstream can't quietly turn
+        # every digest into a 403. supplementalGroups rather than fsGroup: the
+        # PVC is mounted read-only, and fsGroup invites the kubelet to manage
+        # volume ownership, which is pointless on NFS and risky on a read-only
+        # mount. Group membership is the whole ask.
+        supplementalGroups: [1000]
+      containers:
+        - name: nginx
+          # nginx-unprivileged listens on 8080 and runs as uid 101 without
+          # needing a root-owned master process.
+          image: nginxinc/nginx-unprivileged:1.31-alpine
+          ports:
+            - containerPort: 8080
+              name: http
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
+            # The digest job owns this data; the server only reads it. The PVC
+            # root is mounted at /srv, and nginx's root is the digests/
+            # subdirectory of it — so state/ is never in the served tree.
+            - name: digests
+              mountPath: /srv
+              readOnly: true
+            # readOnlyRootFilesystem: nginx needs both for its pid file and
+            # proxy/scratch buffers.
+            - name: cache
+              mountPath: /var/cache/nginx
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: ames-council-digest-web
+        - name: digests
+          persistentVolumeClaim:
+            claimName: ames-council-digest
+            readOnly: true
+        - name: cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

@@ -1,0 +1,17 @@
+proxmox_endpoint  = "https://10.0.1.1:8006"
+# Set password here or use PROXMOX_VE_PASSWORD env var
+proxmox_password = "your-root-password"
+
+ssh_public_keys = [
+  "ssh-ed25519 AAAA... user@host",
+]
+
+# pve_nodes = {
+#   pve1 = { address = "10.0.1.1" }
+#   pve2 = { address = "10.0.1.2" }
+# }
+
+# vm_user         = "michael"
+# network_gateway = "10.0.0.1"
+# network_cidr    = "/16"
+# dns_servers     = ["1.1.1.1"]

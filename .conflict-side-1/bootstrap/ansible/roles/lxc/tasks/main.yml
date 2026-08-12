@@ -1,0 +1,33 @@
+---
+- name: Remove apparmor
+  ansible.builtin.apt:
+    name: apparmor
+    state: absent
+    purge: true
+
+- name: Write resolv.conf without search domain
+  ansible.builtin.copy:
+    dest: /etc/resolv.conf
+    content: "nameserver 1.1.1.1\n"
+    mode: "0644"
+
+- name: Create /dev/kmsg symlink
+  ansible.builtin.file:
+    src: /dev/console
+    dest: /dev/kmsg
+    state: link
+    force: true
+
+- name: Persist /dev/kmsg symlink across reboots
+  ansible.builtin.copy:
+    dest: /etc/rc.local
+    mode: "0755"
+    content: |
+      #!/bin/sh
+      [ ! -e /dev/kmsg ] && ln -s /dev/console /dev/kmsg
+      mount --make-rshared /
+      exit 0
+
+- name: Make mount shared
+  ansible.builtin.command: mount --make-rshared /
+  changed_when: false

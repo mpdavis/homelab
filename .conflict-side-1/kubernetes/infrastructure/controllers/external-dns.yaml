@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: external-dns
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: external-dns
+  namespace: external-dns
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: external-dns
+      version: "~1.21"
+      sourceRef:
+        kind: HelmRepository
+        name: external-dns
+        namespace: flux-system
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+  test:
+    enable: true
+  values:
+    provider:
+      name: cloudflare
+    sources:
+      - traefik-proxy
+    domainFilters:
+      - ${DOMAIN}
+    # The traefik-proxy source has no LoadBalancer status to derive a target
+    # from, so it only emits a record for an IngressRoute that carries an
+    # explicit external-dns.alpha.kubernetes.io/target annotation. (--default-
+    # targets does NOT cover this — it is only applied to sources that already
+    # provide a target.) That annotation is injected into every IngressRoute via
+    # a kustomize patch in kubernetes/{apps,infrastructure}/kustomization.yaml,
+    # pointing at the public IP that forwards to Traefik's VIP (10.0.1.200).
+    # Full GitOps: create and delete records to match IngressRoutes. The TXT
+    # registry (txtOwnerId) scopes deletion to records this instance created,
+    # so manually-managed records (e.g. the apex) are never touched.
+    policy: sync
+    registry: txt
+    txtOwnerId: homelab
+    env:
+      - name: CF_API_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: cloudflare-api-token
+            key: api-token

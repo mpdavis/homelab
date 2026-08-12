@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: qbittorrent
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`qbit.${DOMAIN}`)
+      kind: Rule
+      middlewares:
+        - name: authentik-forward-auth
+          namespace: authentik
+      services:
+        - name: qbittorrent
+          port: 8080
+  tls: {}

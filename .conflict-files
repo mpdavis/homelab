@@ -1,0 +1,3 @@
+ancestorEntries = ["docker/ames-council-digest/ames_digest/__main__.py", "docker/ames-council-digest/ames_digest/delivery.py"]
+ourEntries = ["docker/ames-council-digest/ames_digest/__main__.py", "docker/ames-council-digest/ames_digest/delivery.py"]
+theirEntries = ["docker/ames-council-digest/ames_digest/__main__.py", "docker/ames-council-digest/ames_digest/delivery.py"]

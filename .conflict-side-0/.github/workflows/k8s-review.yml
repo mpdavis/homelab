@@ -1,0 +1,65 @@
+name: K8s Manifest Review
+
+# Focused reviewer for human PRs that touch the Flux-managed cluster state under
+# kubernetes/. Reviews Flux/Helm/Kustomize correctness and homelab conventions,
+# leaving inline comments plus a summary. Renovate PRs are handled separately by
+# renovate-review.yml, so bot authors are skipped here.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'kubernetes/**'
+
+concurrency:
+  group: k8s-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.pull_request.user.login != 'renovate[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: true
+          allowed_bots: "claude"
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this PR's changes under `kubernetes/` for a k3s cluster managed by
+            FluxCD. Read CLAUDE.md in the repo root first and honor the conventions it
+            documents.
+
+            Focus on:
+            - Flux correctness: Kustomization/HelmRelease wiring, dependsOn ordering
+              (infrastructure-sources → infrastructure-controllers → infrastructure →
+              apps), namespaces, source refs, and that every new directory has a
+              kustomization.yaml that is actually referenced by a parent.
+            - Helm/Kustomize hygiene: pinned chart and image versions, values that
+              match the chart's schema, no accidental drift from existing patterns.
+            - Storage: correct StorageClass for the workload — local-path for RWO
+              databases / TSDB / WAL, nfs-nas for RWX media and bulk appdata.
+            - Security & resource hygiene: securityContext, resource requests/limits,
+              no plaintext secrets (this repo syncs secrets via External Secrets
+              Operator from Bitwarden), and ingress/TLS via Traefik with the
+              *.mpdavis.com wildcard cert.
+            - Correctness bugs and typos that would fail reconciliation.
+
+            Use inline comments for specific line-level issues and one top-level
+            comment for the overall summary. Prefer a few high-signal findings over
+            noise. Do not modify files and do not merge.
+          claude_args: |
+            --model claude-sonnet-4-6
+            --max-turns 20
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Read,Grep,Glob"

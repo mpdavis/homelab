@@ -1,0 +1,17 @@
+---
+- name: Write resolv.conf without search domain
+  ansible.builtin.copy:
+    dest: /etc/resolv.conf
+    content: "nameserver 1.1.1.1\n"
+    mode: "0644"
+
+- name: Install qemu-guest-agent
+  ansible.builtin.apt:
+    name: qemu-guest-agent
+    state: present
+
+- name: Enable qemu-guest-agent
+  ansible.builtin.systemd:
+    name: qemu-guest-agent
+    enabled: true
+    state: started

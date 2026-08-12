@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: external
+# Routing for services that run OUTSIDE the k8s cluster, on other LAN hosts.
+# Each service is a selector-less Service + a manual Endpoints pointing at the
+# host's LAN IP, fronted by a normal IngressRoute — so external hosts get the
+# same Traefik entry point, wildcard TLS cert, and ExternalDNS record as
+# in-cluster apps (see docs/design.md, "Traefik as single ingress").
+resources:
+  - namespace.yaml
+  - ./birdnet
+  - ./proxmox

@@ -1,0 +1,61 @@
+# Read-only cluster access for the coding agent. The ServiceAccount itself is
+# created by the app-template chart (serviceAccount.coding-agent, forceRename).
+#
+# Built-in `view` covers standard namespaced resources (incl. pods/log and
+# events) and deliberately EXCLUDES Secrets — the agent can inspect anything
+# but read no secret data and write nothing. Fixes flow through git branches +
+# PRs, never kubectl mutations.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: coding-agent-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: ServiceAccount
+    name: coding-agent
+    namespace: ai
+---
+# Cluster-scoped resources and CRDs that `view` does not cover. Read-only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: coding-agent-extra-view
+rules:
+  - apiGroups: [""]
+    resources: [nodes, namespaces, persistentvolumes]
+    verbs: [get, list, watch]
+  - apiGroups:
+      - storage.k8s.io
+      - networking.k8s.io
+      - apiextensions.k8s.io
+      - metrics.k8s.io
+    resources: ["*"]
+    verbs: [get, list, watch]
+  - apiGroups:
+      - kustomize.toolkit.fluxcd.io
+      - source.toolkit.fluxcd.io
+      - helm.toolkit.fluxcd.io
+      - notification.toolkit.fluxcd.io
+      - fluxcd.controlplane.io
+      - traefik.io
+      - external-secrets.io
+      - cert-manager.io
+      - monitoring.coreos.com
+    resources: ["*"]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: coding-agent-extra-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: coding-agent-extra-view
+subjects:
+  - kind: ServiceAccount
+    name: coding-agent
+    namespace: ai

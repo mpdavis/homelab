@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: listenarr
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`listenarr.${DOMAIN}`)
+      kind: Rule
+      middlewares:
+        - name: authentik-forward-auth
+          namespace: authentik
+      services:
+        - name: listenarr
+          port: 4545
+  tls: {}

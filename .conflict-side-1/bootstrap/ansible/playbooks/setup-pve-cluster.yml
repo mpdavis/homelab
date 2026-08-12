@@ -1,0 +1,76 @@
+---
+- name: Prepare SSH trust between PVE nodes
+  hosts: pve
+  vars:
+    pve_cluster_name: homelab
+    pve_seed_host: "{{ groups['pve'][0] }}"
+    pve_seed_ip: "{{ hostvars[pve_seed_host].ansible_host }}"
+  tasks:
+    - name: Ensure root SSH key exists
+      ansible.builtin.user:
+        name: root
+        generate_ssh_key: true
+        ssh_key_type: ed25519
+
+    - name: Read root public key
+      ansible.builtin.slurp:
+        src: /root/.ssh/id_ed25519.pub
+      register: root_pub_key
+
+    - name: Store public key as fact
+      ansible.builtin.set_fact:
+        pve_root_pub_key: "{{ root_pub_key.content | b64decode | trim }}"
+
+- name: Distribute SSH keys across PVE nodes
+  hosts: pve
+  vars:
+    pve_cluster_name: homelab
+    pve_seed_host: "{{ groups['pve'][0] }}"
+    pve_seed_ip: "{{ hostvars[pve_seed_host].ansible_host }}"
+  tasks:
+    - name: Authorize all PVE nodes' root keys
+      ansible.builtin.authorized_key:
+        user: root
+        key: "{{ hostvars[item].pve_root_pub_key }}"
+      loop: "{{ groups['pve'] }}"
+      when: item != inventory_hostname
+
+    - name: Scan and trust host keys for all PVE nodes
+      ansible.builtin.shell: |
+        ssh-keyscan -H {{ hostvars[item].ansible_host }} >> /root/.ssh/known_hosts 2>/dev/null
+        sort -u /root/.ssh/known_hosts -o /root/.ssh/known_hosts
+      loop: "{{ groups['pve'] }}"
+      when: item != inventory_hostname
+      changed_when: false
+
+- name: Create Proxmox cluster on seed node
+  hosts: pve[0]
+  vars:
+    pve_cluster_name: homelab
+  tasks:
+    - name: Check if cluster already exists
+      ansible.builtin.command: pvecm status
+      register: cluster_status
+      changed_when: false
+      failed_when: false
+
+    - name: Create cluster
+      ansible.builtin.command: pvecm create {{ pve_cluster_name }}
+      when: cluster_status.rc != 0
+
+- name: Join remaining nodes to cluster
+  hosts: pve:!pve[0]
+  serial: 1
+  vars:
+    pve_seed_host: "{{ groups['pve'][0] }}"
+    pve_seed_ip: "{{ hostvars[pve_seed_host].ansible_host }}"
+  tasks:
+    - name: Check if already in cluster
+      ansible.builtin.command: pvecm status
+      register: cluster_status
+      changed_when: false
+      failed_when: false
+
+    - name: Join cluster
+      ansible.builtin.command: pvecm add {{ pve_seed_ip }} --use_ssh
+      when: cluster_status.rc != 0

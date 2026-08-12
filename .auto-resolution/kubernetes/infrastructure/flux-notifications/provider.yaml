@@ -1,0 +1,14 @@
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Provider
+metadata:
+  name: github-status
+  namespace: flux-system
+spec:
+  # Posts GitHub commit statuses for the revision Flux reconciles. v1beta3 is
+  # the only version this CRD ships — there is no v1 yet.
+  type: github
+  address: ${GIT_REPO_URL}
+  secretRef:
+    # Secret synced by external-secret.yaml; must contain a `token` key holding
+    # a GitHub PAT with commit-status write (classic: repo:status).
+    name: github-token

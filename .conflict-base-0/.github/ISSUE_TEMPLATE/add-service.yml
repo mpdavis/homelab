@@ -1,0 +1,60 @@
+name: Add a new service
+description: Request a new application/service be deployed to the homelab k3s cluster
+title: "Add service: <service-name>"
+# Issues from this form are auto-labeled `new service`, which triggers
+# .github/workflows/new-service.yml to research the service and open a PR.
+labels: ["new service"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tell us **what** to run and **where** — that's it. When you submit, this issue is
+        labeled `new service`, which kicks off automation that researches the service from
+        the documentation link below, scaffolds it following this repo's conventions
+        (HelmRelease, pinned image, Traefik ingress, Homepage tile), and opens a **PR for
+        you to review**. You don't need to figure out the image, port, storage, or secrets
+        up front — the automation proposes a first pass and flags anything it had to guess.
+
+  - type: input
+    id: service-name
+    attributes:
+      label: Service name
+      description: lowercase, kebab-case — used for the directory, manifests, and `<name>.mpdavis.com`
+      placeholder: my-service
+    validations:
+      required: true
+
+  - type: dropdown
+    id: namespace
+    attributes:
+      label: Namespace
+      description: Which namespace this belongs to. Pick an existing group or request a new one.
+      options:
+        - media (arr apps, players, download clients, request managers)
+        - ai (inference / model serving)
+        - New namespace (name it in "Anything else")
+      default: 0
+    validations:
+      required: true
+
+  - type: input
+    id: docs
+    attributes:
+      label: Documentation link
+      description: >
+        A link the automation can research from — the project's docs, GitHub repo,
+        Docker image page, or Helm chart. Used to determine the image, port, storage,
+        ingress, and any secrets.
+      placeholder: https://github.com/org/project
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else (optional)
+      description: >
+        Anything that shouldn't be guessed — a specific image/tag, a new namespace name,
+        GPU/node requirements, or "no web UI". Leave blank to let the automation decide.
+    validations:
+      required: false

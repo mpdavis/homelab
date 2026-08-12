@@ -1,0 +1,17 @@
+---
+- name: Deploy subscription nag removal script
+  ansible.builtin.template:
+    src: pve-remove-nag.sh.j2
+    dest: /usr/local/bin/pve-remove-nag.sh
+    mode: "0755"
+
+- name: Run nag removal script
+  ansible.builtin.command: /usr/local/bin/pve-remove-nag.sh
+  changed_when: false
+
+- name: Install apt hook to re-apply nag removal after updates
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/no-nag-script
+    mode: "0644"
+    content: |
+      DPkg::Post-Invoke { "/usr/local/bin/pve-remove-nag.sh"; };

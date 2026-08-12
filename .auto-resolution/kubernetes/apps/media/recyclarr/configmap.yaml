@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: recyclarr-config
+data:
+  recyclarr.yml: |
+    sonarr:
+      sonarr-homelab:
+        base_url: http://sonarr:8989
+        api_key: !env_var SONARR_API_KEY
+
+        media_naming:
+          series: emby-tvdb
+          season: default
+          episodes:
+            rename: true
+            standard: default
+            daily: default
+            anime: default
+
+        quality_definition:
+          type: series
+
+        quality_profiles:
+          - trash_id: 72dae194fc92bf828f32cde7744e51a1  # WEB-1080p
+            reset_unmatched_scores:
+              enabled: true
+          - trash_id: 9d142234e45d6143785ac55f5a9e8dc9  # WEB-1080p (Alternative)
+            reset_unmatched_scores:
+              enabled: true
+            qualities:
+              - name: WEB 1080p
+                qualities:
+                  - WEBRip-1080p
+                  - WEBDL-1080p
+              - name: non-WEB 1080p
+                qualities:
+                  - Bluray-1080p
+                  - HDTV-1080p
+              - name: WEB 2160p
+                qualities:
+                  - WEBRip-2160p
+                  - WEBDL-2160p
+              - name: non-WEB 2160p
+                qualities:
+                  - Bluray-2160p
+                  - HDTV-2160p
+              - name: WEB 720p
+                qualities:
+                  - WEBRip-720p
+                  - WEBDL-720p
+              - name: non-WEB 720p/576p
+                qualities:
+                  - Bluray-720p
+                  - HDTV-720p
+                  - Bluray-576p
+              - name: WEB 480p
+                qualities:
+                  - WEBRip-480p
+                  - WEBDL-480p
+              - name: Bluray-480p
+              - name: SD
+                qualities:
+                  - DVD
+                  - SDTV
+
+        custom_formats:
+          - trash_ids:
+              - d7c747094a7c65f4c2de083c24899e8b  # FreeLeech
+            assign_scores_to:
+              - name: WEB-1080p
+              - name: WEB-1080p (Alternative)
+          - trash_ids:
+              - 3bc5f395426614e155e585a2f056cdf1  # Season Pack
+            assign_scores_to:
+              - name: WEB-1080p
+              - name: WEB-1080p (Alternative)
+
+        custom_format_groups:
+          add:
+            - trash_id: 158188097a58d7687dee647e04af0da3  # [Optional] Golden Rule HD
+              select_all: true
+            - trash_id: 59c3af66780d08332fdc64e68297098f  # [Unwanted] Unwanted Formats
+              select_all: true
+
+    radarr:
+      radarr-homelab:
+        base_url: http://radarr:7878
+        api_key: !env_var RADARR_API_KEY
+
+        media_naming:
+          folder: emby-tmdb
+          movie:
+            rename: true
+            standard: standard
+
+        quality_definition:
+          type: movie
+
+        quality_profiles:
+          - trash_id: d1d67249d3890e49bc12e275d989a7e9  # HD Bluray + WEB
+            reset_unmatched_scores:
+              enabled: true
+
+        custom_format_groups:
+          add:
+            - trash_id: f8bf8eab4617f12dfdbd16303d8da245  # [Optional] Golden Rule HD
+              select_all: true
+            - trash_id: a3ac6af01d78e4f21fcb75f601ac96df  # [Unwanted] Unwanted Formats
+              select_all: true

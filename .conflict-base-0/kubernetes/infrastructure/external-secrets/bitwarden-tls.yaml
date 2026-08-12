@@ -1,0 +1,125 @@
+# TLS for the Bitwarden SDK server that External Secrets talks to.
+#
+# WHY THIS IS A TWO-TIER CHAIN AND NOT ONE SELF-SIGNED CERTIFICATE
+#
+# ESO is pointed at `ca.crt` from `bitwarden-tls-certs` (see
+# clustersecretstore.yaml, provider.caProvider) and treats it as a trust
+# anchor. A selfSigned Issuer minting the server certificate directly does not
+# produce a usable anchor: cert-manager sets `ca.crt` to a byte-identical copy
+# of the leaf, and that leaf carries `CA:FALSE` with no `keyCertSign`. Go's
+# x509 verifier refuses it as an authority:
+#
+#   x509: certificate signed by unknown authority (possibly because of
+#   "x509: invalid signature: parent certificate cannot sign this kind of
+#   certificate" while trying to verify candidate authority certificate
+#   "bitwarden-sdk-server")
+#
+# That arrangement only appears to work while the served certificate and
+# `ca.crt` are the same bytes, so it breaks on every renewal: cert-manager
+# rewrites the secret, the sdk-server keeps serving the certificate it loaded
+# at startup, and the two stop matching. That is exactly what happened on
+# 2026-07-27 — the renewal landed, nothing restarted the pod, and all fifteen
+# ExternalSecrets across the cluster failed with the error above for nine days.
+# Only ames-council-digest surfaced it, because every other ExternalSecret has
+# `deletionPolicy: Retain` and kept running on the Secret it had already
+# materialized; the digest was the first thing to need a *new* secret.
+#
+# With a real CA as the anchor, `ca.crt` is stable across leaf renewals, so a
+# rotated leaf still validates and a lagging pod is no longer an outage.
+#
+# RESIDUAL RISK: nothing reloads the sdk-server when the leaf rotates, so it
+# serves whatever it loaded at startup until something restarts it. The chain
+# below makes that survivable rather than fatal, and the leaf is given a year
+# so a long-lived pod cannot age past its own certificate in normal operation.
+# The complete fix is a reloader (none is deployed in this cluster today) or a
+# chart option to watch the secret; until then, restart the deployment after
+# any deliberate certificate change.
+#
+# NOTE ON THE ISSUER RENAME: the old `Issuer/bitwarden-sdk-server` was
+# `selfSigned` and is deliberately not reused here. cert-manager forbids an
+# Issuer carrying two types, so patching `spec.ca` onto it is rejected
+# outright ("may not specify more than one issuer type"). Introducing a new
+# Issuer sidesteps the mutation; Flux prunes the old one, since the
+# infrastructure Kustomization sets prune: true.
+
+# Signs the CA below. "Bootstrap" describes when it matters, not how long it
+# is needed: the CA renews 30 days before its 10-year expiry and is re-signed
+# through this Issuer, so it has to outlive the CA it created. Deleting it once
+# the chain is up would leave that renewal with nothing to sign it.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: bitwarden-selfsign-bootstrap
+  namespace: external-secrets
+spec:
+  selfSigned: {}
+---
+# The trust anchor ESO actually pins. Long-lived and rotated deliberately —
+# replacing this invalidates every leaf it has signed, so it is not something
+# to let turn over on a short clock.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: bitwarden-sdk-server-ca
+  namespace: external-secrets
+spec:
+  isCA: true
+  commonName: bitwarden-sdk-server-ca
+  secretName: bitwarden-sdk-server-ca-tls
+  duration: 87600h # 10y
+  renewBefore: 720h # 30d
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  usages:
+    - cert sign
+    - crl sign
+  issuerRef:
+    name: bitwarden-selfsign-bootstrap
+    kind: Issuer
+---
+# Signs the server leaf with the CA above, so `ca.crt` in the leaf's secret is
+# the CA certificate rather than a copy of the leaf.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: bitwarden-sdk-server-ca
+  namespace: external-secrets
+spec:
+  ca:
+    secretName: bitwarden-sdk-server-ca-tls
+---
+# The server certificate. secretName is unchanged, so the ClusterSecretStore's
+# caProvider reference needs no edit — the contents of ca.crt change meaning,
+# not location.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: bitwarden-sdk-server-tls
+  namespace: external-secrets
+spec:
+  secretName: bitwarden-tls-certs
+  duration: 8760h # 1y — see RESIDUAL RISK above
+  renewBefore: 720h # 30d
+  # Stated rather than inherited, matching the CA above. RSA 2048 is already
+  # cert-manager's default for an unset privateKey, so this changes nothing
+  # today — but its privateKey defaults do move (rotationPolicy flipped from
+  # Never to Always in v1.18), and a manifest that silently tracks them is the
+  # same class of surprise this file exists to fix. rotationPolicy is left
+  # unset deliberately: Always is both the current default and what is wanted
+  # here, since a renewed leaf should not carry the old key forward.
+  #
+  # RSA against an ECDSA CA is not a mismatch — a leaf's own key type is
+  # independent of the algorithm that signs it.
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  issuerRef:
+    name: bitwarden-sdk-server-ca
+    kind: Issuer
+  commonName: bitwarden-sdk-server
+  dnsNames:
+    - bitwarden-sdk-server
+    - bitwarden-sdk-server.external-secrets
+    - bitwarden-sdk-server.external-secrets.svc
+    - bitwarden-sdk-server.external-secrets.svc.cluster.local

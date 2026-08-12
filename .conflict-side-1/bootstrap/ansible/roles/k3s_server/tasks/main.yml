@@ -1,0 +1,47 @@
+---
+- name: Check if k3s is already installed
+  ansible.builtin.stat:
+    path: /etc/rancher/k3s/k3s.yaml
+  register: k3s_installed
+
+- name: Install k3s server
+  ansible.builtin.shell: |
+    curl -sfL https://get.k3s.io | sh -s - server \
+      --disable=traefik \
+      --disable=servicelb \
+      --write-kubeconfig-mode=644 \
+      --tls-san={{ ansible_host }} \
+      --node-label=node-type={{ node_type }} \
+      --kubelet-arg=protect-kernel-defaults=true  # LXC: /proc/sys is read-only, so kubelet must not try to set kernel params
+  when: not k3s_installed.stat.exists
+
+- name: Wait for k3s to be ready
+  ansible.builtin.command: k3s kubectl get nodes
+  register: k3s_ready
+  retries: 30
+  delay: 5
+  until: k3s_ready.rc == 0
+  changed_when: false
+
+- name: Read node token
+  ansible.builtin.slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  register: k3s_token_raw
+
+- name: Set k3s token fact
+  ansible.builtin.set_fact:
+    k3s_token: "{{ k3s_token_raw.content | b64decode | trim }}"
+
+- name: Fetch kubeconfig
+  ansible.builtin.fetch:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "{{ playbook_dir }}/../../../kubeconfig.yaml"
+    flat: true
+
+- name: Update kubeconfig server address
+  delegate_to: localhost
+  become: false
+  ansible.builtin.replace:
+    path: "{{ playbook_dir }}/../../../kubeconfig.yaml"
+    regexp: 'https://127\.0\.0\.1:6443'
+    replace: "https://{{ ansible_host }}:6443"

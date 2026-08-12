@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: coding-agent
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      # Whole agent home: repo clone, ~/.claude sessions, opencode auth/state,
+      # CloudCLI auth.db, npm caches.
+      storage: 10Gi

@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emby
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: emby
+  template:
+    metadata:
+      labels:
+        app: emby
+    spec:
+      runtimeClassName: nvidia
+      containers:
+        - name: emby
+          image: emby/embyserver:4.10.0.23
+          ports:
+            - containerPort: 8096
+              name: http
+          env:
+            - name: TZ
+              value: ${TZ}
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: all
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: media
+              mountPath: /media
+        # Emby writes its real logs to files under /config/logs rather than
+        # stdout, so Promtail only ever sees the startup banner. This sidecar
+        # tails every log file (embyserver, ffmpeg transcodes, hardware
+        # detection, ...) to stdout, prefixing each line with the source
+        # filename, so the full log stream lands in Loki/Grafana.
+        - name: log-shipper
+          image: busybox:1.38.0
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              LOGDIR=/config/logs
+              tailed=""
+              while true; do
+                for f in "$LOGDIR"/*.txt; do
+                  [ -e "$f" ] || continue
+                  case " $tailed " in
+                    *" $f "*) ;;
+                    *)
+                      tailed="$tailed $f"
+                      # ffmpeg transcode logs are one-shot and deleted when
+                      # the session ends; follow by descriptor (-f) so the
+                      # tail goes idle instead of spamming reopen-retry
+                      # errors. Persistent server/hardware logs rotate by
+                      # name, so follow by name (-F).
+                      if echo "$f" | grep -q "ffmpeg-transcode"; then
+                        ( tail -n 0 -f "$f" | sed "s|^|[$(basename "$f")] |" ) &
+                      else
+                        ( tail -n 0 -F "$f" | sed "s|^|[$(basename "$f")] |" ) &
+                      fi
+                      ;;
+                  esac
+                done
+                sleep 15
+              done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: emby-config
+        - name: media
+          nfs:
+            server: ${NAS_IP}
+            path: ${NAS_DATA_PATH}/media

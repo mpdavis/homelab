@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: coding-agent
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`code.${DOMAIN}`)
+      kind: Rule
+      middlewares:
+        - name: authentik-forward-auth
+          namespace: authentik
+      services:
+        - name: coding-agent
+          port: 3001
+  tls: {}

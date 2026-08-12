@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ai
+  - civic
+  - docs
+  - external
+  - media
+  - ntfy
+  - travel
+  - homepage
+  - hello-world
+
+# ExternalDNS (traefik-proxy source) only provisions a record for an
+# IngressRoute that carries an explicit target annotation — IngressRoute CRDs
+# expose no LoadBalancer status to derive one from. Apply it to every
+# IngressRoute so new services get a DNS record automatically. 46.110.78.19 is
+# the public IP that forwards external traffic to Traefik's VIP (10.0.1.200).
+patches:
+  - target:
+      group: traefik.io
+      version: v1alpha1
+      kind: IngressRoute
+    patch: |-
+      apiVersion: traefik.io/v1alpha1
+      kind: IngressRoute
+      metadata:
+        name: ignored
+        annotations:
+          external-dns.alpha.kubernetes.io/target: ${PUBLIC_IP}

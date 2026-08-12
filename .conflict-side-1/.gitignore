@@ -1,0 +1,7 @@
+kubeconfig.yaml
+.DS_Store
+.claude/worktrees/
+.mcp.json
+.idea
+# Local scratch notes — never committed (may contain secrets)
+local.md

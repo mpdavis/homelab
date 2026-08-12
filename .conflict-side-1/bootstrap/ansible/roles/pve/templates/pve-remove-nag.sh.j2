@@ -1,0 +1,31 @@
+#!/bin/sh
+# Removes Proxmox VE subscription nag from web and mobile UIs.
+# Re-run automatically via apt DPkg::Post-Invoke hook after package updates.
+
+WEB_JS=/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+if [ -s "$WEB_JS" ] && ! grep -q NoMoreNagging "$WEB_JS"; then
+    sed -i -e "/data\.status/ s/!//" -e "/data\.status/ s/active/NoMoreNagging/" "$WEB_JS"
+fi
+
+MOBILE_TPL=/usr/share/pve-yew-mobile-gui/index.html.tpl
+MARKER="<!-- MANAGED BLOCK FOR MOBILE NAG -->"
+if [ -f "$MOBILE_TPL" ] && ! grep -q "$MARKER" "$MOBILE_TPL"; then
+    printf "%s\n" \
+      "$MARKER" \
+      "<script>" \
+      "  function removeSubscriptionElements() {" \
+      "    document.querySelectorAll('dialog.pwt-outer-dialog').forEach(function(d) {" \
+      "      if ((d.textContent || '').toLowerCase().includes('subscription')) d.remove();" \
+      "    });" \
+      "    document.querySelectorAll('.pwt-card.pwt-p-2.pwt-d-flex.pwt-interactive.pwt-justify-content-center').forEach(function(c) {" \
+      "      if (!c.querySelector('button') && (c.textContent || '').toLowerCase().includes('subscription')) c.remove();" \
+      "    });" \
+      "  }" \
+      "  var observer = new MutationObserver(removeSubscriptionElements);" \
+      "  observer.observe(document.body, { childList: true, subtree: true });" \
+      "  removeSubscriptionElements();" \
+      "  setInterval(removeSubscriptionElements, 300);" \
+      "  setTimeout(function() { observer.disconnect(); }, 10000);" \
+      "</script>" \
+      "" >> "$MOBILE_TPL"
+fi

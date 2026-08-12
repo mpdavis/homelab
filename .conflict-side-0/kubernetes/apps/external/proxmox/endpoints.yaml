@@ -1,0 +1,14 @@
+# Manual Endpoints pointing at a Proxmox node's web UI. Any single node serves
+# the whole cluster UI, so one address is enough; pve1 (10.0.1.1, from the
+# docs/design.md IP plan) is used here. Add pve2 (10.0.1.2) as a second address
+# for failover if you want the route to survive pve1 being down.
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: proxmox
+subsets:
+  - addresses:
+      - ip: 10.0.1.1 # pve1 — confirm against your LAN
+    ports:
+      - name: https
+        port: 8006

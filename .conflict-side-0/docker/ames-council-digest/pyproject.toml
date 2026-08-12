@@ -1,0 +1,36 @@
+[project]
+name = "ames-council-digest"
+version = "1.0.0"
+description = "Fetch Ames City Council agendas and packets, summarize them, and emit a digest"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27,<1",
+    "pypdf>=5,<7",
+    "markdown>=3.5,<4",
+    # The quiet period measures a listing stamp's age against the repository's
+    # own clock, so it needs an IANA zone. Slim base images do not reliably
+    # ship the system zoneinfo database; depending on this makes the behavior
+    # the same everywhere rather than a property of the image.
+    "tzdata>=2024.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10"]
+
+[project.scripts]
+ames-digest = "ames_digest.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["ames_digest*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# tests/ is not a package, so conftest's helpers import by bare name. rootdir
+# insertion is what makes `from conftest import item` work from any test file.
+addopts = "--import-mode=importlib"
+pythonpath = ["tests"]
+filterwarnings = ["error"]

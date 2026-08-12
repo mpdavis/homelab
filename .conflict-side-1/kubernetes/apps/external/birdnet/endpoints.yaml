@@ -1,0 +1,14 @@
+# Manual Endpoints pointing at the BirdNET-Pi host on the LAN. The port name
+# (`http`) must match the Service port name; the port VALUE is the real port
+# the BirdNET web UI listens on (this is authoritative for a selector-less
+# Service — the Service's targetPort is ignored).
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: birdnet
+subsets:
+  - addresses:
+      - ip: 10.0.63.190
+    ports:
+      - name: http
+        port: 80

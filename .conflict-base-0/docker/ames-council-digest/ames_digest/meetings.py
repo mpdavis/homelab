@@ -1,0 +1,223 @@
+"""Meeting discovery: pair each dated meeting folder across the clerk's trees.
+
+The repository keeps a meeting's documents in three parallel trees, all keyed
+by the meeting date:
+
+    Clerk Files/Agendas/<Board>/<Year>/<YYYY MMDD>/   -> the agenda PDF
+    Clerk Files/Council Packet/<Year>/<YYYY MMDD>/    -> one PDF per agenda item
+    Clerk Files/Minutes/<Board>/<Year>/<YYYY MMDD>/   -> the summary minutes
+
+Only the City Council has a packet tree; other boards publish an agenda and
+minutes alone. Any side may be missing, and they arrive at different times:
+the agenda first, the packet a few days later, the minutes about a week after
+the meeting itself. That staggering is why a meeting is digested in two
+passes — see :mod:`ames_digest.summarize`.
+"""
+
+from __future__ import annotations
+
+import logging
+import re
+from dataclasses import dataclass, field
+from datetime import date
+
+from .weblink import Entry, WebLinkClient
+
+log = logging.getLogger(__name__)
+
+AGENDAS_FOLDER = "Agendas"
+PACKET_FOLDER = "Council Packet"
+MINUTES_FOLDER = "Minutes"
+# The packet tree is council-only; agendas for other boards live one level
+# deeper under Agendas/<Board>.
+COUNCIL_BOARD = "City Council"
+
+
+@dataclass
+class Meeting:
+    """One dated meeting, with whatever documents are published for it."""
+
+    board: str
+    meeting_date: date
+    # "" for a regular meeting. A labeled special session (e.g. "Tax Levy") can
+    # fall on the same date as a regular one, so the label is part of a
+    # meeting's identity, not decoration.
+    label: str = ""
+    agenda: Entry | None = None
+    agenda_folder_id: int | None = None
+    packet_master: Entry | None = None
+    packet_items: list[Entry] = field(default_factory=list)
+    packet_folder_id: int | None = None
+    minutes: Entry | None = None
+    minutes_folder_id: int | None = None
+    # Each tree's folder stamp, captured during discovery and therefore free.
+    # Laserfiche propagates a folder's LastModified up from its children, so
+    # these answer "has anything in this meeting changed since we digested it"
+    # without listing a single document. See :mod:`ames_digest.freshness`.
+    folder_stamps: dict[str, str] = field(default_factory=dict)
+    # False until MeetingSource.load_documents has listed this meeting's
+    # folders, so an unexamined meeting is never mistaken for an empty one.
+    documents_loaded: bool = False
+
+    @property
+    def key(self) -> str:
+        """Stable identifier used for state tracking and output filenames."""
+        parts = [self.board, self.meeting_date.isoformat(), self.label]
+        slug = "-".join(p for p in parts if p).lower()
+        return re.sub(r"[^a-z0-9]+", "-", slug).strip("-")
+
+    @property
+    def display_name(self) -> str:
+        return f"{self.board} — {self.label}" if self.label else self.board
+
+    @property
+    def has_documents(self) -> bool:
+        """Whether anything is published for this meeting at all."""
+        return bool(
+            self.agenda or self.packet_master or self.packet_items or self.minutes
+        )
+
+    @property
+    def has_preview_documents(self) -> bool:
+        """Whether the before-the-meeting material (agenda/packet) is up."""
+        return bool(self.agenda or self.packet_master or self.packet_items)
+
+    @property
+    def has_minutes(self) -> bool:
+        return self.minutes is not None
+
+    def __str__(self) -> str:
+        label = f" [{self.label}]" if self.label else ""
+        return (
+            f"{self.board}{label} {self.meeting_date.isoformat()} "
+            f"(agenda={'yes' if self.agenda else 'no'}, "
+            f"items={len(self.packet_items)}, "
+            f"minutes={'yes' if self.minutes else 'no'})"
+        )
+
+
+def _documents(client: WebLinkClient, folder_id: int) -> list[Entry]:
+    return [
+        e
+        for e in client.list_folder(folder_id)
+        if e.is_document and e.extension == "pdf"
+    ]
+
+
+def _split_master(entries: list[Entry]) -> tuple[Entry | None, list[Entry]]:
+    """Separate the combined ``~Master`` PDF from the individual item PDFs."""
+    master = next((e for e in entries if e.is_master), None)
+    items = [e for e in entries if not e.is_master]
+    # Items sort naturally by their agenda code (A001, A002, …); anything
+    # without a code goes last so it doesn't interleave oddly.
+    items.sort(key=lambda e: (e.item_code is None, e.item_code or e.name))
+    return master, items
+
+
+class MeetingSource:
+    """Locates meetings for a board across one or more years."""
+
+    def __init__(self, client: WebLinkClient, root_folder_id: int, board: str) -> None:
+        self.client = client
+        self.root_folder_id = root_folder_id
+        self.board = board
+
+    def _agenda_year_folders(self) -> dict[int, int]:
+        parent = self.client.resolve_path(
+            self.root_folder_id, AGENDAS_FOLDER, self.board
+        )
+        return self.client.year_folders(parent)
+
+    def _packet_year_folders(self) -> dict[int, int]:
+        if self.board != COUNCIL_BOARD:
+            return {}
+        try:
+            parent = self.client.resolve_path(self.root_folder_id, PACKET_FOLDER)
+        except LookupError:
+            log.warning("no %r folder in the repository", PACKET_FOLDER)
+            return {}
+        return self.client.year_folders(parent)
+
+    def _minutes_year_folders(self) -> dict[int, int]:
+        try:
+            parent = self.client.resolve_path(
+                self.root_folder_id, MINUTES_FOLDER, self.board
+            )
+        except LookupError:
+            # Not every board publishes minutes here; the preview pass is
+            # unaffected, so this is a debug note rather than a warning.
+            log.debug("no %s/%s folder in the repository", MINUTES_FOLDER, self.board)
+            return {}
+        return self.client.year_folders(parent)
+
+    def discover(self, years: list[int]) -> list[Meeting]:
+        """Return every meeting folder in the given years, oldest first.
+
+        Only the folders — listing each meeting's documents costs one request
+        per meeting per tree, which is the bulk of a run's traffic against the
+        city's server. Callers narrow by date and digest state first, then call
+        :meth:`load_documents` on what actually survives. A meeting comes back
+        from here with no documents attached and ``has_documents`` False; that
+        means "not looked at yet", not "empty".
+        """
+        # Keyed by (date, label) so a "Tax Levy" session and that day's regular
+        # meeting stay separate. Packet and minutes folders carry no label, so
+        # an unlabeled one pairs with the unlabeled agenda — the regular meeting.
+        meetings: dict[tuple[date, str], Meeting] = {}
+
+        def absorb(year_folders: dict[int, int], tree: str) -> None:
+            for year in years:
+                folder_id = year_folders.get(year)
+                if folder_id is None:
+                    log.debug("no %s folder for %s", tree, year)
+                    continue
+                for folder in self.client.meeting_folders(folder_id):
+                    meeting = meetings.setdefault(
+                        (folder.meeting_date, folder.label),
+                        Meeting(
+                            board=self.board,
+                            meeting_date=folder.meeting_date,
+                            label=folder.label,
+                        ),
+                    )
+                    setattr(meeting, f"{tree}_folder_id", folder.entry_id)
+                    # Absent rather than empty when the repository serves no
+                    # stamp: a missing key is "unknown", which freshness must be
+                    # able to tell from "known to be blank".
+                    if folder.last_modified_text:
+                        meeting.folder_stamps[tree] = folder.last_modified_text
+
+        absorb(self._agenda_year_folders(), "agenda")
+        absorb(self._packet_year_folders(), "packet")
+        absorb(self._minutes_year_folders(), "minutes")
+
+        return [m for _, m in sorted(meetings.items(), key=lambda kv: kv[0])]
+
+    def load_documents(self, meeting: Meeting) -> Meeting:
+        """Fetch the document listings for one meeting. Idempotent."""
+        if meeting.documents_loaded:
+            return meeting
+
+        if meeting.agenda_folder_id is not None:
+            # An agenda folder holds a single master PDF; if the clerk ever
+            # posts several, prefer the master and keep the rest as items.
+            master, extra = _split_master(
+                _documents(self.client, meeting.agenda_folder_id)
+            )
+            meeting.agenda = master or (extra[0] if extra else None)
+
+        if meeting.packet_folder_id is not None:
+            master, items = _split_master(
+                _documents(self.client, meeting.packet_folder_id)
+            )
+            meeting.packet_master = master
+            meeting.packet_items = items
+
+        if meeting.minutes_folder_id is not None:
+            master, extra = _split_master(
+                _documents(self.client, meeting.minutes_folder_id)
+            )
+            meeting.minutes = master or (extra[0] if extra else None)
+
+        meeting.documents_loaded = True
+        return meeting

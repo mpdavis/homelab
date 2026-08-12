@@ -1,0 +1,160 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: monitoring
+  namespace: monitoring
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: kube-prometheus-stack
+      version: "~87.21.0"
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community
+        namespace: flux-system
+  install:
+    crds: Create
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      strategy: rollback
+  test:
+    enable: true
+  values:
+    crds:
+      # Helm cannot upgrade this chart's CRDs in place, and large CRD changes
+      # (e.g. the Prometheus-Operator jump in the 72->86 upgrade) otherwise fail.
+      # This pre-upgrade hook Job applies the updated CRDs server-side.
+      upgradeJob:
+        enabled: true
+    # k3s runs the controller-manager, scheduler, and kube-proxy inside the
+    # single k3s process and does not expose the separate metrics endpoints this
+    # chart scrapes by default. Left enabled, those targets read as "down" and
+    # fire perpetual false-positive Kube*Down criticals. Disabling the component
+    # removes both the scrape and the alert. Control-plane health is still
+    # covered via the apiserver and node/kubelet metrics.
+    kubeControllerManager:
+      enabled: false
+    kubeScheduler:
+      enabled: false
+    kubeProxy:
+      enabled: false
+    grafana:
+      admin:
+        existingSecret: grafana-admin
+        userKey: admin-user
+        passwordKey: admin-password
+      grafana.ini:
+        server:
+          root_url: https://grafana.${DOMAIN}
+        auth:
+          disable_login_form: false
+        users:
+          auto_assign_org: true
+          auto_assign_org_role: Admin
+      initChownData:
+        enabled: false
+      securityContext:
+        runAsUser: 472
+        runAsGroup: 472
+        fsGroup: 472
+      persistence:
+        enabled: true
+        storageClassName: local-path
+        size: 2Gi
+      additionalDataSources:
+        - name: Loki
+          type: loki
+          url: http://loki-gateway.loki.svc.cluster.local
+          access: proxy
+          isDefault: false
+    prometheus:
+      prometheusSpec:
+        retention: 30d
+        retentionSize: 10GB
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: local-path
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 20Gi
+        resources:
+          requests:
+            memory: 512Mi
+            cpu: 250m
+          limits:
+            memory: 2Gi
+    alertmanager:
+      alertmanagerSpec:
+        # Mount the ntfy token (Secret alertmanager-ntfy, from the ExternalSecret
+        # in infrastructure/monitoring/) as an OPTIONAL volume: this HelmRelease
+        # reconciles in infrastructure-controllers, before the ExternalSecret is
+        # applied in the later infrastructure Kustomization, so the secret may
+        # not exist yet when the AM pod rolls. optional:true lets the pod start
+        # regardless (no downtime → no false alertmanager gatus failure), and
+        # credentials_file is read per-request, so publishing starts working as
+        # soon as the token syncs.
+        volumes:
+          - name: ntfy-token
+            secret:
+              secretName: alertmanager-ntfy
+              optional: true
+        volumeMounts:
+          - name: ntfy-token
+            mountPath: /etc/alertmanager/ntfy
+            readOnly: true
+        storage:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: local-path
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 2Gi
+      # Route alerts to self-hosted ntfy (ntfy.mpdavis.com, topic
+      # homelab-alerts). ntfy's tpl=1 templating turns the Alertmanager JSON
+      # into a readable title/body — no bridge needed. critical → priority 5 +
+      # rotating_light; everything else → priority 3 + warning. The token in
+      # credentials_file grants write access to the (deny-all) topic.
+      config:
+        route:
+          group_by: ["alertname", "namespace"]
+          group_wait: 30s
+          group_interval: 5m
+          repeat_interval: 4h
+          receiver: ntfy-warning
+          routes:
+            # Watchdog is an always-firing dead-man's-switch; InfoInhibitor is
+            # plumbing. Neither should page.
+            - receiver: "null"
+              matchers:
+                - alertname = "Watchdog"
+            - receiver: "null"
+              matchers:
+                - alertname = "InfoInhibitor"
+            - receiver: ntfy-critical
+              matchers:
+                - severity = "critical"
+        receivers:
+          - name: "null"
+          - name: ntfy-warning
+            webhook_configs:
+              - url: "http://ntfy.ntfy.svc.cluster.local/homelab-alerts?tpl=1&title=%7B%7Bif%20eq%20.status%20%22resolved%22%7D%7D%E2%9C%85%20%7B%7Belse%7D%7D%F0%9F%94%A5%20%7B%7Bend%7D%7D%7B%7B.commonLabels.alertname%7D%7D&message=%7B%7Brange%20.alerts%7D%7D%7B%7B.annotations.description%7D%7D%0A%7B%7Bend%7D%7D&priority=3&tags=warning"
+                send_resolved: true
+                http_config:
+                  authorization:
+                    credentials_file: /etc/alertmanager/ntfy/token
+          - name: ntfy-critical
+            webhook_configs:
+              - url: "http://ntfy.ntfy.svc.cluster.local/homelab-alerts?tpl=1&title=%7B%7Bif%20eq%20.status%20%22resolved%22%7D%7D%E2%9C%85%20%7B%7Belse%7D%7D%F0%9F%94%A5%20%7B%7Bend%7D%7D%7B%7B.commonLabels.alertname%7D%7D&message=%7B%7Brange%20.alerts%7D%7D%7B%7B.annotations.description%7D%7D%0A%7B%7Bend%7D%7D&priority=5&tags=rotating_light"
+                send_resolved: true
+                http_config:
+                  authorization:
+                    credentials_file: /etc/alertmanager/ntfy/token

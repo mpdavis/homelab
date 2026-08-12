@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: prowlarr
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`prowlarr.${DOMAIN}`)
+      kind: Rule
+      middlewares:
+        - name: authentik-forward-auth
+          namespace: authentik
+      services:
+        - name: prowlarr
+          port: 9696
+  tls: {}

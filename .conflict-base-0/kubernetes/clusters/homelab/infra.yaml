@@ -1,0 +1,88 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-sources
+  namespace: flux-system
+spec:
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./kubernetes/infrastructure/sources
+  prune: true
+  wait: true
+  timeout: 5m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-controllers
+  namespace: flux-system
+spec:
+  interval: 10m
+  dependsOn:
+    - name: infrastructure-sources
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./kubernetes/infrastructure/controllers
+  prune: true
+  wait: true
+  timeout: 10m
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-vars
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure
+  namespace: flux-system
+spec:
+  interval: 10m
+  dependsOn:
+    - name: infrastructure-controllers
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./kubernetes/infrastructure
+  prune: true
+  # No wait: this path contains External Secrets resources (ClusterSecretStore,
+  # ExternalSecret). Flux's wait health check (kstatus) can't track those CRDs —
+  # its status poller reports them 'NotFound' even when they are Ready, so the
+  # check always times out. Confirmed unaffected by healthCheckExprs or a
+  # controller restart. HelmRelease health gating lives in
+  # infrastructure-controllers; Deployment-level gating here is tracked in an
+  # issue (move Kustomize apps to HelmReleases).
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-vars
+      - kind: ConfigMap
+        name: bws-secret-ids
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-notifications
+  namespace: flux-system
+spec:
+  interval: 10m
+  dependsOn:
+    # Needs the bitwarden ClusterSecretStore, which the infrastructure
+    # Kustomization applies (external-secrets/).
+    - name: infrastructure
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./kubernetes/infrastructure/flux-notifications
+  prune: true
+  # No wait: this path contains an ExternalSecret (github-token), which Flux's
+  # wait health check can't track, and this must not gate anything.
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-vars
+      - kind: ConfigMap
+        name: bws-secret-ids

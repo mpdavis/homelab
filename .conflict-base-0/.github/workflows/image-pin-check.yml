@@ -1,0 +1,63 @@
+name: Image Pin Check
+
+# Deterministic guard against pinning an image to a tag or digest the registry
+# does not actually publish (e.g. `teamarr:v2.6.0` when the real tag is `2.6.0`).
+# Such a typo only fails at runtime as ImagePullBackOff, so we catch it at PR time
+# by resolving every newly added `image:` reference against its registry. No LLM,
+# no secrets — just the public OCI manifest API.
+
+# Deliberately NOT filtered on `paths: kubernetes/**`. This is a REQUIRED status
+# check on main's ruleset, and a required check that does not run leaves the PR
+# blocked forever waiting for a verdict that never arrives. Running it everywhere
+# costs ~5s on PRs that touch no manifests: verify-image-pins.py finds no added
+# `image:` lines and exits 0 with "No image references to verify."
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: image-pin-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Need the base commit available locally to diff added image lines.
+          fetch-depth: 0
+
+      - name: Verify added image references resolve
+        id: verify
+        run: |
+          set +e
+          python3 .github/scripts/verify-image-pins.py \
+            --changed "${{ github.event.pull_request.base.sha }}" | tee result.txt
+          code=${PIPESTATUS[0]}
+          set -e
+          echo "exit=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Comment on unresolved pins
+        if: always() && steps.verify.outputs.exit != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "## ❌ Image pin check failed"
+            echo
+            echo "One or more newly added \`image:\` references do not resolve in their registry."
+            echo "A pinned tag/digest the registry does not publish will \`ImagePullBackOff\` at runtime."
+            echo
+            echo '```'
+            cat result.txt
+            echo '```'
+          } > comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file comment.md
+
+      - name: Fail if any reference is unresolved
+        if: steps.verify.outputs.exit != '0'
+        run: exit 1

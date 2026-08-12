@@ -1,0 +1,35 @@
+---
+- name: Disable pve-enterprise repository
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/pve-enterprise.list
+    state: absent
+  notify: update apt cache
+
+- name: Remove enterprise .sources file if present
+  ansible.builtin.shell: |
+    for file in /etc/apt/sources.list.d/*.sources; do
+      if grep -q "pve-enterprise" "$file" 2>/dev/null; then
+        rm -f "$file"
+      fi
+    done
+  changed_when: false
+
+- name: Disable ceph enterprise repository
+  ansible.builtin.shell: |
+    for file in /etc/apt/sources.list.d/*.sources; do
+      if grep -q "enterprise.proxmox.com.*ceph" "$file" 2>/dev/null; then
+        rm -f "$file"
+      fi
+    done
+    rm -f /etc/apt/sources.list.d/ceph.list
+  changed_when: false
+
+- name: Add pve-no-subscription repository (deb822)
+  ansible.builtin.template:
+    src: pve-no-subscription.sources.j2
+    dest: /etc/apt/sources.list.d/pve-no-subscription.sources
+    mode: "0644"
+  notify: update apt cache
+
+- name: Flush handlers to update apt cache
+  ansible.builtin.meta: flush_handlers

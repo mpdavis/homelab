@@ -1,0 +1,145 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qbittorrent
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: qbittorrent
+  template:
+    metadata:
+      labels:
+        app: qbittorrent
+    spec:
+      # The mousehole Service injects legacy MOUSEHOLE_* service-link env vars
+      # (e.g. MOUSEHOLE_PORT=tcp://...), which collide with mousehole's own
+      # MOUSEHOLE_PORT config and crash it. These links are unused here.
+      enableServiceLinks: false
+      # Gluetun requires /dev/net/tun which is only available on VM nodes, not LXC
+      nodeSelector:
+        node-type: vm
+      containers:
+        - name: gluetun
+          image: qmcgaw/gluetun:v3.41.3
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: VPN_SERVICE_PROVIDER
+              value: protonvpn
+            - name: VPN_TYPE
+              value: wireguard
+            # ProtonVPN WireGuard is far more stable than OpenVPN here (no route-add
+            # errors, no healthcheck-restart loop) and keeps NAT-PMP port forwarding
+            # alive reliably. Port forwarding is unlocked by generating the WireGuard
+            # key in the ProtonVPN dashboard with "NAT-PMP (Port Forwarding)" toggled
+            # on — so the OpenVPN "+pmp" username hack is no longer needed.
+            - name: WIREGUARD_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: protonvpn-credentials
+                  key: wireguard-private-key
+            # Copied from the "Address" line of the generated WireGuard config
+            # (ProtonVPN assigns 10.2.0.2/32).
+            - name: WIREGUARD_ADDRESSES
+              value: "10.2.0.2/32"
+            - name: SERVER_COUNTRIES
+              value: Netherlands
+            - name: VPN_PORT_FORWARDING
+              value: "on"
+            - name: PORT_FORWARD_ONLY
+              value: "on"
+            - name: VPN_PORT_FORWARDING_UP_COMMAND
+              value: /bin/sh -c 'wget -O- -nv --retry-connrefused --post-data "json={\"listen_port\":{{PORT}},\"random_port\":false,\"upnp\":false}" http://127.0.0.1:8080/api/v2/app/setPreferences'
+            - name: VPN_PORT_FORWARDING_DOWN_COMMAND
+              value: /bin/sh -c 'wget -O- -nv --retry-connrefused --post-data "json={\"listen_port\":0}" http://127.0.0.1:8080/api/v2/app/setPreferences'
+            - name: DOT
+              value: "off"
+            - name: DNS_ADDRESS
+              value: "1.1.1.1"
+            - name: TZ
+              value: ${TZ}
+          # A failed NAT-PMP lease renewal clears the forwarded-port file and can
+          # leave the client unconnectable indefinitely while the pod stays
+          # Running; restart gluetun to force a fresh VPN session and port grant.
+          # (Gluetun's own healthcheck only watches VPN connectivity, not the
+          # forwarded port.)
+          startupProbe:
+            exec:
+              command: ["/bin/sh", "-c", "test -s /tmp/gluetun/forwarded_port"]
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "test -s /tmp/gluetun/forwarded_port"]
+            periodSeconds: 60
+            failureThreshold: 3
+          volumeMounts:
+            - name: tun
+              mountPath: /dev/net/tun
+        - name: qbittorrent
+          image: linuxserver/qbittorrent:5.2.1_v2.0.13-ls460
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: TZ
+              value: ${TZ}
+            - name: WEBUI_PORT
+              value: "8080"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: media
+              mountPath: /media
+        # Shares the pod (gluetun) network namespace so it reports/updates the
+        # ProtonVPN exit IP — the same IP the tracker sees from torrent traffic.
+        - name: mousehole
+          image: tmmrtn/mousehole:0.5.0
+          ports:
+            - containerPort: 5010
+              name: mousehole
+          env:
+            - name: MOUSEHOLE_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mousehole-auth
+                  key: auth-password
+            # Default host allowlist is localhost-only; permit the Traefik vhost.
+            - name: MOUSEHOLE_ALLOWED_HOSTS
+              value: mousehole.${DOMAIN}
+            # Traefik terminates TLS and forwards over HTTP, so the same-origin
+            # default rejects the browser's https Origin; allow it explicitly.
+            - name: MOUSEHOLE_ALLOWED_ORIGINS
+              value: https://mousehole.${DOMAIN}
+            # Served exclusively over HTTPS via Traefik — mark session cookies Secure.
+            - name: MOUSEHOLE_HTTPS_ONLY_COOKIES
+              value: "true"
+            - name: TZ
+              value: ${TZ}
+          volumeMounts:
+            - name: mousehole-data
+              mountPath: /var/lib/mousehole
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: qbittorrent-config
+        - name: mousehole-data
+          persistentVolumeClaim:
+            claimName: mousehole-data
+        - name: media
+          nfs:
+            server: ${NAS_IP}
+            path: ${NAS_DATA_PATH}/media
+        - name: tun
+          hostPath:
+            path: /dev/net/tun
+            type: CharDevice

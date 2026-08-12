@@ -1,0 +1,75 @@
+name: Build Coding Agent Image
+
+# Builds docker/coding-agent (CloudCLI + claude + opencode + kubectl/flux/gh)
+# into ghcr.io/mpdavis/coding-agent. Tags are semver (1.0.<run_number>) so the
+# Deployment pins a real tag (image-pin-check) and Renovate's kubernetes
+# manager can open bump PRs — the image is never referenced as :latest.
+#
+# ONLY main PUBLISHES. Renovate picks bumps by reading the registry's tag list,
+# which carries no provenance — so any tag this workflow pushes is a tag the
+# Deployment can end up running. When pull requests also pushed, that included
+# builds off branches nobody had merged; on the sibling digest image that is
+# exactly how an unreviewed base-image jump reached the cluster. Publishing
+# only from main makes "newest tag" and "newest reviewed code" the same thing,
+# and Renovate safe to accept on sight.
+#
+# Pull requests still build (never push) so a broken Dockerfile fails the PR
+# rather than main. The `paths` filter keeps merges that don't touch the image
+# from publishing a tag whose contents are identical to the last one.
+#
+# THE TRADEOFF: a PR can no longer change the image and bump the pin at once —
+# image-pin-check would resolve a tag that does not exist yet. Merge the image
+# change, let main publish, then bump the pin in a second PR (Renovate opens it
+# unprompted, usually within the hour).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docker/coding-agent/**'
+  pull_request:
+    paths:
+      - 'docker/coding-agent/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: build-coding-agent-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # The single gate on publishing. Covers workflow_dispatch too: dispatching
+      # this from a branch builds it without pushing, same as a PR.
+      PUSH: ${{ github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - if: env.PUSH == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: docker/coding-agent
+          platforms: linux/amd64
+          push: ${{ env.PUSH == 'true' }}
+          tags: |
+            ghcr.io/mpdavis/coding-agent:1.0.${{ github.run_number }}
+            ghcr.io/mpdavis/coding-agent:latest
+
+      - name: Print image tag
+        run: |
+          if [ "$PUSH" = "true" ]; then
+            echo "Published ghcr.io/mpdavis/coding-agent:1.0.${{ github.run_number }}"
+          else
+            echo "Built only — ${GITHUB_REF} does not publish. Merge to main to push a tag."
+          fi

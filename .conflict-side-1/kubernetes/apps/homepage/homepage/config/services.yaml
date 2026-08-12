@@ -1,0 +1,103 @@
+- Media:
+    - Emby:
+        icon: emby.png
+        href: https://emby.${DOMAIN}
+        description: Media server
+    - Sonarr:
+        icon: sonarr.png
+        href: https://sonarr.${DOMAIN}
+        description: TV series management
+    - Radarr:
+        icon: radarr.png
+        href: https://radarr.${DOMAIN}
+        description: Movie management
+    - Seerr:
+        icon: overseerr.png
+        href: https://seerr.${DOMAIN}
+        description: Media requests
+    - qBittorrent:
+        icon: qbittorrent.png
+        href: https://qbit.${DOMAIN}
+        description: Torrent client
+    - Mousehole:
+        icon: mdi-vpn
+        href: https://mousehole.${DOMAIN}
+        description: VPN port-forward monitor
+    - Prowlarr:
+        icon: prowlarr.png
+        href: https://prowlarr.${DOMAIN}
+        description: Indexer management
+    - Listenarr:
+        icon: mdi-headphones
+        href: https://listenarr.${DOMAIN}
+        description: Audiobook management
+    - AudiobookShelf:
+        icon: audiobookshelf.png
+        href: https://audiobookshelf.${DOMAIN}
+        description: Audiobook & podcast server
+    - PodFetch:
+        icon: mdi-podcast
+        href: https://podfetch.${DOMAIN}
+        description: Podcast downloader & manager
+- IPTV:
+    - Dispatcharr:
+        icon: mdi-television-classic
+        href: https://dispatcharr.${DOMAIN}
+        description: IPTV stream dispatcher
+    - Teamarr:
+        icon: mdi-account-group
+        href: https://teamarr.${DOMAIN}
+        description: IPTV team management
+    - ECM:
+        icon: mdi-key-variant
+        href: https://ecm.${DOMAIN}
+        description: ECM server
+    - StreamFlow:
+        icon: mdi-sort-variant
+        href: https://streamflow.${DOMAIN}
+        description: IPTV stream quality ordering
+- AI:
+    - Open WebUI:
+        icon: open-webui.png
+        href: https://ai.${DOMAIN}
+        description: AI chat interface (Ollama)
+    - Coding Agent:
+        icon: claude-ai.png
+        href: https://code.${DOMAIN}
+        description: Claude Code / opencode web UI (CloudCLI)
+- Documents:
+    - Paperless:
+        icon: paperless-ngx.png
+        href: https://paperless.${DOMAIN}
+        description: Document management & OCR
+- Travel:
+    - Trek:
+        icon: mdi-airplane
+        href: https://trek.${DOMAIN}
+        description: Travel planning
+- Civic:
+    - Council Digest:
+        icon: mdi-gavel
+        href: https://council.${DOMAIN}
+        description: Ames city council meeting digests
+- Infrastructure:
+    - Authentik:
+        icon: authentik.png
+        href: https://iam.${DOMAIN}
+        description: Identity provider & SSO
+    - Grafana:
+        icon: grafana.png
+        href: https://grafana.${DOMAIN}
+        description: Monitoring & dashboards
+    - ntfy:
+        icon: mdi-bell-ring
+        href: https://ntfy.${DOMAIN}
+        description: Push notifications (alerting)
+    - Flux:
+        icon: flux-cd.png
+        href: https://flux.${DOMAIN}
+        description: GitOps delivery
+    - Traefik:
+        icon: traefik.png
+        href: https://traefik.${DOMAIN}
+        description: Ingress controller

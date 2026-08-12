@@ -1,0 +1,33 @@
+---
+- name: Wait for cloud-init to finish
+  ansible.builtin.command: cloud-init status --wait
+  changed_when: false
+  failed_when: cloud_init_result.rc not in [0, 2]
+  register: cloud_init_result
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name:
+      - curl
+      - gnupg
+      - open-iscsi
+      - nfs-common
+    state: present
+
+- name: Set k3s-required kernel sysctls
+  ansible.builtin.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-k3s.conf
+    reload: true
+  loop:
+    - { key: kernel.panic, value: "10" }
+    - { key: kernel.panic_on_oops, value: "1" }
+    - { key: vm.overcommit_memory, value: "1" }
+  when: node_type == 'vm'
+

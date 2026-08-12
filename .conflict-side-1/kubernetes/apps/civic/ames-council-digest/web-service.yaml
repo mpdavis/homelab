@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ames-council-digest-web
+spec:
+  selector:
+    app: ames-council-digest-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
