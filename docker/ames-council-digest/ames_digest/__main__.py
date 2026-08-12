@@ -20,7 +20,7 @@ from .delivery import (
 from .llm import LLMClient
 from .meetings import Meeting, MeetingSource
 from .pdftext import extract
-from .render import render
+from .render import render, render_record
 from .state import PHASE_OUTCOME, PHASE_PREVIEW, PHASES, State
 from .summarize import MeetingDigest, MeetingSummarizer, Reuse
 from .weblink import WebLinkClient
@@ -125,6 +125,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser(
         "index",
         help="rebuild the index page from the digests on disk (no model calls)",
+    )
+    sub.add_parser(
+        "render",
+        help="rebuild meeting pages from JSON records (no model calls)",
     )
 
     listing = sub.add_parser("list", help="show known meetings and their digest state")
@@ -664,6 +668,28 @@ def cmd_list(args: argparse.Namespace, cfg: Config) -> int:
     return 0
 
 
+def cmd_render(cfg: Config) -> int:
+    """Regenerate every meeting page from its durable JSON record."""
+    cfg.output_dir.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for path in sorted(cfg.output_dir.glob("*.json")):
+        stored = record.MeetingRecord.load(cfg.output_dir, path.stem)
+        if stored is None:
+            log.warning("skipping unreadable meeting record %s", path)
+            continue
+        rendered = render_record(stored)
+        (cfg.output_dir / f"{stored.key}.md").write_text(
+            rendered.markdown, encoding="utf-8"
+        )
+        (cfg.output_dir / f"{stored.key}.html").write_text(
+            rendered.html, encoding="utf-8"
+        )
+        count += 1
+    index.rebuild(cfg.output_dir, cfg.state_dir, gateway_prices(cfg))
+    print(f"rendered {count} meeting(s) in {cfg.output_dir}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     logging.basicConfig(
@@ -686,6 +712,8 @@ def main(argv: list[str] | None = None) -> int:
         count = index.rebuild(cfg.output_dir, cfg.state_dir, gateway_prices(cfg))
         print(f"indexed {count} meeting(s) in {cfg.output_dir}")
         return 0
+    if command == "render":
+        return cmd_render(cfg)
 
     # `run` is the default when no subcommand is given; argparse hasn't filled
     # its defaults in that case, so supply them.

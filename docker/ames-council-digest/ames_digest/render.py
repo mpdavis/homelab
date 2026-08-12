@@ -217,3 +217,10 @@ def render(digest: MeetingDigest) -> RenderedDigest:
         text=merge.plaintext(digest.body_markdown.strip()),
         filename_stem=filename_stem(digest),
     )
+
+
+def render_record(record: MeetingRecord) -> RenderedDigest:
+    """Render a stored record; this path must never need an LLM."""
+    rendered = render(record.to_digest())
+    rendered.record = record
+    return rendered

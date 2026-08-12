@@ -178,15 +178,8 @@ A page rebuilt from revised sources says so in its footer.
 The two passes are tracked separately in state: a meeting whose preview is done
 still has an outcome pending until its minutes appear. `--phase` runs just one.
 
-Digests written before the one-page format left the outcome in a separate
-`<meeting>-outcome.html`. Those are still found and still linked, folded into
-their meeting's row on the index rather than appearing as a second meeting. To
-convert one, re-run both passes over it and delete the leftover:
-
-```bash
-ames-digest run --meeting 2026-07-28 --force   # ~$1.40, re-summarizes the packet
-rm /data/digests/city-council-2026-07-28-outcome.{md,html}
-```
+Each meeting has one rendered URL. The outcome pass enriches that page in place;
+the JSON record retains the preview body for later template work.
 
 A run then:
 
@@ -308,11 +301,10 @@ writing one class and registering it in `delivery.py`'s `SINKS`.
 ## Reading the digests
 
 The `file` sink also regenerates `index.html` — a landing page listing meetings
-newest first, each with links to both passes ("Before the meeting" / "What
-council decided") as they become available. It is rebuilt by scanning the
-output directory rather than tracked in state, so a digest restored from backup
-or written before the index existed still appears. Titles are read back out of
-each digest's `<title>`, so the index cannot drift from the pages it links.
+newest first. It is rebuilt by scanning the output directory rather than tracked
+in state, so a digest restored from backup or written before the index existed
+still appears. Titles are read back out of each digest's `<title>`, so the index
+cannot drift from the pages it links.
 
 An nginx Deployment (`kubernetes/apps/civic/ames-council-digest/web-*.yaml`)
 mounts the same PVC read-only and serves that directory at
@@ -321,6 +313,10 @@ mounts the same PVC read-only and serves that directory at
 
 `ames-digest index` rebuilds the page on demand without any model calls —
 useful to bootstrap a fresh volume or after moving files around.
+
+`ames-digest render` rebuilds every Markdown and HTML meeting page from the
+stored JSON records, then refreshes the index. It makes template changes free:
+no model client is constructed and no source documents are fetched.
 
 ### Usage counters
 
@@ -392,6 +388,9 @@ ames-digest list
 
 # Rebuild the web server's index page from what's on disk
 ames-digest index
+
+# Rebuild every meeting page from JSON records, without model calls
+ames-digest render
 
 # Digest anything outstanding from the last 30 days (the CronJob's behavior)
 ames-digest run
