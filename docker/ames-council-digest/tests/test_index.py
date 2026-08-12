@@ -87,15 +87,6 @@ class TestDigestEntry:
         kwargs.setdefault("has_markdown", True)
         return index.DigestEntry(stem=stem, **kwargs)
 
-    def test_legacy_outcome_detected(self):
-        assert self._entry("city-council-2026-07-28-outcome").is_legacy_outcome
-        assert not self._entry("city-council-2026-07-28").is_legacy_outcome
-
-    def test_meeting_stem_strips_the_legacy_suffix(self):
-        assert self._entry("city-council-2026-07-28-outcome").meeting_stem == (
-            "city-council-2026-07-28"
-        )
-
     def test_undated_entries_sort_last_rather_than_crashing(self):
         undated = self._entry("x", meeting_date=None)
         dated = self._entry("y")
@@ -131,23 +122,23 @@ class TestCollectMeetings:
         write_page(tmp_path, "city-council-2026-08-11")
         assert len(index.collect_meetings(tmp_path)) == 2
 
-    def test_a_legacy_outcome_folds_into_its_meeting_row(self, tmp_path):
-        # Rather than appearing as a phantom second meeting.
+    def test_each_page_is_its_own_meeting_row(self, tmp_path):
         write_page(tmp_path, "city-council-2026-07-28")
         write_page(tmp_path, "city-council-2026-07-28-outcome",
                    title="City Council — July 28, 2026 — what council decided")
         rows = index.collect_meetings(tmp_path)
-        assert len(rows) == 1
-        assert rows[0].page is not None and rows[0].legacy_outcome is not None
+        assert len(rows) == 2
 
     def test_row_title_prefers_the_page(self, tmp_path):
         write_page(tmp_path, "city-council-2026-07-28", title="The Real Title")
         assert index.collect_meetings(tmp_path)[0].title == "The Real Title"
 
-    def test_legacy_only_row_drops_the_decided_suffix(self, tmp_path):
+    def test_page_title_is_read_without_legacy_rewriting(self, tmp_path):
         write_page(tmp_path, "city-council-2026-07-28-outcome",
                    title="City Council — July 28, 2026 — what council decided")
-        assert index.collect_meetings(tmp_path)[0].title == "City Council — July 28, 2026"
+        assert index.collect_meetings(tmp_path)[0].title == (
+            "City Council — July 28, 2026 — what council decided"
+        )
 
     def test_updated_reflects_the_phase_tag(self, tmp_path):
         write_page(tmp_path, "a-2026-07-28", phase=PHASE_OUTCOME)
@@ -212,14 +203,11 @@ class TestRenderIndex:
         assert "Updated after the meeting" in html
         assert "Awaiting the minutes" not in html
 
-    def test_a_legacy_outcome_suppresses_awaiting_the_minutes(self, tmp_path):
-        # Its result is published, just not on this page — saying otherwise
-        # would contradict the link sitting next to it.
+    def test_preview_page_awaits_minutes_until_it_is_rewritten(self, tmp_path):
         write_page(tmp_path, "city-council-2026-07-28", phase=PHASE_PREVIEW)
         write_page(tmp_path, "city-council-2026-07-28-outcome", phase=PHASE_OUTCOME)
         html = index.render_index(index.collect_meetings(tmp_path))
-        assert "Awaiting the minutes" not in html
-        assert "Outcome (older format)" in html
+        assert "Awaiting the minutes" in html
 
     def test_titles_are_escaped(self, tmp_path):
         write_page(tmp_path, "a-2026-07-28", title="Parks &amp; Rec <script>")

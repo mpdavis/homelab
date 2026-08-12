@@ -7,6 +7,7 @@ from ames_digest.agenda import AgendaOutline
 from ames_digest.llm import Usage
 from ames_digest.meetings import Meeting
 from ames_digest.record import MeetingRecord
+from ames_digest.render import render, render_record
 from ames_digest.summarize import ItemSummary, MeetingDigest
 
 
@@ -53,6 +54,22 @@ def test_outcome_keeps_the_preview_body():
 
     assert outcome.preview["body"] == "## preview"
     assert outcome.outcome["body"] == "## outcome"
+
+
+def test_rendering_a_record_matches_the_original_digest():
+    original = digest()
+    stored = MeetingRecord.from_digest(original)
+    assert render_record(stored).markdown == render(original).markdown
+
+
+def test_outcome_record_renders_the_result_body():
+    original = digest("outcome")
+    preview = MeetingRecord.from_digest(digest())
+    stored = MeetingRecord.from_digest(original, prior=preview)
+    assert "# City Council" in render_record(stored).markdown
+    assert "## outcome" in render_record(stored).markdown
+    assert "## preview" not in render_record(stored).markdown
+    assert render_record(stored).markdown == render(original).markdown
 
 
 def test_invalid_record_is_ignored(tmp_path):

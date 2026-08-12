@@ -122,6 +122,10 @@ class MeetingRecord:
                 "output_tokens": digest.total_usage.output_tokens,
                 "calls": digest.total_usage.calls,
             },
+            "preview_generated_at": (
+                digest.preview_generated_at.isoformat(timespec="seconds")
+                if digest.preview_generated_at else None
+            ),
         }
         if digest.is_outcome:
             record.outcome = pass_record
@@ -130,3 +134,48 @@ class MeetingRecord:
         else:
             record.preview = pass_record
         return record
+
+    def to_digest(self) -> Any:
+        """Reconstruct the renderer's input without constructing an LLM client."""
+        from datetime import datetime
+
+        from .agenda import AgendaOutline
+        from .llm import Usage
+        from .meetings import Meeting
+        from .summarize import ItemSummary, MeetingDigest
+
+        selected = self.outcome or self.preview or {}
+        kind = "outcome" if self.outcome else "preview"
+        generated_at = datetime.fromisoformat(
+            str(selected.get("generated_at") or self.meeting_date)
+        )
+        preview_generated_at = selected.get("preview_generated_at")
+        if "preview_generated_at" not in selected and self.preview:
+            preview_generated_at = self.preview.get("generated_at")
+        meeting = Meeting(
+            board=self.board,
+            meeting_date=datetime.fromisoformat(self.meeting_date).date(),
+            label=self.label,
+        )
+        return MeetingDigest(
+            meeting=meeting,
+            body_markdown=str(selected.get("body") or ""),
+            kind=kind,
+            items=[ItemSummary.from_archive(item) for item in self.items],
+            agenda=AgendaOutline.from_archive(self.agenda),
+            agenda_url=self.meeting.get("agenda_url"),
+            packet_url=self.meeting.get("packet_url"),
+            minutes_url=self.meeting.get("minutes_url"),
+            generated_at=generated_at,
+            usage=Usage(
+                int((selected.get("usage") or {}).get("input_tokens") or 0),
+                int((selected.get("usage") or {}).get("output_tokens") or 0),
+                int((selected.get("usage") or {}).get("calls") or 0),
+            ),
+            model=str(selected.get("model") or ""),
+            revision=int(selected.get("revision") or 0),
+            preview_generated_at=(
+                datetime.fromisoformat(str(preview_generated_at))
+                if preview_generated_at else None
+            ),
+        )
