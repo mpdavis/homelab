@@ -173,7 +173,7 @@ class TestMatch:
         ]
         assert match(agenda, packet).by_agenda == {0: 1, 1: 0}
 
-    def test_assignment_is_one_to_one(self):
+    def test_one_agenda_entry_claims_only_one_of_several_documents(self):
         result = match(
             [entry("23", "Fitch Family Indoor Aquatic Center")],
             [item("Fitch Family Indoor Aquatic Center", eid=1),
@@ -181,6 +181,36 @@ class TestMatch:
         )
         assert len(result.by_agenda) == 1
         assert len(result.unmatched_packet) == 1
+
+    def test_two_agenda_entries_cannot_claim_the_same_document(self):
+        # The other direction, and the one that actually happens: a real agenda
+        # carries three near-identical withdrawal requests. If the clerk posts
+        # only one of the PDFs, the second entry has to go orphan rather than
+        # pointing at the first entry's document and duplicating it on the page.
+        agenda = [
+            entry("12", "Request from City of Kelley to withdraw from Resource "
+                        "Recovery System 28E Intergovernmental Agreement"),
+            entry("13", "Request from City of Slater to withdraw from Resource "
+                        "Recovery System 28E Intergovernmental Agreement"),
+        ]
+        packet = [item("Request from City of Kelley to withdraw from Resource "
+                       "Recovery System 28E Intergovernmental Agreement")]
+        result = match(agenda, packet)
+        assert result.by_agenda == {0: 0}
+        assert result.unmatched_agenda == [1]
+        assert result.unmatched_packet == []
+
+    def test_no_document_is_assigned_twice_across_a_whole_meeting(self):
+        # The invariant behind both cases above, stated once over a realistic
+        # mix: whatever the scores say, each PDF is spoken for at most once.
+        agenda = [entry(str(n), f"Change Order No. {n} for the aquatic center")
+                  for n in range(1, 6)]
+        packet = [item(f"Change Order No. {n} for the aquatic center", eid=n)
+                  for n in (2, 4)]
+        result = match(agenda, packet)
+        claimed = list(result.by_agenda.values())
+        assert len(claimed) == len(set(claimed))
+        assert len(claimed) <= len(packet)
 
     def test_printed_item_number_breaks_a_tie(self):
         # Two uploads of the same agreement; only the number tells them apart.

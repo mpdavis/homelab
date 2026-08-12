@@ -20,6 +20,17 @@ class TestParseJsonObject:
     def test_fenced_without_language(self):
         assert parse_json_object('```\n{"a": 1}\n```') == {"a": 1}
 
+    def test_fence_beats_braces_in_the_surrounding_prose(self):
+        # The two strategies are not redundant. Brace-scanning alone would span
+        # from the prose's "{" to the object's "}" and produce garbage, so this
+        # is the case that proves the fence is load-bearing.
+        raw = 'Note {see the packet}:\n```json\n{"a": 1}\n```\nHope that helps.'
+        assert parse_json_object(raw) == {"a": 1}
+
+    def test_fence_beats_trailing_prose_braces(self):
+        raw = '```json\n{"a": 1}\n```\nLet me know if {anything} is unclear.'
+        assert parse_json_object(raw) == {"a": 1}
+
     def test_chatty_preamble_and_tail(self):
         raw = 'Sure! Here you go:\n{"a": 1}\nLet me know if you need more.'
         assert parse_json_object(raw) == {"a": 1}
