@@ -80,6 +80,11 @@
         icon: mdi-gavel
         href: https://council.${DOMAIN}
         description: Ames city council meeting digests
+- Automation:
+    - Home Assistant:
+        icon: home-assistant.png
+        href: https://homeassistant.${DOMAIN}
+        description: Home automation platform
 - Infrastructure:
     - Authentik:
         icon: authentik.png

@@ -65,6 +65,7 @@ spec:
                       - birdnet.mpdavis.com
                       - proxmox.mpdavis.com
                       - council.mpdavis.com
+                      - homeassistant.mpdavis.com
   values:
     resources:
       requests:
@@ -162,6 +163,13 @@ spec:
         - name: trek
           group: external-open
           url: https://trek.mpdavis.com/
+          conditions: *open-conditions
+        - name: homeassistant
+          group: external-open
+          # Home Assistant has its own login; onboarding/login page returns 200.
+          # Requires http.trusted_proxies configured in configuration.yaml for
+          # requests through Traefik (else HA returns 400 to proxied requests).
+          url: https://homeassistant.mpdavis.com/
           conditions: *open-conditions
         # External (non-k8s) LAN hosts routed through Traefik via
         # Service+Endpoints — probed exactly like in-cluster open services.

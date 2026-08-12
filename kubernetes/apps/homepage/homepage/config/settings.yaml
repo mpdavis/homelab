@@ -23,3 +23,6 @@ layout:
   Civic:
     style: row
     columns: 3
+  Automation:
+    style: row
+    columns: 3
