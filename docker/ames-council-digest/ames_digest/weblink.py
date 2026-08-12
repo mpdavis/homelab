@@ -52,7 +52,19 @@ MASTER_PREFIX = "~Master"
 LISTING_TIME_FORMATS = ("%m/%d/%Y %I:%M:%S %p", "%m/%d/%Y %I:%M %p", "%m/%d/%Y")
 
 
-def _parse_listing_datetime(raw: object) -> datetime | None:
+def listing_text(raw: object) -> str:
+    """A listing timestamp exactly as served, whitespace-normalized.
+
+    This, not the parsed value, is what freshness comparisons use. The repository
+    serves naive local wall time, so comparing raw strings for *inequality*
+    sidesteps DST and clock skew entirely and still catches a stamp that moves
+    backwards — which an ordering comparison would silently accept. Parsing is
+    for display and for age, nothing else.
+    """
+    return " ".join(raw.split()) if isinstance(raw, str) else ""
+
+
+def parse_listing_datetime(raw: object) -> datetime | None:
     """Read a listing's date column, tolerating a shape we have not seen."""
     if not isinstance(raw, str) or not raw.strip():
         return None
@@ -82,6 +94,9 @@ class Entry:
     # count changing — so this is the only signal that what we summarized is no
     # longer what the repository serves.
     last_modified: datetime | None = None
+    # The same stamp as served, kept alongside the parsed one because freshness
+    # compares strings rather than datetimes. See `listing_text`.
+    last_modified_text: str = ""
 
     @property
     def is_folder(self) -> bool:
@@ -118,6 +133,11 @@ class MeetingFolder:
     # "" for a regular meeting; "Tax Levy" and the like for special sessions.
     label: str = ""
     documents: list[Entry] = field(default_factory=list)
+    # The folder's own stamp, which Laserfiche propagates up from its children:
+    # it is always at or after the newest document inside. That makes it a free
+    # fingerprint for "has anything in this meeting changed" — free because
+    # discovery already lists the year folder these rows come from.
+    last_modified_text: str = ""
 
 
 def parse_meeting_folder(folder_name: str) -> tuple[date, str] | None:
@@ -214,6 +234,7 @@ class WebLinkClient:
             for row in rows:
                 cols = _zip_columns(col_types, row)
                 page_count = cols.get("PageCount")
+                modified = cols.get("LastModified")
                 entries.append(
                     Entry(
                         entry_id=row["entryId"],
@@ -222,7 +243,8 @@ class WebLinkClient:
                         extension=(row.get("extension") or "").lower(),
                         page_count=page_count if isinstance(page_count, int) else None,
                         description=(cols.get("f_Document Description") or "").strip(),
-                        last_modified=_parse_listing_datetime(cols.get("LastModified")),
+                        last_modified=parse_listing_datetime(modified),
+                        last_modified_text=listing_text(modified),
                     )
                 )
 
@@ -269,6 +291,7 @@ class WebLinkClient:
                     name=entry.name,
                     meeting_date=meeting_date,
                     label=label,
+                    last_modified_text=entry.last_modified_text,
                 )
             )
         yield from sorted(found, key=lambda f: (f.meeting_date, f.label))

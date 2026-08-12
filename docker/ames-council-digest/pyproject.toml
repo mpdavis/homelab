@@ -7,6 +7,11 @@ dependencies = [
     "httpx>=0.27,<1",
     "pypdf>=5,<7",
     "markdown>=3.5,<4",
+    # The quiet period measures a listing stamp's age against the repository's
+    # own clock, so it needs an IANA zone. Slim base images do not reliably
+    # ship the system zoneinfo database; depending on this makes the behavior
+    # the same everywhere rather than a property of the image.
+    "tzdata>=2024.1",
 ]
 
 [project.optional-dependencies]

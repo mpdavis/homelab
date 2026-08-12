@@ -158,6 +158,12 @@ def _footer(digest: MeetingDigest) -> str:
             f"Generated {digest.preview_generated_at.strftime('%Y-%m-%d %H:%M')}, "
             f"updated {digest.generated_at.strftime('%Y-%m-%d %H:%M')}"
         )
+    if digest.revision:
+        # The clerk revises packet documents in place after we have digested
+        # them. A reader comparing this page against the packet deserves to
+        # know it was rebuilt, and how many times.
+        plural = "s" if digest.revision > 1 else ""
+        when += f" · rebuilt after {digest.revision} source revision{plural}"
 
     return (
         f"{when} by ames-council-digest using {digest.model} · "

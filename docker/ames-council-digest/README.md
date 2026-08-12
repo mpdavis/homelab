@@ -82,6 +82,96 @@ read from. That makes the archive the answer to "what did we summarize, and from
 which version of the document" — the question that matters because the clerk
 revises packet documents in place after we have already digested them.
 
+## A packet is not final when it first appears
+
+The clerk uploads a packet over an hour or so and then **revises documents in
+place**, sometimes the next day, hours before the meeting. Digesting once and
+never looking again means a run that lands mid-upload captures a partial packet
+permanently.
+
+This is not hypothetical. On the 2026-08-11 packet, all 33 documents were
+created on 8/10 between 2:06 and 3:13 PM, and four were revised the next day:
+
+| Document | Created | Last modified |
+|---|---|---|
+| `~Master` | 8/10 2:06 PM | 8/10 2:06 PM |
+| `A002 - payment of claims` | 8/10 2:13 PM | **8/11 2:12 PM** |
+| `A003 - Report of Change Orders` | 8/10 2:15 PM | **8/11 2:15 PM** |
+| `A004 - Summary of Minutes` | 8/10 2:16 PM | **8/11 2:13 PM** |
+
+**The item count never changed**, so a "did the count change?" check misses this
+entirely. It has to be timestamps. The same happens on the outcome side: the
+7/28 minutes folder received `~Master` at 8/7 2:48 PM and `A001` six and a half
+hours later, so a run in that window sees half the minutes.
+
+Detection runs in three layers, cheapest first:
+
+| Layer | Cost | What it answers |
+|---|---|---|
+| **Folder fingerprint** | free, every poll | has anything in this meeting moved? |
+| **Manifest diff** | one listing, only on a layer-1 miss | *which* documents moved? |
+| **Policy** | free | are we willing to act on it? |
+
+Layer 1 is free because Laserfiche propagates a folder's `LastModified` up from
+its children, and discovery already lists the year folders those rows come from.
+A no-op poll therefore still costs **nine requests** — the figure the discovery
+section above is careful about — and that is asserted against the live
+repository, not just assumed.
+
+Because layer 1 costs nothing, it is allowed to be over-sensitive. A folder
+touched with no surviving change to any document inside it fails layer 1, costs
+exactly one listing, is re-baselined so it stops recurring, and never reaches a
+model call.
+
+Comparisons are on the **raw timestamp strings**, never parsed ordering. The
+repository serves naive local wall time, so string inequality sidesteps DST and
+clock skew and still catches a stamp moving backwards. Only the quiet period
+below needs a real clock.
+
+### Only the changed documents are re-summarized
+
+A full packet is ~$1.40; re-reading all 33 documents to pick up four changes
+would make update detection correct but too expensive to leave on. So a revision
+reuses the archived summary for every document whose timestamp has not moved,
+re-summarizes only the ones that have, drops the ones that are gone, and re-runs
+the single reduce call over the merged set. The agenda outline is reused on the
+same terms — if the agenda PDF itself is unchanged, segmentation is not bought
+again. Matching always re-runs, because it is pure, free, and the item set it
+has to place may have changed.
+
+That turns the 8/11 revision from 33 item calls into 4.
+
+Token counts **accumulate** rather than replace: a revision that re-summarized
+four of 33 items spent a fraction of the original, and storing that fraction
+would make the index's cumulative ledger fall after a revision.
+
+### Spend guardrails
+
+Detection and cheap re-summarization make revisions possible and affordable.
+These decide when we act, so a CronJob polling every ten minutes cannot rework
+itself into a large bill:
+
+| Guardrail | Default | Why |
+|---|---|---|
+| **Quiet period** | 2 hours | The 8/11 packet uploaded over 67 minutes. Digesting mid-burst guarantees rework, so a meeting's folders must sit still first. |
+| **Freeze** | — | A preview freezes once its meeting has happened; the whole meeting freezes once its outcome publishes. A clerk tidying old folders must not re-bill us for history nobody is re-reading. |
+| **Revision cap** | 5 per pass | A runaway stops loudly, naming the meeting in a warning, rather than silently. |
+| **`--since-days`** | 30 | Revisions to meetings older than the window go undetected. That is a deliberate bound, not an oversight. |
+
+`--recheck` re-evaluates freshness for passes the policy would leave alone —
+frozen meetings, ones at the cap — while still only re-digesting what actually
+changed. That is the difference from `--force`, which re-digests regardless and
+pays full price.
+
+The quiet period is the one piece that needs a real clock, since it measures a
+stamp's *age* rather than its identity. Listing timestamps carry no timezone, so
+`AMES_REPO_TIMEZONE` (default `America/Chicago`) says which clock wrote them. A
+misconfigured zone degrades the quiet period rather than breaking the run:
+unreadable or future-dated stamps are treated as settled, and a future stamp
+logs a warning pointing at the timezone.
+
+A page rebuilt from revised sources says so in its footer.
+
 The two passes are tracked separately in state: a meeting whose preview is done
 still has an outcome pending until its minutes appear. `--phase` runs just one.
 
@@ -257,6 +347,9 @@ Everything is environment-driven; nothing needs a rebuild to change.
 | `AMES_BOARD` | `City Council` | board or commission to track |
 | `AMES_MEETING_TIME` | `6:00 PM` | fallback when the agenda does not print a start time |
 | `AMES_MEETING_LOCATION` | `City Hall, 515 Clark Ave` | fallback when the agenda does not print a place |
+| `AMES_QUIET_PERIOD_MINUTES` | `120` | how long a meeting's folders must sit unchanged before digesting; `0` disables |
+| `AMES_REVISION_CAP` | `5` | most revisions to pay for on one pass |
+| `AMES_REPO_TIMEZONE` | `America/Chicago` | which clock wrote the repository's timestamps (quiet period only) |
 | `AMES_LLM_BASE_URL` | `https://opencode.ai/zen/v1` | Anthropic-compatible gateway |
 | `AMES_LLM_API_KEY` | — | gateway key (or `OPENCODE_API_KEY`) |
 | `AMES_ITEM_MODEL` | `claude-sonnet-4-5` | model for per-item summaries |
@@ -305,6 +398,10 @@ ames-digest run --phase outcome
 
 # One specific meeting, printed, without touching state
 ames-digest run --meeting 2026-07-28 --no-state --delivery stdout
+
+# Look for revised source documents even where policy would leave them alone.
+# Still only re-digests what actually changed — unlike --force
+ames-digest run --recheck
 
 # Check document availability and text extraction without spending tokens
 ames-digest run --meeting 2026-07-28 --dry-run

@@ -50,6 +50,11 @@ class Meeting:
     packet_folder_id: int | None = None
     minutes: Entry | None = None
     minutes_folder_id: int | None = None
+    # Each tree's folder stamp, captured during discovery and therefore free.
+    # Laserfiche propagates a folder's LastModified up from its children, so
+    # these answer "has anything in this meeting changed since we digested it"
+    # without listing a single document. See :mod:`ames_digest.freshness`.
+    folder_stamps: dict[str, str] = field(default_factory=dict)
     # False until MeetingSource.load_documents has listed this meeting's
     # folders, so an unexamined meeting is never mistaken for an empty one.
     documents_loaded: bool = False
@@ -160,11 +165,11 @@ class MeetingSource:
         # an unlabeled one pairs with the unlabeled agenda — the regular meeting.
         meetings: dict[tuple[date, str], Meeting] = {}
 
-        def absorb(year_folders: dict[int, int], attr: str) -> None:
+        def absorb(year_folders: dict[int, int], tree: str) -> None:
             for year in years:
                 folder_id = year_folders.get(year)
                 if folder_id is None:
-                    log.debug("no %s folder for %s", attr, year)
+                    log.debug("no %s folder for %s", tree, year)
                     continue
                 for folder in self.client.meeting_folders(folder_id):
                     meeting = meetings.setdefault(
@@ -175,11 +180,16 @@ class MeetingSource:
                             label=folder.label,
                         ),
                     )
-                    setattr(meeting, attr, folder.entry_id)
+                    setattr(meeting, f"{tree}_folder_id", folder.entry_id)
+                    # Absent rather than empty when the repository serves no
+                    # stamp: a missing key is "unknown", which freshness must be
+                    # able to tell from "known to be blank".
+                    if folder.last_modified_text:
+                        meeting.folder_stamps[tree] = folder.last_modified_text
 
-        absorb(self._agenda_year_folders(), "agenda_folder_id")
-        absorb(self._packet_year_folders(), "packet_folder_id")
-        absorb(self._minutes_year_folders(), "minutes_folder_id")
+        absorb(self._agenda_year_folders(), "agenda")
+        absorb(self._packet_year_folders(), "packet")
+        absorb(self._minutes_year_folders(), "minutes")
 
         return [m for _, m in sorted(meetings.items(), key=lambda kv: kv[0])]
 

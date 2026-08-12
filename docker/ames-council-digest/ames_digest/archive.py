@@ -69,6 +69,11 @@ class PreviewArchive:
     usage: Usage = field(default_factory=Usage)
     model: str = ""
     generated_at: str = ""
+    # How many times this page has been re-digested because its source
+    # documents changed. `usage` is cumulative across all of them, so a footer
+    # built from it reports what the page cost rather than what its last
+    # revision cost.
+    revision: int = 0
 
     @property
     def has_page(self) -> bool:
@@ -112,8 +117,15 @@ def save_preview(
     usage: Usage,
     model: str,
     generated_at: str,
+    revision: int = 0,
 ) -> None:
-    """Persist everything the outcome pass needs to update this page in place."""
+    """Persist everything the outcome pass needs to update this page in place.
+
+    ``usage`` is expected to be cumulative for the page, not just what the
+    calling pass spent — this file is where the next pass reads its
+    ``prior_usage`` from, so anything left out here is spend the footer will
+    never report again.
+    """
     path = _path(state_dir, key)
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -124,6 +136,7 @@ def save_preview(
         "body": body,
         "model": model,
         "generated_at": generated_at,
+        "revision": revision,
         "usage": {
             "input_tokens": usage.input_tokens,
             "output_tokens": usage.output_tokens,
@@ -192,6 +205,7 @@ def load_preview(state_dir: Path, key: str) -> PreviewArchive:
         )
 
     agenda = payload.get("agenda")
+    revision = payload.get("revision")
 
     return PreviewArchive(
         items=[i for i in items if isinstance(i, dict)],
@@ -200,4 +214,6 @@ def load_preview(state_dir: Path, key: str) -> PreviewArchive:
         usage=_usage(payload),
         model=str(payload.get("model") or ""),
         generated_at=str(payload.get("generated_at") or ""),
+        revision=revision if isinstance(revision, int) and not isinstance(revision, bool)
+        else 0,
     )
