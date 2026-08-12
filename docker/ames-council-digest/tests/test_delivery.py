@@ -15,6 +15,7 @@ from ames_digest.delivery import (
     gateway_prices,
 )
 from ames_digest.render import RenderedDigest
+from ames_digest.record import MeetingRecord
 
 
 @pytest.fixture
@@ -25,6 +26,7 @@ def rendered():
         html="<html><title>City Council — July 28, 2026</title></html>",
         text="City Council",
         filename_stem="city-council-2026-07-28",
+        record=MeetingRecord(key="city-council-2026-07-28", board="City Council", meeting_date="2026-07-28"),
     )
 
 
@@ -68,6 +70,7 @@ class TestFileSink:
         FileSink().deliver(rendered, cfg)
         assert (cfg.output_dir / "city-council-2026-07-28.md").read_text().startswith("#")
         assert (cfg.output_dir / "city-council-2026-07-28.html").exists()
+        assert (cfg.output_dir / "city-council-2026-07-28.json").exists()
 
     def test_creates_the_output_directory(self, cfg, rendered):
         assert not cfg.output_dir.exists()

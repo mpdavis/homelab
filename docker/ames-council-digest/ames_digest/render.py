@@ -16,6 +16,7 @@ from dataclasses import dataclass
 import markdown as markdown_lib
 
 from . import merge
+from .record import MeetingRecord
 from .summarize import MeetingDigest
 
 # Kept inline rather than in a stylesheet: email clients strip <style> blocks
@@ -67,6 +68,7 @@ class RenderedDigest:
     html: str
     text: str
     filename_stem: str
+    record: MeetingRecord | None = None
 
 
 def _pretty_date(digest: MeetingDigest) -> str:
