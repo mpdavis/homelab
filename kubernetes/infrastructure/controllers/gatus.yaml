@@ -271,3 +271,11 @@ spec:
           group: internal
           url: http://ollama.ai.svc.cluster.local:11434/api/version
           conditions: *internal-conditions
+        # Minecraft speaks its own TCP protocol on :25565, not HTTP — no
+        # IngressRoute/DNS record, so this is a plain TCP connect check
+        # against the in-cluster Service.
+        - name: minecraft
+          group: internal
+          url: tcp://minecraft.gaming.svc.cluster.local:25565
+          conditions:
+            - "[CONNECTED] == true"

@@ -1,0 +1,65 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: minecraft
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: "~5.0"
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    crds: CreateReplace
+  values:
+    controllers:
+      main:
+        containers:
+          main:
+            image:
+              repository: itzg/minecraft-server
+              tag: 2024.9.1-java21
+            env:
+              TZ: ${TZ}
+              EULA: "TRUE"
+              TYPE: VANILLA
+              VERSION: LATEST
+              MEMORY: 2048M
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: 25565
+                  initialDelaySeconds: 60
+                  periodSeconds: 10
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: 25565
+                  initialDelaySeconds: 30
+                  periodSeconds: 10
+    service:
+      main:
+        controller: main
+        type: LoadBalancer
+        ports:
+          minecraft:
+            port: 25565
+    persistence:
+      data:
+        existingClaim: minecraft
+        globalMounts:
+          - path: /data

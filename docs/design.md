@@ -328,6 +328,7 @@ homelab/
 │   │   ├── kustomization.yaml
 │   │   ├── ai/                # ollama, open-webui, coding-agent
 │   │   ├── docs/              # paperless-ngx (document management)
+│   │   ├── gaming/            # minecraft
 │   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
 │   │   ├── ntfy/              # ntfy (push notifications / Alertmanager sink)
 │   │   ├── travel/            # trek (travel planning)
@@ -378,6 +379,7 @@ homelab/
 | 2025-05-27 | LXC containers over VMs | Lower overhead; VM only for GPU node (VFIO requires it) |
 | 2025-05-27 | Traefik as single ingress for all services | Routes to both k8s and external services via Service+Endpoints |
 | 2026-07-17 | Gatus for synthetic monitoring + deploy canary | One declarative tool serves both continuous health checks (→ Prometheus alerts) and post-merge deploy verification (→ commit status + auto-revert PR); baseline comparison exempts pre-existing failures from reverts |
+| 2026-08-15 | Minecraft exposed via a dedicated MetalLB `LoadBalancer` Service, not Traefik/IngressRoute | Minecraft speaks its own TCP protocol on :25565, not HTTP — Traefik only routes HTTP(S). No ExternalDNS record either, since that source only watches IngressRoutes; `minecraft.mpdavis.com` is pointed at the assigned LoadBalancer IP manually. Monitored via a Gatus TCP connect check instead of an HTTP probe |
 
 ## Deploy Sequence
 
