@@ -94,10 +94,25 @@ trusted.
 18 HelmRepositories, 536 rendered objects — measures **~5 seconds** and produces a
 ~7 MB cache, so the job is dominated by runner startup rather than by rendering.
 
-**Timeout.** Capped at 15 minutes as a backstop, not a budget. Source resolution can
-pathologically stall: pinning a chart to a version matching no published tag sends
-flate enumerating the registry's entire tag list, which was observed hanging for
-minutes instead of failing fast.
+**Known flakiness in flate 0.5.0 — read this before debugging a slow run.** flate has
+been observed **wedging** rather than failing. Twice locally, and once in CI where
+`flate build` sat for 11+ minutes on a tree that `flate test` had rendered seconds
+earlier in the same job. It is not repo-specific and not reproducible on demand.
+
+Mitigations, none of them a proven fix:
+
+- `FLATE_CONCURRENCY: 8` — the default of 40 parallel reconcile bodies is a lot to
+  schedule onto a 4-vCPU runner, and narrows the window for whatever the stall is.
+- **Per-step `timeout-minutes`** (5 for render and build, 8 for diff) on top of the
+  15-minute job cap, so a wedge fails in minutes and names the step that hung instead
+  of reporting a generic job timeout.
+- The diff step is additionally `continue-on-error` — it is advisory, so it must never
+  hold the check hostage.
+
+A known-pathological case is at least understood: pinning a chart to a version matching
+no published tag sends flate enumerating the registry's entire tag list, which hangs
+rather than failing fast. If this proves noisy in practice, the fallback is to drop to
+a single `flate build` invocation (halving the render work) or to pin an older release.
 
 **Version pins.** The flate action is pinned by tag (Renovate's `github-actions`
 manager keeps it current); `KUBECONFORM_VERSION` is a `# renovate:`-annotated env var

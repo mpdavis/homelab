@@ -50,6 +50,12 @@ permissions:
 env:
   # renovate: datasource=github-releases depName=yannh/kubeconform
   KUBECONFORM_VERSION: "v0.8.0"
+  # flate defaults to 40 parallel reconcile bodies, which is a lot to schedule onto a
+  # 4-vCPU runner. `flate build` was observed wedging for 11+ minutes at the default
+  # immediately after `flate test` had rendered the same tree in seconds, so this is
+  # both a fit to the runner and a narrowing of the window for that stall. See the
+  # "Known flakiness" note in README.md — it is a mitigation, not a proven fix.
+  FLATE_CONCURRENCY: "8"
 
 jobs:
   render:
@@ -95,6 +101,10 @@ jobs:
 
       - name: Reconcile every Kustomization and HelmRelease
         id: render
+        # Per-step bounds, not just the job bound: a wedged flate should fail this
+        # check in minutes with an obvious culprit, rather than quietly eating the
+        # whole job budget and reporting a generic job timeout.
+        timeout-minutes: 5
         run: |
           set +e
           flate test all --path ./kubernetes --no-progress 2>&1 | tee render.txt
@@ -120,6 +130,7 @@ jobs:
 
       - name: Build the rendered manifests
         if: steps.render.outputs.exit == '0'
+        timeout-minutes: 5
         run: flate build all --path ./kubernetes --no-progress > rendered.yaml
 
       - name: Validate rendered objects against Kubernetes and CRD schemas
@@ -159,6 +170,11 @@ jobs:
       - name: Render the diff against the base commit
         id: diff
         if: github.event_name == 'pull_request' && steps.render.outputs.exit == '0'
+        # Advisory output — a stall or crash here must not hold the check hostage, so
+        # it is bounded AND non-fatal. It renders two trees, so it gets a little more
+        # room than the single-tree steps.
+        timeout-minutes: 8
+        continue-on-error: true
         run: |
           set +e
           flate diff all \
