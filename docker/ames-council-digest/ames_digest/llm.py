@@ -1,10 +1,9 @@
 """Minimal Anthropic Messages API client.
 
 opencode zen exposes an Anthropic-compatible endpoint at
-``https://opencode.ai/zen/v1/messages``, and so do api.anthropic.com and local
-bridges like Meridian. Talking to the wire format directly (rather than through
-a vendor SDK) keeps the image small and avoids coupling the gateway's behavior
-to an SDK version.
+``https://opencode.ai/zen/v1/messages``, and so does api.anthropic.com. Talking
+to the wire format directly (rather than through a vendor SDK) keeps the image
+small and avoids coupling the gateway's behavior to an SDK version.
 
 Auth is sent as both ``x-api-key`` and ``Authorization: Bearer`` because
 gateways differ on which one they read; each ignores the other. This is not
