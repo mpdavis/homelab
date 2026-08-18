@@ -327,6 +327,7 @@ homelab/
 │   ├── apps/                  # grouped by namespace, one dir per service
 │   │   ├── kustomization.yaml
 │   │   ├── ai/                # ollama, open-webui, coding-agent
+│   │   ├── automation/        # home-assistant (home automation)
 │   │   ├── docs/              # paperless-ngx (document management)
 │   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
 │   │   ├── ntfy/              # ntfy (push notifications / Alertmanager sink)
