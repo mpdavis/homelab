@@ -52,9 +52,6 @@ spec:
               HOST: "0.0.0.0"
               # The claude CLI must not try to update itself inside the image
               DISABLE_AUTOUPDATER: "1"
-              # Git-managed opencode config (configmap.yaml): merged between
-              # the PVC-local global config and any project config.
-              OPENCODE_CONFIG: /etc/opencode/opencode.json
               CLAUDE_CODE_OAUTH_TOKEN:
                 secretKeyRef:
                   name: coding-agent-secrets
@@ -76,54 +73,6 @@ spec:
               limits:
                 cpu: "2"
                 memory: 4Gi
-          # Meridian (github.com/rynfar/meridian): local Anthropic-compatible
-          # API bridging requests onto the Claude subscription via the Agent
-          # SDK. opencode in the main container points its anthropic provider
-          # at it (configmap.yaml, loaded via OPENCODE_CONFIG), so opencode
-          # shares the claude CLI's subscription auth instead of needing an
-          # API key.
-          meridian:
-            image:
-              repository: ghcr.io/rynfar/meridian
-              tag: 1.61.0
-            env:
-              TZ: ${TZ}
-              # The proxy is unauthenticated and spends the Claude
-              # subscription: bind loopback so it is reachable only inside
-              # this pod's network namespace, not via the pod IP (the image
-              # default is 0.0.0.0).
-              CLAUDE_PROXY_HOST: "127.0.0.1"
-              CLAUDE_CODE_OAUTH_TOKEN:
-                secretKeyRef:
-                  name: coding-agent-secrets
-                  key: claude-code-oauth-token
-              # $(...) is Kubernetes dependent-env expansion of the secret
-              # var above (must precede this one in the rendered env list).
-              MERIDIAN_PROFILES: '[{"id":"default","oauthToken":"$(CLAUDE_CODE_OAUTH_TOKEN)"}]'
-              MERIDIAN_DEFAULT_PROFILE: default
-            probes:
-              # Liveness only (exec, since kubelet httpGet probes target the
-              # pod IP and Meridian binds loopback). No readiness probe: an
-              # unhealthy proxy shouldn't mark the pod unready and take the
-              # CloudCLI UI offline with it.
-              liveness:
-                enabled: true
-                custom: true
-                spec:
-                  exec:
-                    command:
-                      - node
-                      - -e
-                      - "const r=await fetch('http://127.0.0.1:3456/health');process.exit(r.ok?0:1)"
-            securityContext:
-              allowPrivilegeEscalation: false
-            resources:
-              requests:
-                cpu: 50m
-                memory: 256Mi
-              limits:
-                cpu: "1"
-                memory: 2Gi
     service:
       main:
         controller: main
@@ -133,17 +82,7 @@ spec:
     persistence:
       home:
         existingClaim: coding-agent
-        # advancedMounts (not global): the Meridian sidecar has no business
-        # seeing the agent home (repo clone, CloudCLI auth.db, gh creds).
         advancedMounts:
           main:
             main:
               - path: /home/agent
-      opencode-config:
-        type: configMap
-        name: coding-agent-opencode
-        advancedMounts:
-          main:
-            main:
-              - path: /etc/opencode
-                readOnly: true
