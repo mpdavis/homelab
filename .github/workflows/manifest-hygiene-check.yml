@@ -1,0 +1,74 @@
+name: Manifest Hygiene Check
+
+# Deterministic guard for the workload conventions in docs/manifest-conventions.md:
+# runtime uid/gid (PUID/PGID vs securityContext, decided by image family), container
+# hardening, resource requests, floating image tags, and Gatus/Homepage registration
+# for new hostnames. No LLM, no secrets — every one of these is mechanically decidable,
+# and each was a finding the k8s reviewer had re-derived on multiple separate PRs.
+#
+# Scoped to manifests the PR **adds**. The tree predates these conventions (see
+# `check-manifest-hygiene.py --all` for the backlog), so a whole-tree gate would fail
+# every unrelated PR. The rules apply to new services, which is where they were being
+# missed.
+#
+# Unlike image-pin-check.yml this is NOT a required status check, so the `paths` filter
+# is safe here — a required check that never runs would block the PR forever.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'kubernetes/**'
+      - '.github/scripts/check-manifest-hygiene.py'
+
+concurrency:
+  group: manifest-hygiene-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Need the base commit locally to diff which manifests were added.
+          fetch-depth: 0
+
+      - name: Install PyYAML
+        run: python3 -m pip install --quiet pyyaml
+
+      - name: Check added manifests against the conventions
+        id: check
+        run: |
+          set +e
+          python3 .github/scripts/check-manifest-hygiene.py \
+            --changed "${{ github.event.pull_request.base.sha }}" | tee result.txt
+          code=${PIPESTATUS[0]}
+          set -e
+          echo "exit=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Comment on convention violations
+        if: always() && steps.check.outputs.exit != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "## ❌ Manifest hygiene check failed"
+            echo
+            echo "New manifests in this PR don't meet the workload conventions in"
+            echo "[\`docs/manifest-conventions.md\`](https://github.com/${{ github.repository }}/blob/main/docs/manifest-conventions.md)."
+            echo "These are the findings that kept recurring in review, so they're enforced"
+            echo "mechanically now instead of costing a round-trip."
+            echo
+            echo '```'
+            cat result.txt
+            echo '```'
+          } > comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file comment.md
+
+      - name: Fail if any convention is violated
+        if: steps.check.outputs.exit != '0'
+        run: exit 1

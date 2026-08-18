@@ -17,6 +17,12 @@ arguments: [service_name]
 
 Add a new service to the k3s cluster following the exact patterns established in this repository.
 
+**Read `docs/manifest-conventions.md` before writing manifests.** It is the source of truth for
+the workload baseline — runtime uid/gid, container hardening, resource requests, image pinning,
+and monitoring registration — and `manifest-hygiene-check.yml` enforces the checkable parts of it
+on every manifest a PR adds. Step 3.5 below is the short version; the doc has the reasoning and
+the exception cases.
+
 **Default to a HelmRelease.** Every new service should be a HelmRelease unless there is a
 strong reason not to. Services with an official/well-maintained chart use that chart;
 everything else uses the generic **bjw-s `app-template`** chart (already proven in this repo by
