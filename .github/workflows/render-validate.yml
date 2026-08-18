@@ -1,0 +1,206 @@
+name: Render & Validate
+
+# The deterministic pre-merge counterpart to deploy-canary.yml.
+#
+# Everything else in this repo checks manifests either semantically (the Claude
+# reviewers, which read intent) or after the fact (the canary, which watches real
+# traffic once main has already moved). Nothing rendered them. A patch whose target
+# does not exist, a resource missing from a kustomization.yaml, a Helm value the
+# chart silently ignores, an unresolved ${VAR} — all of that merged green and only
+# surfaced at reconcile time, which for `apps` (deliberately no `wait:`) can mean it
+# surfaces as a Gatus alert rather than a Flux error.
+#
+# This job does what kustomize-controller and helm-controller would do, offline:
+#   1. `flate test`  — reconcile every Kustomization + HelmRelease, resolving real
+#                      chart sources and applying postBuild substitution from the
+#                      in-repo cluster-vars / bws-secret-ids ConfigMaps.
+#   2. `kubeconform` — validate the rendered objects against the Kubernetes API
+#                      schemas plus the CRD catalog (IngressRoute, ExternalSecret,
+#                      PrometheusRule, Certificate, …). Catches field typos that
+#                      render fine but the API server rejects, e.g. a PVC with
+#                      `storageClass:` where the field is `storageClassName:`.
+#   3. `flate diff`  — render the PR and its base and comment the *rendered* delta,
+#                      so a chart bump shows the lines of the Deployment it actually
+#                      changes rather than a version string. Advisory, never blocks.
+#
+# No cluster access and no secrets, same as image-pin-check.yml — flate links helm,
+# kustomize and the Flux source SDKs as libraries and resolves charts from their
+# public repositories.
+#
+# Deliberately NOT filtered on `paths: kubernetes/**`. This is intended to be a
+# REQUIRED status check, and a required check that does not run leaves the PR blocked
+# forever waiting for a verdict that never arrives — the same lesson as
+# image-pin-check (#425) and ames-council-digest-tests. On a PR touching no manifests
+# flate still renders the tree from cache in a couple of seconds.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: render-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  # renovate: datasource=github-releases depName=yannh/kubeconform
+  KUBECONFORM_VERSION: "v0.8.0"
+  # flate defaults to 40 parallel reconcile bodies, which is a lot to schedule onto a
+  # 4-vCPU runner. `flate build` was observed wedging for 11+ minutes at the default
+  # immediately after `flate test` had rendered the same tree in seconds, so this is
+  # both a fit to the runner and a narrowing of the window for that stall. See the
+  # "Known flakiness" note in README.md — it is a mitigation, not a proven fix.
+  FLATE_CONCURRENCY: "8"
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    # A cold-cache render of this repo measures ~5s, so this is pure backstop, not a
+    # budget. It is here because source resolution *can* pathologically stall: a chart
+    # version matching no published tag sends flate enumerating the whole registry tag
+    # list, which was observed hanging for minutes rather than failing fast. Bounded so
+    # a bad version pin fails the check instead of occupying a runner.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # `flate diff --base` materializes the base commit's tree, so it has to
+          # exist locally.
+          fetch-depth: 0
+
+      - name: Install flate
+        uses: home-operations/flate/action@v0.5.0
+        with:
+          # MUST stay empty. The action's `base` defaults to the default branch and it
+          # exports the value as FLATE_BASE in GITHUB_ENV, which every later `flate`
+          # call picks up implicitly — putting `test` and `build` into changed-only
+          # mode. A PR touching no manifests then renders *nothing* and still exits 0:
+          # the first run of this workflow reported "0 passed · 23 skipped" and went
+          # green. Full-tree costs ~5s here, and only the diff step wants a baseline —
+          # it passes --base explicitly, which overrides this.
+          base: ""
+          # Persists resolved chart artifacts between runs. An optimization, not a
+          # requirement — a fully cold render of this repo takes ~5s and produces a
+          # ~7MB cache — but it keeps ~20 Helm repositories from being re-pulled on
+          # every PR, and the token keeps GHCR chart pulls off the anonymous rate limit.
+          cache: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install kubeconform
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -sSfL \
+            "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/bin" kubeconform
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Reconcile every Kustomization and HelmRelease
+        id: render
+        # Per-step bounds, not just the job bound: a wedged flate should fail this
+        # check in minutes with an obvious culprit, rather than quietly eating the
+        # whole job budget and reporting a generic job timeout.
+        timeout-minutes: 5
+        run: |
+          set +e
+          flate test all --path ./kubernetes --no-progress 2>&1 | tee render.txt
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      # A green check that validated nothing is worse than no check, because it is
+      # trusted. Everything above can report success while covering an empty set — an
+      # implicit FLATE_BASE, a bad --path, a future flag change — so assert that real
+      # work happened rather than inferring it from the exit code.
+      - name: Guard against a vacuous pass
+        if: steps.render.outputs.exit == '0'
+        run: |
+          # Matched without the leading ✓/✗ glyph on purpose — a multibyte character
+          # class is at the mercy of the runner's sed and locale.
+          passed=$(grep -o '[0-9][0-9]* passed' render.txt | tail -1 | cut -d' ' -f1)
+          if [ -z "$passed" ] || [ "$passed" -eq 0 ]; then
+            echo "::error::flate rendered no resources, so nothing was actually validated."
+            echo "Expected the whole tree (5 Kustomizations + every HelmRelease). Got:"
+            cat render.txt
+            exit 1
+          fi
+          echo "flate reconciled ${passed} resources."
+
+      - name: Build the rendered manifests
+        if: steps.render.outputs.exit == '0'
+        timeout-minutes: 5
+        run: flate build all --path ./kubernetes --no-progress > rendered.yaml
+
+      - name: Validate rendered objects against Kubernetes and CRD schemas
+        id: schema
+        if: steps.render.outputs.exit == '0'
+        run: |
+          set +e
+          # -ignore-missing-schemas keeps a brand-new CRD that the catalog has not
+          # published yet from hard-failing an unrelated PR on a required check. The
+          # skipped count is surfaced below so that leniency never goes unnoticed.
+          kubeconform \
+            -strict \
+            -summary \
+            -ignore-missing-schemas \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            rendered.yaml 2>&1 | tee schema.txt
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Check what schema validation actually covered
+        if: steps.render.outputs.exit == '0'
+        run: |
+          # Same vacuity guard as above: "Valid: 0, Invalid: 0" is a pass by exit code.
+          found=$(grep -o 'Summary: [0-9][0-9]*' schema.txt | tail -1 | cut -d' ' -f2)
+          if [ -z "$found" ] || [ "$found" -eq 0 ]; then
+            echo "::error::kubeconform found no resources to validate in rendered.yaml."
+            cat schema.txt
+            exit 1
+          fi
+          skipped=$(grep -o 'Skipped: [0-9][0-9]*' schema.txt | tail -1 | cut -d' ' -f2)
+          if [ -n "$skipped" ] && [ "$skipped" != "0" ]; then
+            echo "::warning::${skipped} of ${found} rendered resource(s) had no schema available and were not validated."
+          fi
+
+      # ---------------------------------------------------------------- reporting
+
+      - name: Render the diff against the base commit
+        id: diff
+        if: github.event_name == 'pull_request' && steps.render.outputs.exit == '0'
+        # Advisory output — a stall or crash here must not hold the check hostage, so
+        # it is bounded AND non-fatal. It renders two trees, so it gets a little more
+        # room than the single-tree steps.
+        timeout-minutes: 8
+        continue-on-error: true
+        run: |
+          set +e
+          flate diff all \
+            --path ./kubernetes \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --no-progress \
+            -o github > diff.txt 2>&1
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ]; then
+            echo "flate diff failed; skipping the diff comment" >&2
+            cat diff.txt >&2
+            : > diff.txt
+          fi
+          if [ -s diff.txt ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Report to the pull request
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RENDER_EXIT: ${{ steps.render.outputs.exit }}
+          SCHEMA_EXIT: ${{ steps.schema.outputs.exit }}
+          DIFF_CHANGED: ${{ steps.diff.outputs.changed }}
+        run: .github/scripts/render-validate-comment.sh
+
+      - name: Fail if rendering or schema validation failed
+        if: steps.render.outputs.exit != '0' || steps.schema.outputs.exit != '0'
+        run: exit 1
