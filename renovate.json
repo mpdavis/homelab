@@ -23,6 +23,16 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\nARG [A-Z_]+=(?<currentValue>[^\\s]+)"
       ]
+    },
+    {
+      "description": "Bump tool versions pinned as annotated env vars in GitHub workflows. The github-actions manager only sees `uses:` refs, so a binary downloaded by URL (e.g. kubeconform in render-validate.yml) would otherwise silently rot.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\n\\s+[A-Z_]+: \"(?<currentValue>[^\"]+)\""
+      ]
     }
   ],
   "packageRules": [
