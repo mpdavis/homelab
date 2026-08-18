@@ -70,6 +70,14 @@ jobs:
       - name: Install flate
         uses: home-operations/flate/action@v0.5.0
         with:
+          # MUST stay empty. The action's `base` defaults to the default branch and it
+          # exports the value as FLATE_BASE in GITHUB_ENV, which every later `flate`
+          # call picks up implicitly — putting `test` and `build` into changed-only
+          # mode. A PR touching no manifests then renders *nothing* and still exits 0:
+          # the first run of this workflow reported "0 passed · 23 skipped" and went
+          # green. Full-tree costs ~5s here, and only the diff step wants a baseline —
+          # it passes --base explicitly, which overrides this.
+          base: ""
           # Persists resolved chart artifacts between runs. An optimization, not a
           # requirement — a fully cold render of this repo takes ~5s and produces a
           # ~7MB cache — but it keeps ~20 Helm repositories from being re-pulled on
@@ -92,6 +100,24 @@ jobs:
           flate test all --path ./kubernetes --no-progress 2>&1 | tee render.txt
           echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
+      # A green check that validated nothing is worse than no check, because it is
+      # trusted. Everything above can report success while covering an empty set — an
+      # implicit FLATE_BASE, a bad --path, a future flag change — so assert that real
+      # work happened rather than inferring it from the exit code.
+      - name: Guard against a vacuous pass
+        if: steps.render.outputs.exit == '0'
+        run: |
+          # Matched without the leading ✓/✗ glyph on purpose — a multibyte character
+          # class is at the mercy of the runner's sed and locale.
+          passed=$(grep -o '[0-9][0-9]* passed' render.txt | tail -1 | cut -d' ' -f1)
+          if [ -z "$passed" ] || [ "$passed" -eq 0 ]; then
+            echo "::error::flate rendered no resources, so nothing was actually validated."
+            echo "Expected the whole tree (5 Kustomizations + every HelmRelease). Got:"
+            cat render.txt
+            exit 1
+          fi
+          echo "flate reconciled ${passed} resources."
+
       - name: Build the rendered manifests
         if: steps.render.outputs.exit == '0'
         run: flate build all --path ./kubernetes --no-progress > rendered.yaml
@@ -113,12 +139,19 @@ jobs:
             rendered.yaml 2>&1 | tee schema.txt
           echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
-      - name: Warn on resources with no available schema
+      - name: Check what schema validation actually covered
         if: steps.render.outputs.exit == '0'
         run: |
-          skipped=$(sed -n 's/.*Skipped: \([0-9]*\).*/\1/p' schema.txt)
+          # Same vacuity guard as above: "Valid: 0, Invalid: 0" is a pass by exit code.
+          found=$(grep -o 'Summary: [0-9][0-9]*' schema.txt | tail -1 | cut -d' ' -f2)
+          if [ -z "$found" ] || [ "$found" -eq 0 ]; then
+            echo "::error::kubeconform found no resources to validate in rendered.yaml."
+            cat schema.txt
+            exit 1
+          fi
+          skipped=$(grep -o 'Skipped: [0-9][0-9]*' schema.txt | tail -1 | cut -d' ' -f2)
           if [ -n "$skipped" ] && [ "$skipped" != "0" ]; then
-            echo "::warning::${skipped} rendered resource(s) had no schema available and were not validated."
+            echo "::warning::${skipped} of ${found} rendered resource(s) had no schema available and were not validated."
           fi
 
       # ---------------------------------------------------------------- reporting

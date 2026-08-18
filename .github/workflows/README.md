@@ -76,6 +76,20 @@ flate build all --path ./kubernetes | kubeconform -strict -summary \
 > real `.git`), but `/new-task`-style worktrees need `flate test` / `flate build`
 > without `--base`, or a plain clone for the diff.
 
+**The `base: ""` on the install step is load-bearing.** The flate action's `base` input
+defaults to the repository's default branch and exports it as `FLATE_BASE` in
+`GITHUB_ENV`, which every later `flate` invocation picks up *implicitly* — putting
+`test` and `build` into changed-only mode. A PR touching no manifests then renders
+nothing and still exits 0. The first run of this workflow did exactly that: it reported
+`✓ 0 passed · 23 skipped` and went green. Only the diff step wants a baseline, and it
+passes `--base` explicitly.
+
+**Vacuity guards.** Because of the above, neither tool's exit code is trusted on its
+own: the job asserts that flate reconciled a non-zero number of resources and that
+kubeconform found a non-zero number to validate, and fails if either covered an empty
+set. A green check that validated nothing is worse than no check, because it gets
+trusted.
+
 **Speed.** A fully cold render of this repo — all 5 Kustomizations, 29 HelmReleases,
 18 HelmRepositories, 536 rendered objects — measures **~5 seconds** and produces a
 ~7 MB cache, so the job is dominated by runner startup rather than by rendering.
