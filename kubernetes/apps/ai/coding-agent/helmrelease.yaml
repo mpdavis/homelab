@@ -85,7 +85,7 @@ spec:
           meridian:
             image:
               repository: ghcr.io/rynfar/meridian
-              tag: 1.61.0
+              tag: 1.62.5
             env:
               TZ: ${TZ}
               # The proxy is unauthenticated and spends the Claude
