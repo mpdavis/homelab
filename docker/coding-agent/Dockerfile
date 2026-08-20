@@ -11,7 +11,7 @@ ARG CLAUDE_CODE_VERSION=2.1.237
 # renovate: datasource=npm depName=opencode-ai
 ARG OPENCODE_VERSION=1.18.19
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
-ARG KUBECTL_VERSION=v1.36.3
+ARG KUBECTL_VERSION=v1.36.4
 # renovate: datasource=github-releases depName=fluxcd/flux2
 ARG FLUX_VERSION=v2.9.4
 # renovate: datasource=github-releases depName=cli/cli
