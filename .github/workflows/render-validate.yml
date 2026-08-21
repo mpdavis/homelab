@@ -74,7 +74,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install flate
-        uses: home-operations/flate/action@v0.5.0
+        uses: home-operations/flate/action@v0.5.1
         with:
           # MUST stay empty. The action's `base` defaults to the default branch and it
           # exports the value as FLATE_BASE in GITHUB_ENV, which every later `flate`
