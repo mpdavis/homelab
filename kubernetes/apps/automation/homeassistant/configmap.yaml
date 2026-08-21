@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homeassistant-config
+data:
+  configuration.yaml: |
+    # Loads default set of integrations. Do not remove.
+    default_config:
+
+    # Trust the in-cluster reverse proxy (Traefik). Without this Home Assistant
+    # rejects proxied requests with 400 (invalid X-Forwarded-For).
+    #
+    # NOTE: as of Home Assistant 2026.8 the `http:` YAML block is deprecated and
+    # auto-imported into Settings > System > Network on first boot (a repair
+    # issue is raised). The values below still take effect; once HA has imported
+    # them you can delete this block.
+    http:
+      use_x_forwarded_for: true
+      trusted_proxies:
+        - 10.42.0.0/16
+        - 10.0.1.200
+        - 127.0.0.1

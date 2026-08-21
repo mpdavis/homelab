@@ -26,6 +26,18 @@ spec:
         # local-path RWO PVC — Recreate so rolling updates don't hang trying to
         # mount the volume still attached to the old pod.
         strategy: Recreate
+        initContainers:
+          seed-config:
+            image:
+              repository: ghcr.io/home-assistant/home-assistant
+              tag: "2026.8.2"
+            command:
+              - /bin/sh
+              - -c
+              - |
+                if [ ! -f /config/configuration.yaml ]; then
+                  cp /config-init/configuration.yaml /config/configuration.yaml
+                fi
         containers:
           main:
             image:
@@ -57,3 +69,11 @@ spec:
         existingClaim: homeassistant
         globalMounts:
           - path: /config
+      config-seed:
+        type: configMap
+        name: homeassistant-config
+        advancedMounts:
+          main:
+            seed-config:
+              - path: /config-init
+                readOnly: true
