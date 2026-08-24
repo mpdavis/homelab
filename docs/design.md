@@ -329,6 +329,7 @@ homelab/
 │   │   ├── ai/                # ollama, open-webui, coding-agent
 │   │   ├── automation/        # home-assistant (home automation)
 │   │   ├── docs/              # paperless-ngx (document management)
+│   │   ├── gaming/            # minecraft (game server)
 │   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
 │   │   ├── ntfy/              # ntfy (push notifications / Alertmanager sink)
 │   │   ├── travel/            # trek (travel planning)
