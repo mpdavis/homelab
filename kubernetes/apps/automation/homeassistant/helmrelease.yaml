@@ -37,6 +37,9 @@ spec:
               - |
                 if [ ! -f /config/configuration.yaml ]; then
                   cp /config-init/configuration.yaml /config/configuration.yaml
+                elif ! grep -q '^http:' /config/configuration.yaml; then
+                  printf '\n' >> /config/configuration.yaml
+                  cat /config-init/http-block.yaml >> /config/configuration.yaml
                 fi
         containers:
           main:
