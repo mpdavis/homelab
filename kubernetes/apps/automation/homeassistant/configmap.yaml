@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata:
   name: homeassistant-config
 data:
+  # Full file, used only to seed a brand-new /config volume that has no
+  # configuration.yaml yet.
   configuration.yaml: |
     # Loads default set of integrations. Do not remove.
     default_config:
@@ -14,6 +16,17 @@ data:
     # auto-imported into Settings > System > Network on first boot (a repair
     # issue is raised). The values below still take effect; once HA has imported
     # them you can delete this block.
+    http:
+      use_x_forwarded_for: true
+      trusted_proxies:
+        - 10.42.0.0/16
+        - 10.0.1.200
+        - 127.0.0.1
+  # Standalone fragment, appended by the seed-config initContainer to an
+  # existing configuration.yaml that predates this block and is missing it.
+  http-block.yaml: |
+    # Trust the in-cluster reverse proxy (Traefik). Without this Home Assistant
+    # rejects proxied requests with 400 (invalid X-Forwarded-For).
     http:
       use_x_forwarded_for: true
       trusted_proxies:
