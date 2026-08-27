@@ -1,0 +1,70 @@
+---
+- name: Wait for cloud-init to finish
+  ansible.builtin.command: cloud-init status --wait
+  changed_when: false
+  failed_when: cloud_init_result.rc not in [0, 2]
+  register: cloud_init_result
+
+- name: Add Tailscale package signing key
+  ansible.builtin.get_url:
+    url: "{{ tailscale_apt_keyring_url }}"
+    dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
+    mode: "0644"
+
+- name: Add Tailscale apt repository
+  ansible.builtin.get_url:
+    url: "{{ tailscale_apt_list_url }}"
+    dest: /etc/apt/sources.list.d/tailscale.list
+    mode: "0644"
+  register: tailscale_repo
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+  when: tailscale_repo.changed
+
+- name: Install tailscale
+  ansible.builtin.apt:
+    name: tailscale
+    state: present
+
+- name: Enable IPv4 forwarding
+  ansible.builtin.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_file: /etc/sysctl.d/99-tailscale.conf
+    reload: true
+
+- name: Enable IPv6 forwarding
+  ansible.builtin.sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: "1"
+    sysctl_file: /etc/sysctl.d/99-tailscale.conf
+    reload: true
+
+- name: Enable and start tailscaled
+  ansible.builtin.systemd:
+    name: tailscaled
+    enabled: true
+    state: started
+
+- name: Check current tailscale backend state
+  ansible.builtin.command: tailscale status --json
+  changed_when: false
+  failed_when: false
+  register: tailscale_status_raw
+
+# tailscale up is not safely re-runnable once authenticated (re-supplying
+# --auth-key on an already-running backend errors out), so this only fires on
+# first bring-up. Route/hostname changes after that are applied manually with
+# `tailscale set`.
+- name: Bring up tailscale and advertise the LAN route
+  ansible.builtin.command: >
+    tailscale up
+    --auth-key={{ tailscale_auth_key }}
+    --advertise-routes={{ tailscale_advertise_routes }}
+    --accept-dns=false
+    --hostname={{ tailscale_hostname }}
+  when: "'\"BackendState\":\"Running\"' not in tailscale_status_raw.stdout"
+  changed_when: true
+  no_log: true

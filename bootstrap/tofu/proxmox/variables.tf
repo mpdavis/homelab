@@ -92,6 +92,25 @@ variable "containers" {
       start_order = 2
       tags       = ["k3s", "agent"]
     }
+    tailscale-router = {
+      vmid       = 203
+      node       = "pve1"
+      cores      = 1
+      memory     = 512
+      disk_size  = 8
+      ip         = "10.0.1.53"
+      # Privileged: the bpg/proxmox provider has no way to grant TUN device
+      # passthrough (needed for tailscaled) via Terraform — CustomLXCConfig.Raw
+      # is read-only from the API, and the `features` block only exposes
+      # nesting/fuse/keyctl/mount/mknod, none of which cover this. The actual
+      # /dev/net/tun passthrough is applied out-of-band by the tailscale-router
+      # Ansible playbook, which edits /etc/pve/lxc/203.conf directly on pve1.
+      privileged = true
+      nesting    = false
+      keyctl     = false
+      start_order = 3
+      tags       = ["tailscale", "subnet-router"]
+    }
 
   }
 }
