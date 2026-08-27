@@ -3,8 +3,9 @@ kind: ConfigMap
 metadata:
   name: homeassistant-config
 data:
-  # Full file, used only to seed a brand-new /config volume that has no
-  # configuration.yaml yet.
+  # Seeds a brand-new /config volume that has no configuration.yaml yet, so a
+  # fresh instance's one-time boot picks up the http: block below before
+  # onboarding even runs.
   configuration.yaml: |
     # Loads default set of integrations. Do not remove.
     default_config:
@@ -12,21 +13,13 @@ data:
     # Trust the in-cluster reverse proxy (Traefik). Without this Home Assistant
     # rejects proxied requests with 400 (invalid X-Forwarded-For).
     #
-    # NOTE: as of Home Assistant 2026.8 the `http:` YAML block is deprecated and
-    # auto-imported into Settings > System > Network on first boot (a repair
-    # issue is raised). The values below still take effect; once HA has imported
-    # them you can delete this block.
-    http:
-      use_x_forwarded_for: true
-      trusted_proxies:
-        - 10.42.0.0/16
-        - 10.0.1.200
-        - 127.0.0.1
-  # Standalone fragment, appended by the seed-config initContainer to an
-  # existing configuration.yaml that predates this block and is missing it.
-  http-block.yaml: |
-    # Trust the in-cluster reverse proxy (Traefik). Without this Home Assistant
-    # rejects proxied requests with 400 (invalid X-Forwarded-For).
+    # NOTE: as of Home Assistant 2026.8 the `http:` YAML block is imported into
+    # internal storage ONLY on an instance's very first boot (before onboarding
+    # completes) — every boot after that permanently ignores it (yaml_migration
+    # _done flag) and just raises a cosmetic repair issue if it's still present.
+    # So this block is only useful for genuinely new installs; it does nothing
+    # for an already-onboarded instance. Once HA has imported it, delete this
+    # block to silence the repair issue.
     http:
       use_x_forwarded_for: true
       trusted_proxies:
