@@ -28,6 +28,18 @@ spec:
             capabilities:
               add:
                 - NET_ADMIN
+          # Kubernetes shares IP rules across the whole pod's network namespace,
+          # which outlives a single container restart. If gluetun exits abruptly
+          # (OOM, node event, hung shutdown) it can leave its WireGuard policy
+          # routing rule behind, and the next start then fails permanently with
+          # "adding ip rule 101: ... file exists" — a crash loop that never
+          # self-heals without a pod recreate. Clear any leftover rule on every
+          # start; harmless (exits 0 via `|| true`) when there's nothing to
+          # remove. See https://github.com/qdm12/gluetun-wiki/blob/main/setup/advanced/kubernetes.md#adding-ipv6-rule--file-exists
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/sh", "-c", "(ip rule del table 51820; ip -6 rule del table 51820) || true"]
           ports:
             - containerPort: 8080
               name: http
