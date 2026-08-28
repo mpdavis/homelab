@@ -9,7 +9,7 @@ ARG CLOUDCLI_VERSION=1.37.2
 # renovate: datasource=npm depName=@anthropic-ai/claude-code
 ARG CLAUDE_CODE_VERSION=2.1.250
 # renovate: datasource=npm depName=opencode-ai
-ARG OPENCODE_VERSION=1.18.24
+ARG OPENCODE_VERSION=1.18.25
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
 ARG KUBECTL_VERSION=v1.36.4
 # renovate: datasource=github-releases depName=fluxcd/flux2
