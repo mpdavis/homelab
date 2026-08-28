@@ -7,7 +7,7 @@ FROM node:24-bookworm-slim
 # renovate: datasource=npm depName=@cloudcli-ai/cloudcli
 ARG CLOUDCLI_VERSION=1.37.2
 # renovate: datasource=npm depName=@anthropic-ai/claude-code
-ARG CLAUDE_CODE_VERSION=2.1.248
+ARG CLAUDE_CODE_VERSION=2.1.250
 # renovate: datasource=npm depName=opencode-ai
 ARG OPENCODE_VERSION=1.18.23
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
