@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: ecm
-          image: ghcr.io/motwakorb/enhancedchannelmanager:latest@sha256:c6914d58b8971335f847dfe874f7731595c3d0e278e0a1923e6e943ce744593a
+          image: ghcr.io/motwakorb/enhancedchannelmanager:latest@sha256:2ef4645a618283264f2966b1db2ae387c9629ed254831fea4365bfec604fa0fb
           ports:
             - containerPort: 6100
               name: http
