@@ -37,7 +37,7 @@ spec:
             - name: config
               mountPath: /config
         - name: ecm-mcp
-          image: ghcr.io/motwakorb/enhancedchannelmanager-mcp:latest@sha256:fb1349c9678c89cd15a80d7361aadf1c24f3f4b94e08e215479bd24186c761d9
+          image: ghcr.io/motwakorb/enhancedchannelmanager-mcp:latest@sha256:4312802781d7e82b6d860520d16f2af99a2bd6b78a07880bcc26cb4569ab7b07
           ports:
             - containerPort: 6101
               name: mcp
