@@ -1,6 +1,9 @@
 # Public, read-only status page — deliberately NOT behind Authentik: the
 # deploy-canary GitHub workflow polls /api/v1/endpoints/statuses from the
 # internet after each merge to verify the deploy actually serves traffic.
+#
+# hygiene-exempt: gatus-endpoint Gatus can't probe its own status page
+# hygiene-exempt: gatus-hostalias Gatus can't probe its own status page
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
