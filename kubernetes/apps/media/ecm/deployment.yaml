@@ -14,6 +14,11 @@ spec:
       labels:
         app: ecm
     spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: ecm
           image: ghcr.io/motwakorb/enhancedchannelmanager:latest@sha256:2ef4645a618283264f2966b1db2ae387c9629ed254831fea4365bfec604fa0fb
@@ -21,10 +26,6 @@ spec:
             - containerPort: 6100
               name: http
           env:
-            - name: PUID
-              value: "1000"
-            - name: PGID
-              value: "1000"
             - name: CONFIG_DIR
               value: /config
             - name: ECM_PORT
