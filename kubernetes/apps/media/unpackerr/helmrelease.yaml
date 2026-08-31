@@ -35,7 +35,7 @@ spec:
           main:
             image:
               repository: ghcr.io/unpackerr/unpackerr
-              tag: 0.15.2
+              tag: v0.16.1
             # Container-level hardening; the pod-level securityContext above
             # pins uid/gid. readOnlyRootFilesystem needs the tmp emptyDir below.
             securityContext:
