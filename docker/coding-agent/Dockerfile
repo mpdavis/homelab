@@ -13,7 +13,7 @@ ARG OPENCODE_VERSION=1.18.25
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
 ARG KUBECTL_VERSION=v1.36.4
 # renovate: datasource=github-releases depName=fluxcd/flux2
-ARG FLUX_VERSION=v2.9.4
+ARG FLUX_VERSION=v2.9.5
 # renovate: datasource=github-releases depName=cli/cli
 ARG GH_VERSION=v2.98.0
 
