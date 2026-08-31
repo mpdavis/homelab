@@ -37,6 +37,7 @@
         timeout: 120
       when: tun_cgroup.changed or tun_mount.changed
       delegate_to: localhost
+      become: false
 
 - name: Configure Tailscale subnet router
   hosts: tailscale_router
