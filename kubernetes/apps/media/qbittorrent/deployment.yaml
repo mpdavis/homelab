@@ -25,7 +25,9 @@ spec:
         - name: gluetun
           image: qmcgaw/gluetun:v3.41.3
           securityContext:
+            allowPrivilegeEscalation: false
             capabilities:
+              drop: ["ALL"]
               add:
                 - NET_ADMIN
           # Kubernetes shares IP rules across the whole pod's network namespace,
@@ -98,6 +100,10 @@ spec:
               mountPath: /dev/net/tun
         - name: qbittorrent
           image: linuxserver/qbittorrent:5.2.1_v2.0.13-ls460
+          # LinuxServer/s6-overlay must start as root; only allowPrivilegeEscalation
+          # is safe here -- capabilities.drop: [ALL] breaks s6 init.
+          securityContext:
+            allowPrivilegeEscalation: false
           env:
             - name: PUID
               value: "1000"
@@ -116,6 +122,10 @@ spec:
         # ProtonVPN exit IP — the same IP the tracker sees from torrent traffic.
         - name: mousehole
           image: tmmrtn/mousehole:0.5.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 5010
               name: mousehole

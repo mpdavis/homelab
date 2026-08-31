@@ -17,6 +17,10 @@ spec:
       containers:
         - name: open-webui
           image: ghcr.io/open-webui/open-webui:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 8080
               name: http

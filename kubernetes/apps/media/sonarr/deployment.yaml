@@ -17,6 +17,10 @@ spec:
       containers:
         - name: sonarr
           image: linuxserver/sonarr:4.0.17.2952-ls313
+          # LinuxServer/s6-overlay must start as root; only allowPrivilegeEscalation
+          # is safe here -- capabilities.drop: [ALL] breaks s6 init.
+          securityContext:
+            allowPrivilegeEscalation: false
           ports:
             - containerPort: 8989
               name: http

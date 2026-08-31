@@ -17,6 +17,10 @@ spec:
       containers:
         - name: prowlarr
           image: linuxserver/prowlarr:2.4.0.5397-ls149
+          # LinuxServer/s6-overlay must start as root; only allowPrivilegeEscalation
+          # is safe here -- capabilities.drop: [ALL] breaks s6 init.
+          securityContext:
+            allowPrivilegeEscalation: false
           ports:
             - containerPort: 9696
               name: http

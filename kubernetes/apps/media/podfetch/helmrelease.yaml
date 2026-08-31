@@ -33,6 +33,10 @@ spec:
               POLLING_INTERVAL: "60"
               # SQLite DB lives on the local-path config PVC mounted at /app/db
               DATABASE_URL: sqlite:///app/db/podcast.db
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop: ["ALL"]
     service:
       main:
         controller: main

@@ -18,6 +18,10 @@ spec:
       containers:
         - name: dispatcharr
           image: ghcr.io/dispatcharr/dispatcharr:latest@sha256:e764cd3fb3a4b14e0c96eeb830cce645b44ef0a2494838e21462c71dde5abeb4
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 9191
               name: http

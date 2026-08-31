@@ -36,6 +36,10 @@ spec:
                 secretKeyRef:
                   name: trek-secrets
                   key: encryption-key
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop: ["ALL"]
     service:
       main:
         controller: main

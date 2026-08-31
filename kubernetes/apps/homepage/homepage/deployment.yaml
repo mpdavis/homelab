@@ -20,6 +20,10 @@ spec:
       containers:
         - name: homepage
           image: ghcr.io/gethomepage/homepage:v1.13.2
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 3000
               name: http

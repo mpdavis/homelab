@@ -47,6 +47,10 @@ spec:
                 secretKeyRef:
                   name: recyclarr-secrets
                   key: radarr-api-key
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop: ["ALL"]
     persistence:
       config:
         existingClaim: recyclarr

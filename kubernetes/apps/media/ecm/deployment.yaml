@@ -17,6 +17,10 @@ spec:
       containers:
         - name: ecm
           image: ghcr.io/motwakorb/enhancedchannelmanager:latest@sha256:2ef4645a618283264f2966b1db2ae387c9629ed254831fea4365bfec604fa0fb
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 6100
               name: http
@@ -38,6 +42,10 @@ spec:
               mountPath: /config
         - name: ecm-mcp
           image: ghcr.io/motwakorb/enhancedchannelmanager-mcp:latest@sha256:4312802781d7e82b6d860520d16f2af99a2bd6b78a07880bcc26cb4569ab7b07
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 6101
               name: mcp

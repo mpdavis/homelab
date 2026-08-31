@@ -31,6 +31,10 @@ spec:
               pullPolicy: Always
             env:
               TZ: ${TZ}
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop: ["ALL"]
     service:
       main:
         controller: main

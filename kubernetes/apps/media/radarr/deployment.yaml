@@ -17,6 +17,10 @@ spec:
       containers:
         - name: radarr
           image: linuxserver/radarr:6.2.1.10461-ls305
+          # LinuxServer/s6-overlay must start as root; only allowPrivilegeEscalation
+          # is safe here -- capabilities.drop: [ALL] breaks s6 init.
+          securityContext:
+            allowPrivilegeEscalation: false
           ports:
             - containerPort: 7878
               name: http
