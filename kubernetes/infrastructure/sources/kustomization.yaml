@@ -19,3 +19,4 @@ resources:
   - ollama.yaml
   - authentik.yaml
   - twin.yaml
+  - tailscale.yaml

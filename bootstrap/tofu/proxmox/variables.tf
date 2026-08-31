@@ -92,6 +92,32 @@ variable "containers" {
       start_order = 2
       tags       = ["k3s", "agent"]
     }
+    tailscale-router = {
+      vmid       = 203
+      node       = "pve1"
+      cores      = 1
+      memory     = 512
+      disk_size  = 8
+      ip         = "10.0.1.53"
+      # Privileged: the bpg/proxmox provider has no way to grant TUN device
+      # passthrough (needed for tailscaled) via Terraform — CustomLXCConfig.Raw
+      # is read-only from the API, and the `features` block only exposes
+      # nesting/fuse/keyctl/mount/mknod, none of which cover this. The actual
+      # /dev/net/tun passthrough is applied out-of-band by the tailscale-router
+      # Ansible playbook, which edits /etc/pve/lxc/203.conf directly on pve1.
+      #
+      # Nesting: required even though nothing here runs nested containers.
+      # This template's systemd (255) fails most units — including
+      # systemd-networkd — with "Failed to set up mount namespacing:
+      # Permission denied" (exit 226/NAMESPACE) without it. Confirmed by
+      # direct testing: the container came up with no network at all until
+      # this was flipped to true. Proxmox warns about this at apply time.
+      privileged = true
+      nesting    = true
+      keyctl     = false
+      start_order = 3
+      tags       = ["tailscale", "subnet-router"]
+    }
 
   }
 }

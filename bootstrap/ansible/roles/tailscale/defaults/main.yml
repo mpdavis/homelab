@@ -1,0 +1,5 @@
+---
+tailscale_hostname: tailscale-router
+tailscale_advertise_routes: 10.0.1.0/24
+tailscale_apt_keyring_url: https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg
+tailscale_apt_list_url: https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list
