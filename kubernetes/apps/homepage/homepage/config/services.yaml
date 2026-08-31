@@ -85,6 +85,11 @@
         icon: home-assistant.png
         href: https://homeassistant.${DOMAIN}
         description: Home automation platform
+- Wildlife:
+    - BirdNET:
+        icon: birdnet.png
+        href: https://birdnet.${DOMAIN}
+        description: Backyard bird sound identification
 - Infrastructure:
     - Authentik:
         icon: authentik.png
@@ -94,6 +99,10 @@
         icon: grafana.png
         href: https://grafana.${DOMAIN}
         description: Monitoring & dashboards
+    - Gatus:
+        icon: gatus.png
+        href: https://status.${DOMAIN}
+        description: Synthetic monitoring & status page
     - ntfy:
         icon: mdi-bell-ring
         href: https://ntfy.${DOMAIN}
@@ -106,3 +115,7 @@
         icon: traefik.png
         href: https://traefik.${DOMAIN}
         description: Ingress controller
+    - Proxmox:
+        icon: proxmox.png
+        href: https://proxmox.${DOMAIN}
+        description: Hypervisor management

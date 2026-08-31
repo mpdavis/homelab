@@ -1,3 +1,4 @@
+# hygiene-exempt: homepage-tile the dashboard doesn't need a tile linking to itself
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:

@@ -1,3 +1,4 @@
+# hygiene-exempt: homepage-tile demo/test service, not something to browse to regularly
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:

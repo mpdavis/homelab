@@ -9,6 +9,7 @@ spec:
     # No forward-auth: thumbnail URLs are embedded in EPG/playlist output and
     # fetched by media clients that have no Authentik session. The service is
     # read-only image generation.
+    # hygiene-exempt: homepage-tile machine-facing -- image URLs consumed by media clients, not browsed to
     - match: Host(`thumbs.${DOMAIN}`)
       kind: Rule
       services:
