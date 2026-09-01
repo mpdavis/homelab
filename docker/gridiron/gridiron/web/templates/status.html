@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Status</h1>
+<p class="lede">
+  What is loaded, and when the background refresh last managed to run. Ingest runs
+  inside this process — DuckDB takes one writer — so this page is the only place a
+  wedged refresh becomes visible.
+</p>
+
+<div class="panel">
+  <dl class="kv">
+    <div><dt>Version</dt><dd>{{ version }}</dd></div>
+    <div><dt>CFBD key</dt><dd class="{{ 'good' if cfbd else 'bad' }}">{{ 'set' if cfbd else 'missing' }}</dd></div>
+    <div><dt>Odds API key</dt><dd class="{{ 'good' if odds_api else 'bad' }}">{{ 'set' if odds_api else 'missing' }}</dd></div>
+    <div><dt>Books</dt><dd style="font-size:14px">{{ books|join(', ') }}</dd></div>
+  </dl>
+  <p class="muted" style="margin-top:14px;font-size:13.5px">Database: <code>{{ db_path }}</code></p>
+</div>
+
+<h2>Background refresh</h2>
+<div class="panel">
+  <dl class="kv">
+    <div><dt>Last odds poll</dt><dd style="font-size:14px">{{ refresh.last_odds_at or 'never' }}</dd></div>
+    <div><dt>Rows</dt><dd>{{ refresh.last_odds_rows }}</dd></div>
+    <div><dt>Last ingest</dt><dd style="font-size:14px">{{ refresh.last_ingest_at or 'never' }}</dd></div>
+    <div><dt>Running</dt><dd>{{ 'yes' if refresh.running else 'no' }}</dd></div>
+  </dl>
+  {% if refresh.last_ingest_summary %}
+    <p class="muted" style="margin-top:12px;font-size:13.5px">{{ refresh.last_ingest_summary }}</p>
+  {% endif %}
+  {% if refresh.last_error %}
+    <p class="bad" style="margin-top:8px;font-size:13.5px">{{ refresh.last_error }}</p>
+  {% endif %}
+</div>
+
+<h2>Coverage by season</h2>
+<div class="panel scroll">
+  {% if coverage %}
+  <table>
+    <thead><tr><th>Season</th><th class="num">Games</th><th class="num">Completed</th><th class="num">Drives</th><th class="num">Plays</th></tr></thead>
+    <tbody>
+      {% for row in coverage %}
+      <tr>
+        <td>{{ row.season }}</td>
+        <td class="num">{{ '{:,}'.format(row.games) }}</td>
+        <td class="num">{{ '{:,}'.format(row.completed) }}</td>
+        <td class="num">{{ '{:,}'.format(row.drives) }}</td>
+        <td class="num {{ 'bad' if row.plays == 0 }}">{{ '{:,}'.format(row.plays) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="note">
+    A season with games but no plays has not had its play-by-play pulled, so every
+    hidden-yardage feature is null for it and it silently contributes nothing to a
+    backtest. Fix with <code>gridiron ingest --seasons YYYY</code>.
+  </div>
+  {% else %}
+  <p class="empty">Nothing ingested yet. Start with <code>gridiron ingest</code>.</p>
+  {% endif %}
+</div>
+
+<h2>Tables</h2>
+<div class="panel scroll">
+  <table>
+    <thead><tr><th>Table</th><th class="num">Rows</th></tr></thead>
+    <tbody>
+      {% for table, count in counts.items() %}
+      <tr><td>{{ table }}</td><td class="num">{{ '{:,}'.format(count) }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

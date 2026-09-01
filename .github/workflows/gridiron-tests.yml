@@ -1,0 +1,53 @@
+name: Gridiron Tests
+
+# The unit suite for docker/gridiron, run as its own workflow so it can be a
+# required check on main.
+#
+# NO `paths` FILTER, DELIBERATELY. A required check has to report on every pull
+# request: one that is skipped never reports at all, and GitHub waits for it
+# forever rather than treating it as passed. That is the same lesson as
+# image-pin-check (#425) — a required check and a paths filter cannot coexist.
+#
+# It lives here rather than in build-gridiron.yml because that workflow keeps
+# its paths filter for a good reason: it publishes an image tag on every main
+# push that matches, and running it unfiltered would push a new tag for merges
+# whose image contents are identical to the last one.
+#
+# What this suite is actually protecting: the leakage guarantee. A backtest
+# that can see the future reports a strategy that makes money and does not
+# exist, which is the one bug in this package that costs real money rather than
+# a red build. tests/test_ratings.py and tests/test_backtest.py assert it by
+# rewriting future results and requiring earlier predictions not to move.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gridiron-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          # The version the image ships, so the suite runs on what actually
+          # runs. See the Dockerfile for why it is 3.13 and not 3.14.
+          python-version: '3.13'
+
+      - name: Install the package and its test dependencies
+        working-directory: docker/gridiron
+        run: pip install -e ".[dev]"
+
+      - name: Run unit tests
+        working-directory: docker/gridiron
+        run: pytest -q
