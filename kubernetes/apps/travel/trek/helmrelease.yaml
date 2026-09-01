@@ -24,6 +24,8 @@ spec:
     controllers:
       main:
         containers:
+          # hygiene-exempt: runtime-identity likely a Laravel app (php-fpm/www-data
+          # conventions); uid/entrypoint behavior not verified
           main:
             image:
               repository: mauriceboe/trek

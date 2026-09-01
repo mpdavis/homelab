@@ -17,6 +17,10 @@ spec:
     spec:
       serviceAccountName: homepage
       automountServiceAccountToken: true
+      # hygiene-exempt: runtime-identity homepage's own entrypoint uses a PUID/PGID +
+      # su-exec privilege-drop pattern (like LinuxServer) with a non-root fallback, but
+      # /app/.next build artifacts may be root-owned in the image; forcing pod-level
+      # runAsUser risks silent permission failures, not verified
       containers:
         - name: homepage
           image: ghcr.io/gethomepage/homepage:v2.1.2

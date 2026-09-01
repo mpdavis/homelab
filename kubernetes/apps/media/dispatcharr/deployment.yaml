@@ -15,6 +15,9 @@ spec:
         app: dispatcharr
     spec:
       runtimeClassName: nvidia
+      # hygiene-exempt: runtime-identity GPU device access (runtimeClassName: nvidia)
+      # currently relies on running as root; forcing non-root needs the correct
+      # video/render group membership, not verified
       containers:
         - name: dispatcharr
           image: ghcr.io/dispatcharr/dispatcharr:latest@sha256:e764cd3fb3a4b14e0c96eeb830cce645b44ef0a2494838e21462c71dde5abeb4

@@ -21,6 +21,14 @@ spec:
       strategy: rollback
     crds: CreateReplace
   values:
+    defaultPodOptions:
+      # The recyclarr image already runs as uid 1000 by default; pin it explicitly.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
     controllers:
       main:
         type: cronjob
