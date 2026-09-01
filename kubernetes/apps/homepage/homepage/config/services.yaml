@@ -82,6 +82,10 @@
         icon: mdi-airplane
         href: https://trek.${DOMAIN}
         description: Travel planning
+    - Gridiron:
+        icon: mdi-football
+        href: https://gridiron.${DOMAIN}
+        description: College football model vs. betting lines
 - Infrastructure:
     - Authentik:
         icon: authentik.png

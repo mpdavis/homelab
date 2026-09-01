@@ -6,6 +6,7 @@ resources:
   - civic
   - docs
   - external
+  - gridiron
   - media
   - ntfy
   - travel
