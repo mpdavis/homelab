@@ -64,6 +64,7 @@ spec:
                       - birdnet.mpdavis.com
                       - proxmox.mpdavis.com
                       - council.mpdavis.com
+                      - gridiron.mpdavis.com
                       - homeassistant.mpdavis.com
   values:
     resources:
@@ -251,6 +252,12 @@ spec:
         - name: council-digest
           group: external-auth
           url: https://council.mpdavis.com/
+          client: *auth-client
+          headers: *auth-headers
+          conditions: *auth-conditions
+        - name: gridiron
+          group: external-auth
+          url: https://gridiron.mpdavis.com/
           client: *auth-client
           headers: *auth-headers
           conditions: *auth-conditions

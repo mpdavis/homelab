@@ -1,0 +1,145 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: gridiron
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: "~5.0"
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    crds: CreateReplace
+  values:
+    defaultPodOptions:
+      # Kubernetes injects GRIDIRON_SERVICE_HOST, GRIDIRON_PORT and friends for
+      # every service in the namespace, and this app reads GRIDIRON_PORT as its
+      # own configuration. Left on, the injected value silently overrides the
+      # one set below.
+      enableServiceLinks: false
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    controllers:
+      main:
+        # Recreate, not RollingUpdate, and this is load-bearing rather than
+        # tidy: DuckDB takes a single writer, so a rolling update would start a
+        # second pod that either fails to open the database or corrupts it.
+        strategy: Recreate
+        containers:
+          main:
+            image:
+              repository: ghcr.io/mpdavis/gridiron
+              # build-gridiron.yml publishes only from main, so every tag in the
+              # registry is merged code and Renovate's bump can be taken as read.
+              #
+              # FIRST DEPLOY: this tag is 1.0.<run_number> of that workflow, and
+              # the run number is not knowable before the merge — the pull
+              # request's own build consumes run 1 without publishing. Check
+              # what the main build actually pushed and correct this if it
+              # differs, or wait for Renovate to open the bump. Until the tag
+              # exists the pod sits in ImagePullBackOff, which is visible and
+              # harmless rather than silently wrong.
+              tag: 1.0.2
+            env:
+              TZ: ${TZ}
+              GRIDIRON_DATA_DIR: /data
+              GRIDIRON_PORT: "8080"
+              # 2015 is a deliberate floor: CFBD's drive start position — the
+              # input to every field-position feature — is patchy before it.
+              GRIDIRON_FIRST_SEASON: "2015"
+              GRIDIRON_CFBD_API_KEY:
+                secretKeyRef:
+                  name: gridiron-secrets
+                  key: cfbd-api-key
+              GRIDIRON_ODDS_API_KEY:
+                secretKeyRef:
+                  name: gridiron-secrets
+                  key: odds-api-key
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /healthz
+                    port: 8080
+                  # Opening a multi-gigabyte DuckDB file and running the schema
+                  # migration takes a moment on a cold start.
+                  initialDelaySeconds: 30
+                  periodSeconds: 30
+                  timeoutSeconds: 10
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /healthz
+                    port: 8080
+                  initialDelaySeconds: 10
+                  periodSeconds: 15
+                  timeoutSeconds: 10
+                  failureThreshold: 5
+              # No startup probe: /healthz answers as soon as the app is up,
+              # and ingest runs on a background thread rather than blocking it.
+            securityContext:
+              allowPrivilegeEscalation: false
+              # The image already runs as uid 1000 (`USER 1000` in the
+              # Dockerfile); stating it here means a future image with a
+              # different default cannot silently start running as root.
+              runAsNonRoot: true
+              runAsUser: 1000
+              runAsGroup: 1000
+              # Everything the process writes goes to the /data PVC or the
+              # /tmp emptyDir below — nothing is written beside the code.
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop: [ALL]
+            resources:
+              requests:
+                cpu: 100m
+                # The scheduler places the pod on the request, not the limit,
+                # so too small a request lets a node accept this alongside
+                # other memory-hungry pods and then OOM when a sweep runs.
+                # 1Gi is roughly what an open database plus the server holds
+                # at rest, which is the honest number to reserve.
+                memory: 1Gi
+              limits:
+                # A backtest sweep is a dozen full walk-forward runs over a
+                # decade of games. DuckDB will use every core it is given and
+                # holds intermediates in memory; 6Gi is comfortable for a
+                # ten-season sweep and the limit is what stops one from
+                # disturbing the rest of the node.
+                cpu: "3"
+                memory: 6Gi
+    service:
+      main:
+        controller: main
+        ports:
+          http:
+            port: 8080
+    persistence:
+      data:
+        existingClaim: gridiron-data
+        globalMounts:
+          - path: /data
+      # DuckDB spills to disk when a query's intermediates outgrow memory, and
+      # a sweep over a decade of plays is exactly that query. It spills beside
+      # the database file, which is on the PVC — but the root filesystem is
+      # read-only, so anything that reaches for /tmp regardless needs somewhere
+      # to land rather than an EROFS in the middle of a backtest.
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp

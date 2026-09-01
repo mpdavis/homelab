@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Edges</h1>
+<p class="lede">
+  Where the <code>{{ model }}</code> model disagrees with a book by more than the
+  threshold. One row per game, at the book offering the best number for that side.
+  Stakes are quarter-Kelly.
+</p>
+
+<form class="controls" method="get" action="/">
+  <label>Edge threshold (pts)
+    <input type="number" name="threshold" step="0.5" min="0" max="30" value="{{ '%.1f'|format(threshold) }}">
+  </label>
+  <label>Bankroll
+    <input type="number" name="bankroll" step="50" min="1" value="{{ '%.0f'|format(bankroll) }}">
+  </label>
+  <label>Days ahead
+    <input type="number" name="days" step="1" min="1" max="30" value="{{ days }}">
+  </label>
+  <button type="submit">Recompute</button>
+</form>
+
+{% if error %}
+<div class="panel">
+  <strong>Nothing to show yet.</strong>
+  <p class="muted">{{ error }}</p>
+  <p class="muted">
+    First run: <code>gridiron ingest</code>, then <code>gridiron features build</code>,
+    then <code>gridiron odds</code>.
+  </p>
+</div>
+{% elif not bets %}
+<div class="panel">
+  <p class="empty">
+    No upcoming game clears {{ '%.1f'|format(threshold) }} points.
+    <strong>That is the normal result most weeks</strong> — a market this liquid is
+    rarely wrong by a touchdown, and a system that finds edges every week has
+    usually found a bug instead.
+  </p>
+</div>
+{% else %}
+<div class="panel scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Kickoff</th><th>Matchup</th><th>Bet</th><th>Book</th>
+        <th class="num">Line</th><th class="num">Price</th>
+        <th class="num">Model</th><th class="num">Market</th><th class="num">Edge</th>
+        <th class="num">Win prob</th><th class="num">EV/unit</th>
+        <th class="num">Stake</th><th class="num">Shop</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for bet in bets %}
+      <tr>
+        <td class="muted">{{ bet.kickoff[:16].replace('T', ' ') if bet.kickoff else '' }}</td>
+        <td>{{ bet.away_team }} at {{ bet.home_team }}</td>
+        <td><strong>{{ bet.bet_team }}</strong></td>
+        <td class="muted">{{ bet.book }}</td>
+        <td class="num">{{ '%+.1f'|format(bet.bet_spread) if bet.bet_spread is not none }}</td>
+        <td class="num">{{ '%+d'|format(bet.price|int) if bet.price is not none }}</td>
+        <td class="num">{{ '%+.1f'|format(bet.model_margin) }}</td>
+        <td class="num">{{ '%+.1f'|format(bet.market_margin) }}</td>
+        <td class="num {{ 'good' if bet.edge and bet.edge|abs >= 4 }}">{{ '%+.1f'|format(bet.edge) }}</td>
+        <td class="num">{{ '%.1f%%'|format(bet.model_prob * 100) if bet.model_prob }}</td>
+        <td class="num {{ 'good' if bet.ev_per_unit and bet.ev_per_unit > 0 else 'bad' }}">
+          {{ '%+.3f'|format(bet.ev_per_unit) if bet.ev_per_unit is not none }}
+        </td>
+        <td class="num">{{ '%.2f'|format(bet.stake) if bet.stake }}</td>
+        <td class="num muted">{{ '%.1f'|format(bet.shop_gain_pts) if bet.shop_gain_pts }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="note">
+  <strong>Shop</strong> is how many points separate the best and worst available
+  number for that side. It is often the largest reliable edge on this page: half a
+  point of college spread is worth roughly 1.5% of win probability, and it requires
+  no model to be right about anything.
+</div>
+<div class="note">
+  Win probability comes from a normal approximation with sigma
+  {{ '%.1f'|format(all_rows[0].sigma) if all_rows else '13.5' }} points, taken from
+  the most recent backtest's measured error. It is least accurate near the key
+  numbers 3 and 7, where real margins pile up and a normal curve does not.
+</div>
+{% endif %}
+{% endblock %}

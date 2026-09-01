@@ -134,11 +134,21 @@ For bulk data that doesn't need low-latency random I/O.
 For latency-sensitive, random-I/O workloads. Data lives on the node's local
 disk. Not replicated — rely on backups.
 
-- **What**: SQL databases, SQLite files, Prometheus TSDB, Loki WAL/index
+- **What**: SQL databases, SQLite files, DuckDB files, Prometheus TSDB, Loki WAL/index
 - **Where**: Local SSD on the Proxmox host, passed through to container/VM disk
 - **K8s mechanism**: `local-path-provisioner` (bundled with k3s)
 - **Access mode**: ReadWriteOnce (pinned to the node where the PV lives)
 - **StorageClass name**: `local-path`
+
+Embedded single-writer engines belong here rather than on NFS, and the choice
+constrains the workload's deployment shape as well as its storage. `gridiron`
+is the worked example: DuckDB takes one writer, so its ingest runs on a daemon
+thread *inside* the web process instead of as a separate CronJob (a CronJob
+would be locked out of the file the server holds open), and the Deployment uses
+`strategy: Recreate` so a rolling update never starts a second pod against the
+same file. The cost is that a wedged refresh does not appear in
+`kubectl get jobs`, so the service reports its own refresh state on a `/status`
+page.
 
 ### Tier 3: Replicated (future, optional)
 
@@ -321,7 +331,8 @@ homelab/
 │   ├── tofu/                  # OpenTofu — LXC/VM provisioning
 │   └── ansible/               # Ansible — node config, k3s install, Flux bootstrap
 ├── docker/                    # Custom images built by GitHub Actions → ghcr.io
-│   └── coding-agent/          # CloudCLI + claude/opencode CLIs + k8s tooling
+│   ├── coding-agent/          # CloudCLI + claude/opencode CLIs + k8s tooling
+│   └── gridiron/              # college football betting research (DuckDB + FastAPI)
 ├── kubernetes/                # Flux-managed cluster state (sync root)
 │   ├── kustomization.yaml     # Entry point — includes only Flux plumbing
 │   ├── apps/                  # grouped by namespace, one dir per service
@@ -329,6 +340,7 @@ homelab/
 │   │   ├── ai/                # ollama, open-webui, coding-agent
 │   │   ├── automation/        # home-assistant (home automation)
 │   │   ├── docs/              # paperless-ngx (document management)
+│   │   ├── gridiron/          # gridiron (college football betting research)
 │   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
 │   │   ├── ntfy/              # ntfy (push notifications / Alertmanager sink)
 │   │   ├── travel/            # trek (travel planning)
@@ -379,6 +391,7 @@ homelab/
 | 2025-05-27 | LXC containers over VMs | Lower overhead; VM only for GPU node (VFIO requires it) |
 | 2025-05-27 | Traefik as single ingress for all services | Routes to both k8s and external services via Service+Endpoints |
 | 2026-07-17 | Gatus for synthetic monitoring + deploy canary | One declarative tool serves both continuous health checks (→ Prometheus alerts) and post-merge deploy verification (→ commit status + auto-revert PR); baseline comparison exempts pre-existing failures from reverts |
+| 2026-09-01 | DuckDB (not Postgres) for gridiron, ingest inside the server pod | Every query is an analytical scan over ~10M plays, which an embedded columnar engine answers in the time a Postgres round trip would take — no second pod, no second PVC, backup is one file. The price is a single writer, which is why ingest is an in-process thread and the Deployment is `Recreate` on an RWO local-path PVC |
 
 ## Deploy Sequence
 
