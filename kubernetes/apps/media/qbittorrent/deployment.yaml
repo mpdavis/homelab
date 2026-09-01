@@ -21,6 +21,18 @@ spec:
       # Gluetun requires /dev/net/tun which is only available on VM nodes, not LXC
       nodeSelector:
         node-type: vm
+      # Pod-level fsGroup only (no runAsUser/runAsGroup here) -- gluetun needs to stay
+      # root-ish for VPN/iptables setup and qbittorrent (LinuxServer) needs to start as
+      # root for s6-overlay init. fsGroup alone doesn't force a uid on either of them;
+      # it just chgrps mousehole-data so mousehole's own container-level uid (below) can
+      # write it.
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+      # hygiene-exempt: runtime-identity gluetun has its own PUID/PGID-based
+      # privilege-drop entrypoint and performs privileged network setup
+      # (iptables/WireGuard) at start; forcing pod-level runAsUser is not verified
+      # safe here, same class of risk as the LinuxServer exception
       containers:
         - name: gluetun
           image: qmcgaw/gluetun:v3.41.3
@@ -116,6 +128,12 @@ spec:
         # ProtonVPN exit IP — the same IP the tracker sees from torrent traffic.
         - name: mousehole
           image: tmmrtn/mousehole:0.5.0
+          # Container-level, not pod-level -- gluetun/qbittorrent in this same pod
+          # must not be forced non-root (see the pod securityContext comment above).
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
           ports:
             - containerPort: 5010
               name: mousehole

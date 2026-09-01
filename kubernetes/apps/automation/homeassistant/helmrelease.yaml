@@ -45,6 +45,8 @@ spec:
               tag: "2026.8.3"
             # Container-level hardening. HA runs as root (host integrations), so
             # no runAsNonRoot — just drop escalation and all capabilities.
+            # hygiene-exempt: runtime-identity HA intentionally runs as root for host
+            # integration access (see comment above)
             securityContext:
               allowPrivilegeEscalation: false
               capabilities:

@@ -25,6 +25,8 @@ spec:
       # cloudcli reads HOST/SERVER_PORT-style env; keep the namespace's
       # service-link vars out of the pod (see CLAUDE.md gotcha).
       enableServiceLinks: false
+      # hygiene-exempt: runtime-identity runs arbitrary dev tooling that may need
+      # root (package installs, system deps); forcing non-root could break legitimate agent tasks
       securityContext:
         fsGroup: 1000
         fsGroupChangePolicy: OnRootMismatch

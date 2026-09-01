@@ -24,6 +24,10 @@ spec:
     controllers:
       main:
         containers:
+          # hygiene-exempt: runtime-identity the image has its own PUID-based
+          # privilege-drop entrypoint (gosu, default PUID=99) -- same class as
+          # LinuxServer, needs its own env var, not pod-level runAsUser; also a
+          # dev-tag prerelease
           main:
             image:
               repository: ghcr.io/krinkuto11/streamflow

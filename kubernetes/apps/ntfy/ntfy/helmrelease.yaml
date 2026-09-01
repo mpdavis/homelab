@@ -26,6 +26,12 @@ spec:
       # inject legacy service-link vars (NTFY_PORT=tcp://…, NTFY_SERVICE_*)
       # that collide with them. Disable the injection.
       enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       # Keep the alert-notification path off the GPU node — it is the node most
       # prone to disk pressure, the very failure we want ntfy to tell us about.
       affinity:
@@ -45,6 +51,13 @@ spec:
               repository: binwiederhier/ntfy
               tag: v2.28.0
             args: ["serve"]
+            # ntfy listens on port 80 by default; NET_BIND_SERVICE lets the now
+            # non-root uid still bind it (see the pod securityContext above).
+            # If #545's capabilities.drop: [ALL] lands first, merge this `add`
+            # into that same container securityContext block rather than duplicating it.
+            securityContext:
+              capabilities:
+                add: ["NET_BIND_SERVICE"]
             env:
               TZ: ${TZ}
     service:
