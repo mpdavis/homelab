@@ -22,9 +22,10 @@ spec:
     crds: CreateReplace
   values:
     defaultPodOptions:
-      # GRIDIRON_* env would collide with the service-link variables Kubernetes
-      # injects for a service named `gridiron` in this namespace (see the
-      # gotcha in CLAUDE.md).
+      # Kubernetes injects GRIDIRON_SERVICE_HOST, GRIDIRON_PORT and friends for
+      # every service in the namespace, and this app reads GRIDIRON_PORT as its
+      # own configuration. Left on, the injected value silently overrides the
+      # one set below.
       enableServiceLinks: false
       securityContext:
         fsGroup: 1000
@@ -108,7 +109,12 @@ spec:
             resources:
               requests:
                 cpu: 100m
-                memory: 512Mi
+                # The scheduler places the pod on the request, not the limit,
+                # so too small a request lets a node accept this alongside
+                # other memory-hungry pods and then OOM when a sweep runs.
+                # 1Gi is roughly what an open database plus the server holds
+                # at rest, which is the honest number to reserve.
+                memory: 1Gi
               limits:
                 # A backtest sweep is a dozen full walk-forward runs over a
                 # decade of games. DuckDB will use every core it is given and
