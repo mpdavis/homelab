@@ -33,8 +33,8 @@ Run the same check locally before pushing — it needs no cluster access:
 
 ```sh
 brew install mise && mise trust && mise install
-mise run hygiene        # only what your branch introduces, same as CI
-mise run hygiene:all    # the whole backlog, for deliberate cleanup
+mise run lint        # only what your branch introduces, same as CI
+mise run lint:all    # the whole backlog, for deliberate cleanup
 ```
 
 `mise.toml` pins kube-linter and flate to the versions CI uses, so a local pass means

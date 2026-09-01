@@ -9,13 +9,13 @@
 #   mise trust            # once per clone — mise will not run an untrusted config
 #   mise install          # fetch the pinned tools
 #
-#   mise run hygiene      # what this branch introduces  <- the one you want
-#   mise run hygiene:all  # the whole backlog, for deliberate cleanup
+#   mise run lint      # what this branch introduces  <- the one you want
+#   mise run lint:all  # the whole backlog, for deliberate cleanup
 #   mise tasks            # list everything
 #
-# `hygiene` exits non-zero when your branch introduces a finding, so it works as a
+# `lint` exits non-zero when your branch introduces a finding, so it works as a
 # pre-push hook. It compares against origin/main; override with
-# `HYGIENE_BASE=<ref> mise run hygiene`.
+# `LINT_BASE=<ref> mise run lint`.
 #
 # Keep the versions below in sync with .github/workflows/manifest-hygiene-check.yml
 # (KUBE_LINTER_VERSION) and render-validate.yml (the flate action tag). Renovate
@@ -36,7 +36,7 @@ kube-linter = "0.8.3"
 # costs nothing. Same setting the workflows use.
 FLATE_CONCURRENCY = "1"
 
-[tasks."hygiene:render"]
+[tasks."lint:render"]
 description = "Render the whole tree the way Flux would, to rendered.yaml"
 run = """
 set -euo pipefail
@@ -51,19 +51,19 @@ fi
 echo "Rendered ${objects} objects to rendered.yaml"
 """
 
-[tasks."hygiene:all"]
+[tasks."lint:all"]
 description = "Lint the whole rendered tree, including the pre-existing backlog"
-depends = ["hygiene:render"]
+depends = ["lint:render"]
 run = "kube-linter lint --config .kube-linter.yaml rendered.yaml"
 
-[tasks.hygiene]
-description = "Show only the hygiene findings this branch introduces vs origin/main"
+[tasks.lint]
+description = "Show only the findings this branch introduces vs origin/main"
 run = """
 set -euo pipefail
 
 # Override to compare against something else, e.g. when a PR targets a stack:
-#   HYGIENE_BASE=origin/some-branch mise run hygiene
-base_ref="${HYGIENE_BASE:-origin/main}"
+#   LINT_BASE=origin/some-branch mise run lint
+base_ref="${LINT_BASE:-origin/main}"
 work=$(mktemp -d)
 # The baseline worktree and the rendered YAML are scratch; never leave them behind,
 # including on failure, or a stale worktree blocks the next run.
@@ -88,7 +88,7 @@ set -e
 python3 .github/scripts/kube-linter-diff.py "$work/base.json" "$work/head.json"
 """
 
-[tasks."hygiene:selftest"]
+[tasks."lint:selftest"]
 description = "Prove every configured kube-linter check still fires"
 run = """
 set -euo pipefail
