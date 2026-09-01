@@ -5,3 +5,6 @@ kubeconfig.yaml
 .idea
 # Local scratch notes — never committed (may contain secrets)
 local.md
+
+# Scratch render from `mise run hygiene:render`
+rendered.yaml

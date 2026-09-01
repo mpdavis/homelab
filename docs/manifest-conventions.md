@@ -29,6 +29,19 @@ base. The tree predates this document and carries a backlog; a whole-tree gate w
 fail every unrelated PR. So the backlog is exempt by construction and shrinks as
 manifests get touched, but nothing here is retroactively enforced.
 
+Run the same check locally before pushing — it needs no cluster access:
+
+```sh
+brew install mise && mise trust && mise install
+mise run hygiene        # only what your branch introduces, same as CI
+mise run hygiene:all    # the whole backlog, for deliberate cleanup
+```
+
+`mise.toml` pins kube-linter and flate to the versions CI uses, so a local pass means
+a CI pass. Note that pointing kube-linter at the source manifests directly is *not*
+equivalent: it cannot see inside a HelmRelease, and given the wrong directory it
+reports zero findings and exits 0. Use the task.
+
 Three rules in this document are **documented but not currently machine-checked**:
 
 | Rule | Why not |
