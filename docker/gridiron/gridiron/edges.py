@@ -364,7 +364,7 @@ def _attach_books(fixtures: pd.DataFrame, books: pd.DataFrame) -> pd.DataFrame:
         # the scheduled one keeps a title-game price off the regular-season
         # meeting.
         delta = (merged["commence_time"] - merged["kickoff"]).abs()
-        merged = merged[delta <= pd.Timedelta(days=2)]
+        merged = merged[delta <= pd.Timedelta(2, "D")]
     return merged
 
 

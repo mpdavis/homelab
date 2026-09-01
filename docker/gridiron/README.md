@@ -199,12 +199,21 @@ succeeded and what it last failed with. Check there first.
 
 ## Development
 
+**Use Python 3.13** — the version the image ships and CI runs:
+
 ```
-python3 -m venv .venv
+mise use python@3.13          # or any 3.13 interpreter
+python3.13 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 .venv/bin/python -m pytest -q
 ```
 
+The version matters more than it looks. Warnings are errors here, so a
+dependency resolving differently between your interpreter and CI's turns into a
+red build rather than a shrug — numpy 2.5 publishes no wheel for 3.11, so a
+3.11 venv silently pins an older numpy and passes a suite that fails in CI.
+Matching the interpreter is what makes a green run locally mean anything.
+
 Tests run against a synthetic league generated from known parameters
 (`tests/synth.py`), which is what lets them assert that a fit *recovers the
-right answer* rather than merely that it returns one. Warnings are errors.
+right answer* rather than merely that it returns one.

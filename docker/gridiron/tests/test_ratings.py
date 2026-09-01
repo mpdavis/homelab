@@ -17,7 +17,7 @@ FLAT = Weighting(kind="uniform", season_carryover=1.0)
 
 def _fit(response="margin", ridge_lambda=1.0, weighting=FLAT, **kwargs):
     frame = synth.history_frame(**kwargs)
-    cutoff = frame["kickoff"].max() + pd.Timedelta(days=1)
+    cutoff = frame["kickoff"].max() + pd.Timedelta(1, "D")
     return RidgeRatings(response, weighting, ridge_lambda).fit(frame, cutoff), frame
 
 
@@ -133,7 +133,7 @@ def test_non_fbs_opponents_are_pooled_into_one_rating():
     frame.loc[frame["away_team"] == "Hotel", "away_team"] = "Directional State"
     engine = RidgeRatings("margin", FLAT, 1.0)
     engine.fbs = set(synth.TEAMS)
-    engine.fit(frame, frame["kickoff"].max() + pd.Timedelta(days=1))
+    engine.fit(frame, frame["kickoff"].max() + pd.Timedelta(1, "D"))
     assert "Directional State" not in engine.ratings
     assert FCS in engine.ratings
     # An unseen team is an FCS opponent, not a league-average one.
@@ -170,7 +170,7 @@ def test_every_registered_model_accepts_sweep_parameters():
 
 def test_decomposed_sums_its_two_halves_back_to_a_margin():
     frame = synth.history_frame()
-    cutoff = frame["kickoff"].max() + pd.Timedelta(days=1)
+    cutoff = frame["kickoff"].max() + pd.Timedelta(1, "D")
     model = build_model("decomposed", ridge_lambda=1.0, fp_ridge_lambda=1.0)
     model.fbs = set(synth.TEAMS)
     model.fit(frame, cutoff)
@@ -206,7 +206,7 @@ def test_market_debias_stays_neutral_on_a_thin_sample():
     """Below min_games it must return the market untouched, not a wild fit."""
     frame = synth.history_frame().head(20)
     model = build_model("market_debias", min_games=400)
-    model.fit(frame, frame["kickoff"].max() + pd.Timedelta(days=1))
+    model.fit(frame, frame["kickoff"].max() + pd.Timedelta(1, "D"))
     assert model.premium == 0.0
     assert model.predict(frame) == pytest.approx(frame["market_margin"].to_numpy())
 
@@ -220,7 +220,7 @@ def test_market_debias_recovers_a_planted_brand_premium():
     # per standard deviation, so results fall short of the line by that much.
     frame["market_margin"] = frame["margin"] + 2.0 * gap
     model = build_model("market_debias", min_games=50, half_life_days=100000.0)
-    model.fit(frame, frame["kickoff"].max() + pd.Timedelta(days=1))
+    model.fit(frame, frame["kickoff"].max() + pd.Timedelta(1, "D"))
     assert model.premium == pytest.approx(-2.0, abs=0.25)
 
 
@@ -235,7 +235,7 @@ def test_market_debias_clamps_its_adjustment():
 
 def test_elo_produces_finite_predictions_and_orders_teams_sensibly():
     frame = synth.history_frame()
-    cutoff = frame["kickoff"].max() + pd.Timedelta(days=1)
+    cutoff = frame["kickoff"].max() + pd.Timedelta(1, "D")
     model = build_model("elo")
     model.fit(frame, cutoff)
     fixtures = pd.DataFrame(
