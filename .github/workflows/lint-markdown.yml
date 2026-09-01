@@ -1,0 +1,67 @@
+name: Lint · Markdown
+
+# markdownlint-cli2 over *.md. Advisory: NOT on main's ruleset, paths-filtered, and
+# on a PR it lints only the Markdown files that PR changed — the existing docs carry
+# a backlog and this keeps it from blocking unrelated work. `workflow_dispatch` runs
+# it over the whole tree for a deliberate cleanup pass.
+#
+# Rules and ignores live in .markdownlint-cli2.jsonc.
+
+on:
+  pull_request:
+    paths:
+      - '**/*.md'
+      - '.markdownlint-cli2.jsonc'
+      - '.github/workflows/lint-markdown.yml'
+  # No `push: main` trigger — see lint-dockerfile.yml. PR-time diff check;
+  # `workflow_dispatch` runs the whole tree for a deliberate cleanup pass.
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-markdown-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # renovate: datasource=npm depName=markdownlint-cli2
+  MARKDOWNLINT_CLI2_VERSION: "0.14.0"
+
+jobs:
+  markdownlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install markdownlint-cli2
+        run: npm install -g "markdownlint-cli2@${MARKDOWNLINT_CLI2_VERSION}"
+
+      - name: Select Markdown files in scope
+        id: select
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --name-only --diff-filter=d \
+              "${{ github.event.pull_request.base.sha }}" HEAD \
+              | { grep -E '\.md$' || true; } > files.txt
+          else
+            # Whole tree — .markdownlint-cli2.jsonc `ignores` prunes vendored dirs.
+            git ls-files '*.md' > files.txt
+          fi
+          count=$(wc -l < files.txt | tr -d ' ')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          if [ "$count" -eq 0 ]; then
+            echo "No Markdown files in scope; nothing to lint."
+          else
+            echo "Linting:"; cat files.txt
+          fi
+
+      - name: Run markdownlint-cli2
+        if: steps.select.outputs.count != '0'
+        run: xargs -a files.txt markdownlint-cli2
