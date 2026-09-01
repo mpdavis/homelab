@@ -10,18 +10,41 @@ Three things read this document:
 
 - **`.claude/skills/add-service/SKILL.md`** — scaffolds new services to match it.
 - **`.github/workflows/manifest-hygiene-check.yml`** — mechanically enforces the
-  checkable subset on newly added manifests (`.github/scripts/check-manifest-hygiene.py`).
+  checkable subset with [kube-linter](https://docs.kubelinter.io), configured in
+  `.kube-linter.yaml`.
 - **`.github/workflows/k8s-review.yml`** — the LLM reviewer cites it instead of
   re-deriving the advice.
 
-If you change a rule here, change it in all three places. The check script's rule IDs
-(`floating-tag`, `runtime-identity`, …) are the stable link between them.
+If you change a rule here, change it in all three places. Each section below names the
+kube-linter check that enforces it, which is the stable link between them.
+
+### What is and isn't enforced
+
+The check lints the **rendered** tree (`flate build all`), so an app-template
+HelmRelease, a hand-written Deployment and a third-party chart are all checked
+identically — by the time flate is done they are all just Deployments.
+
+It reports only findings a PR **introduces**, measured against a render of the merge
+base. The tree predates this document and carries a backlog; a whole-tree gate would
+fail every unrelated PR. So the backlog is exempt by construction and shrinks as
+manifests get touched, but nothing here is retroactively enforced.
+
+Three rules in this document are **documented but not currently machine-checked**:
+
+| Rule | Why not |
+|---|---|
+| `allowPrivilegeEscalation: false` (§2) | kube-linter's `privilege-escalation-container` only flags an explicit `true`; an unset field passes. |
+| PUID/PGID vs `runAsUser` by image family (§1) | Conditioning on image family is homelab-specific; no linter models it. |
+| Gatus / Homepage registration (§6) | Being replaced by generated config rather than a lint rule. |
+
+These are tracked in the manifest-hygiene follow-up issue. Until then they are review
+concerns, which is what the `k8s-review` reviewer is for.
 
 ---
 
 ## 1. Runtime identity — how a container gets its uid/gid
 
-**Rule ID: `runtime-identity`**
+**Enforced by: `run-as-non-root`**
 
 There are two mechanisms for setting the uid/gid a container runs as, they are mutually
 exclusive, and the right one is a property of the *image*, not a preference. Picking the
@@ -46,6 +69,16 @@ or dropping `ALL` capabilities breaks the init before the app ever starts.
 
 `allowPrivilegeEscalation: false` is the one container-level control that is safe here —
 s6 de-escalates, it never escalates.
+
+Because these images legitimately start as root, `run-as-non-root` will flag them. That
+is the check being right about the policy and wrong about the intent, so each such
+workload records the exception on the object itself:
+
+```yaml
+metadata:
+  annotations:
+    ignore-check.kube-linter.io/run-as-non-root: "s6-overlay must start as root"
+```
 
 ### Every other image
 
@@ -107,7 +140,7 @@ Reference: `kubernetes/apps/civic/ames-council-digest/web-deployment.yaml`.
 
 ## 2. Container hardening
 
-**Rule IDs: `container-hardening`, `linuxserver-conflict`**
+**Enforced by: `must-drop-all-capabilities`, `no-read-only-root-fs`**
 
 Every container gets a container-level `securityContext`. Pod-level settings pin *who*
 the process is; container-level settings bound *what it can do*. They are separate
@@ -122,8 +155,13 @@ securityContext:
   readOnlyRootFilesystem: true    # when the app tolerates it
 ```
 
-- `allowPrivilegeEscalation: false` — always, including LinuxServer images.
+- `allowPrivilegeEscalation: false` — always, including LinuxServer images. *Not
+  machine-checked*: kube-linter only flags an explicit `true`, so an omitted field
+  passes. Review still asks.
 - `capabilities.drop: [ALL]` — always **except** LinuxServer images (breaks s6 init).
+  *Partially machine-checked*: `must-drop-all-capabilities` evaluates containers that
+  already have a `securityContext.capabilities` block, so it catches a wrong drop list
+  but not a missing `securityContext` altogether.
 - `readOnlyRootFilesystem: true` — whenever the app tolerates it. Most apps that write
   scratch files only need an `emptyDir` at `/tmp`:
 
@@ -136,7 +174,8 @@ securityContext:
   ```
 
   Skip it for apps that write into their own install tree (many `*arr`-adjacent apps do).
-  Skipping is fine; skipping *silently* is not — leave a comment saying why.
+  Skipping is fine; skipping *silently* is not — record the reason in the
+  `ignore-check.kube-linter.io/no-read-only-root-fs` annotation.
 
 Genuine exceptions exist (`gluetun` needs `NET_ADMIN`). Add the capability explicitly and
 comment the reason; don't drop the whole block.
@@ -147,7 +186,8 @@ Reference: `kubernetes/apps/media/unpackerr/helmrelease.yaml`.
 
 ## 3. Resource requests and limits
 
-**Rule ID: `resources`**
+**Enforced by: `unset-cpu-requirements`, `unset-memory-request`,
+`unset-memory-requirements`**
 
 Every container declares requests, and a memory limit.
 
@@ -176,10 +216,14 @@ The point is a declared number, not a large one.
 
 ## 4. Image pinning
 
-**Rule ID: `floating-tag`**
+**Enforced by: `floating-tag`**
 
 Pin to an immutable tag or a digest. `latest`, `edge`, `stable`, `main`, `master`,
 `develop`, `nightly`, `rolling`, and a bare repository with no tag are all rejected.
+
+kube-linter's stock `latest-tag` blocks only `:latest` and untagged references, so
+`.kube-linter.yaml` overrides its block list to cover the rest of the family. Keep the
+two lists in sync.
 
 A floating tag means the running version depends on when a pod last restarted, Renovate
 can't propose a reviewable bump, and `deploy-canary` can't attribute a regression to a
@@ -218,7 +262,11 @@ Advisory, not enforced — "which endpoint means healthy" isn't mechanically dec
 
 ## 6. Monitoring registration for anything with a hostname
 
-**Rule IDs: `gatus-endpoint`, `gatus-hostalias`, `homepage-tile`**
+**Not machine-checked** — see the follow-up issue. Cross-file referential integrity
+between an IngressRoute and two unrelated files is not something a workload linter can
+express, and the better fix is to stop requiring the edits at all: `gatus-sidecar`
+generates Gatus endpoints from IngressRoute annotations, and Homepage has native
+Kubernetes discovery. Until that lands this section is a review concern and a checklist.
 
 A new `IngressRoute` means three more edits, none of which live next to the IngressRoute:
 
@@ -276,21 +324,38 @@ app's own volume ownership — the TwiN Gatus chart ships `fsGroup: 65534` /
 helm show values <repo>/<chart> --version <version> | grep -A10 -i securitycontext
 ```
 
-The hygiene check skips pod/container structural rules for non-`app-template` charts for
-this reason — it can't know the chart's values schema. Floating tags and monitoring
-registration are still checked, and the reviewer will still ask. Verify against the chart
-and say what you found.
+The hygiene check *does* apply the structural rules to third-party charts, because it
+lints the rendered output rather than the HelmRelease — it never has to know the chart's
+values schema, only what the chart produced. That means a chart whose defaults violate
+this document will report findings against values you did not write. Fix it by setting
+the chart's own values, or, when the chart's default is the correct one for that app,
+record why in an `ignore-check.kube-linter.io/<check>` annotation.
+
+This is the one place where "check the chart's defaults first" is load-bearing: layering
+`fsGroup: 1000` onto a chart that ships `65534` silences a linter and breaks the app.
 
 ---
 
 ## Exemptions
 
-Every rule has real exceptions. To take one, put a marker comment anywhere in the file:
+Every rule has real exceptions. To take one, annotate the **object** with the check name
+and the reason:
 
 ```yaml
-# hygiene-exempt: readonly-rootfs  qBittorrent writes into its own install tree
+metadata:
+  annotations:
+    ignore-check.kube-linter.io/no-read-only-root-fs: "qBittorrent writes into its install tree"
 ```
 
-The check honors it; a bare rule ID with no reason after it is rejected. An exemption with
-a reason is a decision on the record — that's the whole point. Silently omitting the field
+The annotation value is the reason, and it is not optional in spirit — an exemption with a
+reason is a decision on the record, which is the whole point. Silently omitting the field
 is what this document exists to stop.
+
+An annotation rather than a comment because the check runs against the **rendered** tree:
+a YAML comment in a HelmRelease does not survive Helm templating, and an annotation does.
+In app-template, set it under the controller's `annotations:`; the whole object is
+exempted from that one check.
+
+To exempt every check on an object, use `ignore-check.kube-linter.io/all`. Prefer naming
+the specific check — "this workload is special" ages badly compared to "this workload
+writes into its install tree".

@@ -20,8 +20,13 @@ Add a new service to the k3s cluster following the exact patterns established in
 **Read `docs/manifest-conventions.md` before writing manifests.** It is the source of truth for
 the workload baseline — runtime uid/gid, container hardening, resource requests, image pinning,
 and monitoring registration — and `manifest-hygiene-check.yml` enforces the checkable parts of it
-on every manifest a PR adds. Step 3.5 below is the short version; the doc has the reasoning and
-the exception cases.
+with kube-linter, against the rendered tree, on every finding a PR introduces. Step 3.5 below is
+the short version; the doc has the reasoning and the exception cases.
+
+A new service is where this bites hardest: it has no baseline, so *every* violation it carries is
+a new finding. Get the container `securityContext`, the resource requests and the pinned tag right
+the first time rather than in a review round-trip. Real exceptions go in an
+`ignore-check.kube-linter.io/<check>` annotation with the reason as the value.
 
 **Default to a HelmRelease.** Every new service should be a HelmRelease unless there is a
 strong reason not to. Services with an official/well-maintained chart use that chart;

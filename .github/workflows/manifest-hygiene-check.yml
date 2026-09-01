@@ -1,74 +1,190 @@
 name: Manifest Hygiene Check
 
-# Deterministic guard for the workload conventions in docs/manifest-conventions.md:
-# runtime uid/gid (PUID/PGID vs securityContext, decided by image family), container
-# hardening, resource requests, floating image tags, and Gatus/Homepage registration
-# for new hostnames. No LLM, no secrets — every one of these is mechanically decidable,
-# and each was a finding the k8s reviewer had re-derived on multiple separate PRs.
+# Enforces the mechanically checkable subset of docs/manifest-conventions.md with
+# kube-linter: runtime identity, container hardening, resource requests, image pinning.
 #
-# Scoped to manifests the PR **adds**. The tree predates these conventions (see
-# `check-manifest-hygiene.py --all` for the backlog), so a whole-tree gate would fail
-# every unrelated PR. The rules apply to new services, which is where they were being
-# missed.
+# Two design decisions worth keeping straight, because both were the other way around
+# in the first cut of this check:
 #
-# Unlike image-pin-check.yml this is NOT a required status check, so the `paths` filter
-# is safe here — a required check that never runs would block the PR forever.
+# 1. It lints the RENDERED tree, not source manifests. `flate build all` is already how
+#    render-validate.yml works, and by the time flate has reconciled the tree an
+#    app-template HelmRelease, a hand-written Deployment and a third-party chart are all
+#    just Deployments. Linting source YAML meant hand-unwrapping app-template's values
+#    schema and giving up entirely on the ~20 HelmReleases using some other chart — they
+#    got one rule out of five. Rendering first is both less code and more coverage.
+#
+# 2. It blames the PR only for findings it INTRODUCES. The tree predates these
+#    conventions and carries a backlog, so a whole-tree gate would fail every unrelated
+#    PR. Rather than scoping to added files (which re-creates the coverage hole — a PR
+#    that edits an existing manifest gets no check at all), render and lint both the PR
+#    and its merge base and diff the findings. Same shape as deploy-canary.yml's Gatus
+#    baseline, for the same reason: report the transition, not the state.
+#
+# Both trees are linted with the PR's .kube-linter.yaml, deliberately. That isolates
+# manifest changes from rule changes: adding a check to the config applies it uniformly
+# to both renders, so it surfaces only on objects this PR actually touched instead of
+# lighting up the whole backlog and blocking the PR that adopts the rule.
+#
+# NOT a required status check, so the `paths` filter is safe here — the lesson from
+# image-pin-check (#425) is that a *required* check which never runs blocks the PR
+# forever waiting on a verdict that never arrives.
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - 'kubernetes/**'
-      - '.github/scripts/check-manifest-hygiene.py'
+      - '.kube-linter.yaml'
+      - '.github/scripts/kube-linter-diff.py'
+      - '.github/scripts/kube-linter-selftest.py'
+      - '.github/tests/kube-linter-canary.yaml'
+      - '.github/workflows/manifest-hygiene-check.yml'
 
 concurrency:
   group: manifest-hygiene-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+env:
+  # renovate: datasource=github-releases depName=stackrox/kube-linter
+  KUBE_LINTER_VERSION: "v0.8.3"
+  # Same non-deterministic DAG-scheduler race render-validate.yml documents
+  # (home-operations/flate#828): concurrent nodes can park the reconcile loop forever.
+  # This tree renders in ~5s, so serialising costs nothing.
+  FLATE_CONCURRENCY: "1"
+
 jobs:
   hygiene:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: write
     steps:
       - uses: actions/checkout@v7
         with:
-          # Need the base commit locally to diff which manifests were added.
+          # The base commit gets rendered too, so it has to exist locally.
           fetch-depth: 0
+
+      - name: Install flate
+        uses: home-operations/flate/action@v0.6.1
+        with:
+          # MUST stay empty — see the long note in render-validate.yml. A non-empty
+          # `base` exports FLATE_BASE and silently puts `build` into changed-only mode,
+          # which would render a partial tree and make the diff meaningless.
+          base: ""
+          cache: true
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install PyYAML
         run: python3 -m pip install --quiet pyyaml
 
-      - name: Check added manifests against the conventions
-        id: check
+      - name: Install kube-linter
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -sSfL \
+            "https://github.com/stackrox/kube-linter/releases/download/${KUBE_LINTER_VERSION}/kube-linter-linux.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/bin" kube-linter
+          chmod +x "$RUNNER_TEMP/bin/kube-linter"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      # Before trusting a clean result, prove the checks are live. kube-linter exits 0
+      # with `Reports: null` when it resolves no objects, and it drops a renamed or
+      # mistyped check from the config without erroring — both of which would leave a
+      # gate that passes everything while looking healthy.
+      - name: Self-test the check configuration
+        run: |
+          kube-linter lint --config .kube-linter.yaml --format json \
+            .github/tests/kube-linter-canary.yaml > canary.json || true
+          python3 .github/scripts/kube-linter-selftest.py .kube-linter.yaml canary.json
+
+      - name: Render this PR's tree
+        id: render_head
+        timeout-minutes: 5
+        run: flate build all --path ./kubernetes --no-progress > head.yaml
+
+      # A green check that validated nothing is worse than no check. flate can exit 0
+      # having rendered an empty set (a bad --path, an implicit FLATE_BASE), and an empty
+      # head.yaml would report "no new findings" forever.
+      - name: Guard against a vacuous render
+        run: |
+          objects=$(grep -c '^kind:' head.yaml || true)
+          if [ "${objects:-0}" -lt 50 ]; then
+            echo "::error::head.yaml has only ${objects:-0} objects; expected the whole tree."
+            exit 1
+          fi
+          echo "Rendered ${objects} objects from this PR."
+
+      - name: Render the merge base
+        id: render_base
+        timeout-minutes: 5
+        continue-on-error: true
+        run: |
+          git worktree add "$RUNNER_TEMP/base" "${{ github.event.pull_request.base.sha }}"
+          flate build all --path "$RUNNER_TEMP/base/kubernetes" --no-progress > base.yaml
+
+      # Without a baseline every pre-existing finding looks new, which would blame this
+      # PR for the whole backlog. A broken base is not this PR's fault, so say so and
+      # pass rather than failing on someone else's breakage.
+      - name: Skip if no baseline could be established
+        if: steps.render_base.outcome != 'success'
+        run: |
+          echo "::warning::Could not render the merge base, so new findings cannot be" \
+               "distinguished from the pre-existing backlog. Skipping the hygiene gate."
+
+      - name: Lint both trees
+        if: steps.render_base.outcome == 'success'
+        run: |
+          # kube-linter exits non-zero whenever it finds anything, which is the normal
+          # case here (the backlog). Only the diff decides pass/fail.
+          set +e
+          kube-linter lint --config .kube-linter.yaml --format json head.yaml > head.json
+          kube-linter lint --config .kube-linter.yaml --format json base.yaml > base.json
+          set -e
+          # An unreadable report would silently read as "zero findings".
+          python3 -c "import json,sys; [json.load(open(f)) for f in ('base.json','head.json')]"
+
+      - name: Report findings this PR introduces
+        id: diff
+        if: steps.render_base.outcome == 'success'
         run: |
           set +e
-          python3 .github/scripts/check-manifest-hygiene.py \
-            --changed "${{ github.event.pull_request.base.sha }}" | tee result.txt
-          code=${PIPESTATUS[0]}
+          python3 .github/scripts/kube-linter-diff.py base.json head.json > comment.md
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
           set -e
-          echo "exit=$code" >> "$GITHUB_OUTPUT"
+          cat comment.md
 
-      - name: Comment on convention violations
-        if: always() && steps.check.outputs.exit != '0'
+      - name: Comment on the pull request
+        if: steps.render_base.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
-          {
-            echo "## ❌ Manifest hygiene check failed"
-            echo
-            echo "New manifests in this PR don't meet the workload conventions in"
-            echo "[\`docs/manifest-conventions.md\`](https://github.com/${{ github.repository }}/blob/main/docs/manifest-conventions.md)."
-            echo "These are the findings that kept recurring in review, so they're enforced"
-            echo "mechanically now instead of costing a round-trip."
-            echo
-            echo '```'
-            cat result.txt
-            echo '```'
-          } > comment.md
-          gh pr comment "${{ github.event.pull_request.number }}" --body-file comment.md
+          MARKER="<!-- manifest-hygiene -->"
+          # One comment edited in place, not one per push — same convention as
+          # render-validate-comment.sh. Silence when there is nothing to say, except to
+          # correct a previous run that had findings.
+          existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" \
+            --paginate --jq \
+            ".[] | select(.body | startswith(\"${MARKER}\")) | .id" | head -1)
 
-      - name: Fail if any convention is violated
-        if: steps.check.outputs.exit != '0'
+          if [ -s comment.md ]; then
+            { printf '%s\n' "$MARKER"; cat comment.md; } > body.md
+          elif [ -n "$existing" ]; then
+            { printf '%s\n' "$MARKER"
+              printf '## ✅ No new manifest hygiene findings\n\n'
+              printf 'Previously reported findings are resolved.\n'; } > body.md
+          else
+            echo "Nothing to report."
+            exit 0
+          fi
+
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
+              -F body=@body.md >/dev/null
+          else
+            gh pr comment "$PR" --body-file body.md
+          fi
+
+      - name: Fail if this PR introduces findings
+        if: steps.render_base.outcome == 'success' && steps.diff.outputs.exit != '0'
         run: exit 1
