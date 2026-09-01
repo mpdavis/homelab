@@ -94,6 +94,15 @@ spec:
               # and ingest runs on a background thread rather than blocking it.
             securityContext:
               allowPrivilegeEscalation: false
+              # The image already runs as uid 1000 (`USER 1000` in the
+              # Dockerfile); stating it here means a future image with a
+              # different default cannot silently start running as root.
+              runAsNonRoot: true
+              runAsUser: 1000
+              runAsGroup: 1000
+              # Everything the process writes goes to the /data PVC or the
+              # /tmp emptyDir below — nothing is written beside the code.
+              readOnlyRootFilesystem: true
               capabilities:
                 drop: [ALL]
             resources:
@@ -119,3 +128,12 @@ spec:
         existingClaim: gridiron-data
         globalMounts:
           - path: /data
+      # DuckDB spills to disk when a query's intermediates outgrow memory, and
+      # a sweep over a decade of plays is exactly that query. It spills beside
+      # the database file, which is on the PVC — but the root filesystem is
+      # read-only, so anything that reaches for /tmp regardless needs somewhere
+      # to land rather than an EROFS in the middle of a backtest.
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp
