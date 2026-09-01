@@ -36,6 +36,12 @@ spec:
                 secretKeyRef:
                   name: trek-secrets
                   key: encryption-key
+            resources:
+              requests:
+                cpu: 20m
+                memory: 64Mi
+              limits:
+                memory: 256Mi
     service:
       main:
         controller: main

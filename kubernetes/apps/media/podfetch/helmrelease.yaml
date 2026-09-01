@@ -33,6 +33,12 @@ spec:
               POLLING_INTERVAL: "60"
               # SQLite DB lives on the local-path config PVC mounted at /app/db
               DATABASE_URL: sqlite:///app/db/podcast.db
+            resources:
+              requests:
+                cpu: 20m
+                memory: 64Mi
+              limits:
+                memory: 256Mi
     service:
       main:
         controller: main

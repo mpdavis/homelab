@@ -65,6 +65,12 @@ spec:
                   name: unpackerr-secrets
                   key: radarr-api-key
               UN_RADARR_0_PATHS_0: /media/downloads
+            resources:
+              requests:
+                cpu: 20m
+                memory: 64Mi
+              limits:
+                memory: 512Mi
     persistence:
       config:
         existingClaim: unpackerr

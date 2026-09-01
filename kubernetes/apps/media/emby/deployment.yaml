@@ -29,7 +29,12 @@ spec:
             - name: NVIDIA_DRIVER_CAPABILITIES
               value: all
           resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
             limits:
+              cpu: "2"
+              memory: 1Gi
               nvidia.com/gpu: "1"
           volumeMounts:
             - name: config

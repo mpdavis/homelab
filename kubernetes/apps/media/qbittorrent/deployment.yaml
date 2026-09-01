@@ -93,6 +93,12 @@ spec:
               command: ["/bin/sh", "-c", "test -s /tmp/gluetun/forwarded_port"]
             periodSeconds: 60
             failureThreshold: 3
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
           volumeMounts:
             - name: tun
               mountPath: /dev/net/tun
@@ -107,6 +113,12 @@ spec:
               value: ${TZ}
             - name: WEBUI_PORT
               value: "8080"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
           volumeMounts:
             - name: config
               mountPath: /config
@@ -137,6 +149,12 @@ spec:
               value: "true"
             - name: TZ
               value: ${TZ}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
           volumeMounts:
             - name: mousehole-data
               mountPath: /var/lib/mousehole

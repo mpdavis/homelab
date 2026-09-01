@@ -69,11 +69,24 @@ spec:
                   name: paperless-secrets
                   key: oidc-client-secret
               PAPERLESS_SOCIALACCOUNT_PROVIDERS: '{"openid_connect": {"SCOPE": ["openid", "profile", "email", "groups"], "APPS": [{"provider_id": "authentik", "name": "Authentik", "client_id": "2637be93cafb37442b1abb9bd89330fe", "secret": "$(OIDC_CLIENT_SECRET)", "settings": {"server_url": "https://iam.${DOMAIN}/application/o/paperless/.well-known/openid-configuration"}}]}}'
+            resources:
+              requests:
+                cpu: 200m
+                memory: 512Mi
+              limits:
+                cpu: "2"
+                memory: 2Gi
           # Broker for the Celery task queue. State is ephemeral (task queue only).
           redis:
             image:
               repository: docker.io/library/redis
               tag: 8-alpine
+            resources:
+              requests:
+                cpu: 10m
+                memory: 16Mi
+              limits:
+                memory: 64Mi
     service:
       main:
         controller: main

@@ -33,6 +33,12 @@ spec:
               value: ${TZ}
             - name: MCP_HOST
               value: localhost
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
           volumeMounts:
             - name: config
               mountPath: /config
@@ -46,6 +52,12 @@ spec:
               value: http://localhost:6100
             - name: MCP_PORT
               value: "6101"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
           volumeMounts:
             - name: config
               mountPath: /config

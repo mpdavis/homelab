@@ -29,6 +29,12 @@ spec:
               value: ${TZ}
             - name: SONARR__AUTH__METHOD
               value: External
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
           volumeMounts:
             - name: config
               mountPath: /config
