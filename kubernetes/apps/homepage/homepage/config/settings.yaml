@@ -14,15 +14,6 @@ layout:
   AI:
     style: row
     columns: 3
-  Documents:
+  Personal:
     style: row
-    columns: 3
-  Travel:
-    style: row
-    columns: 3
-  Civic:
-    style: row
-    columns: 3
-  Automation:
-    style: row
-    columns: 3
+    columns: 4
