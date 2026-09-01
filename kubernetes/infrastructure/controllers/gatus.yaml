@@ -58,7 +58,6 @@ spec:
                       - prowlarr.mpdavis.com
                       - radarr.mpdavis.com
                       - sonarr.mpdavis.com
-                      - streamflow.mpdavis.com
                       - teamarr.mpdavis.com
                       - flux.mpdavis.com
                       - trek.mpdavis.com
@@ -234,12 +233,6 @@ spec:
         - name: sonarr
           group: external-auth
           url: https://sonarr.mpdavis.com/
-          client: *auth-client
-          headers: *auth-headers
-          conditions: *auth-conditions
-        - name: streamflow
-          group: external-auth
-          url: https://streamflow.mpdavis.com/
           client: *auth-client
           headers: *auth-headers
           conditions: *auth-conditions
