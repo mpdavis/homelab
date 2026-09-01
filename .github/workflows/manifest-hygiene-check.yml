@@ -114,12 +114,33 @@ jobs:
           fi
           echo "Rendered ${objects} objects from this PR."
 
+      # The baseline is HEAD's FIRST PARENT, not github.event.pull_request.base.sha.
+      # On a pull_request event actions/checkout checks out refs/pull/N/merge — the PR
+      # already merged into the base branch — so HEAD^1 is exactly the base commit that
+      # merge used and HEAD^2 is the PR head. base.sha is the base branch tip recorded
+      # on the PR object, which lags: it is updated on synchronize, not when the base
+      # branch moves.
+      #
+      # That staleness is not cosmetic. If main gains a finding after base.sha is
+      # recorded, the merge commit inherits it and the stale baseline does not, so the
+      # finding is attributed to this PR and fails it for someone else's change —
+      # precisely the false failure this whole baseline design exists to prevent. It
+      # was caught the benign way round on this PR: an unrelated open-webui image pin
+      # landed on main and showed up here as "fixed".
       - name: Render the merge base
         id: render_base
         timeout-minutes: 5
         continue-on-error: true
         run: |
-          git worktree add "$RUNNER_TEMP/base" "${{ github.event.pull_request.base.sha }}"
+          if git rev-parse --verify --quiet HEAD^2 >/dev/null; then
+            base_sha=$(git rev-parse HEAD^1)
+            echo "HEAD is the PR merge commit; baseline is its first parent ${base_sha}."
+          else
+            base_sha="${{ github.event.pull_request.base.sha }}"
+            echo "::warning::HEAD is not a merge commit; falling back to the PR's" \
+                 "recorded base ${base_sha}, which may lag the base branch."
+          fi
+          git worktree add "$RUNNER_TEMP/base" "$base_sha"
           flate build all --path "$RUNNER_TEMP/base/kubernetes" --no-progress > base.yaml
 
       # Without a baseline every pre-existing finding looks new, which would blame this
