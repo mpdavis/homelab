@@ -44,6 +44,8 @@ spec:
             image:
               repository: binwiederhier/ntfy
               tag: v2.28.0
+            securityContext:
+              readOnlyRootFilesystem: true
             args: ["serve"]
             env:
               TZ: ${TZ}
@@ -65,3 +67,7 @@ spec:
         existingClaim: ntfy
         globalMounts:
           - path: /var/lib/ntfy
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp

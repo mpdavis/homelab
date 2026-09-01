@@ -17,6 +17,8 @@ spec:
     spec:
       serviceAccountName: homepage
       automountServiceAccountToken: true
+      # hygiene-exempt: readonly-rootfs cache footprint beyond the existing logs
+      # emptyDir (/app/config/logs) not verified -- Homepage may cache widget data under /app/config
       containers:
         - name: homepage
           image: ghcr.io/gethomepage/homepage:v1.13.2

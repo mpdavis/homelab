@@ -17,6 +17,8 @@ spec:
       containers:
         - name: teamarr
           image: ghcr.io/pharaoh-labs/teamarr:2.14.0
+          securityContext:
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 9195
               name: http
@@ -26,7 +28,11 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /app/data
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: teamarr-data
+        - name: tmp
+          emptyDir: {}

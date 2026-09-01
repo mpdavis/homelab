@@ -1,3 +1,5 @@
+# hygiene-exempt: readonly-rootfs likely a Laravel app -- writes framework cache/compiled
+# views/logs to storage/ and bootstrap/cache/ beyond the declared data/uploads mounts, not verified
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:

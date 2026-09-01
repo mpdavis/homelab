@@ -21,6 +21,8 @@ spec:
       # Gluetun requires /dev/net/tun which is only available on VM nodes, not LXC
       nodeSelector:
         node-type: vm
+      # hygiene-exempt: readonly-rootfs gluetun manages its own VPN/routing state under /gluetun;
+      # this container is critical-path for the whole pod's networking, not worth the restart risk to verify
       containers:
         - name: gluetun
           image: qmcgaw/gluetun:v3.41.3
@@ -96,6 +98,8 @@ spec:
           volumeMounts:
             - name: tun
               mountPath: /dev/net/tun
+        # hygiene-exempt: readonly-rootfs LinuxServer/s6-overlay writes to multiple system
+        # paths at init and runtime beyond /config
         - name: qbittorrent
           image: linuxserver/qbittorrent:5.2.1_v2.0.13-ls460
           env:
@@ -116,6 +120,8 @@ spec:
         # ProtonVPN exit IP — the same IP the tracker sees from torrent traffic.
         - name: mousehole
           image: tmmrtn/mousehole:0.5.0
+          securityContext:
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 5010
               name: mousehole
@@ -140,6 +146,8 @@ spec:
           volumeMounts:
             - name: mousehole-data
               mountPath: /var/lib/mousehole
+            - name: mousehole-tmp
+              mountPath: /tmp
       volumes:
         - name: config
           persistentVolumeClaim:
@@ -147,6 +155,8 @@ spec:
         - name: mousehole-data
           persistentVolumeClaim:
             claimName: mousehole-data
+        - name: mousehole-tmp
+          emptyDir: {}
         - name: media
           nfs:
             server: ${NAS_IP}

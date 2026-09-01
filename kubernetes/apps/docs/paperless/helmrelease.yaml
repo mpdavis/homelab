@@ -25,6 +25,8 @@ spec:
       main:
         containers:
           # paperless-ngx web/consumer/scheduler — single image runs all roles
+          # hygiene-exempt: readonly-rootfs OCR pipeline (ocrmypdf/pikepdf) and Django write
+          # temp/lock files to paths not fully mapped; holds real documents, not worth the restart risk
           main:
             image:
               repository: ghcr.io/paperless-ngx/paperless-ngx

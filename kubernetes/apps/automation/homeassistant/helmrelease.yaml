@@ -45,6 +45,8 @@ spec:
               tag: "2026.8.3"
             # Container-level hardening. HA runs as root (host integrations), so
             # no runAsNonRoot — just drop escalation and all capabilities.
+            # hygiene-exempt: readonly-rootfs HACS component installs, python cache, and
+            # TTS/media caches write well beyond /config; not compatible without significant rework
             securityContext:
               allowPrivilegeEscalation: false
               capabilities:

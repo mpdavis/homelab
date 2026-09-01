@@ -24,6 +24,7 @@ spec:
     controllers:
       main:
         containers:
+          # hygiene-exempt: readonly-rootfs prerelease app (canary tag), write behavior not verified
           main:
             image:
               # Only canary prereleases are published so far (no stable tag yet).

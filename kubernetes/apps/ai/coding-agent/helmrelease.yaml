@@ -64,6 +64,8 @@ spec:
                 secretKeyRef:
                   name: coding-agent-secrets
                   key: github-token
+            # hygiene-exempt: readonly-rootfs runs arbitrary dev tooling (npm/pip
+            # installs, builds, git ops) -- needs broad filesystem write access, not just /tmp
             securityContext:
               allowPrivilegeEscalation: false
             resources:

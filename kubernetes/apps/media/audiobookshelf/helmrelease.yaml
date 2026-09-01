@@ -30,6 +30,7 @@ spec:
               tag: 2.36.0
             securityContext:
               allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
               capabilities:
                 drop:
                   - ALL
@@ -60,3 +61,7 @@ spec:
         path: ${NAS_DATA_PATH}/media
         globalMounts:
           - path: /media
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp

@@ -12,6 +12,8 @@ spec:
       labels:
         app: hello-world
     spec:
+      # hygiene-exempt: readonly-rootfs demo/test service; stock nginx needs writable
+      # /var/cache/nginx, /var/run and /tmp -- not worth 3 extra emptyDir mounts here
       containers:
         - name: nginx
           image: nginx:alpine

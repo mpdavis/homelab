@@ -14,6 +14,8 @@ spec:
       labels:
         app: open-webui
     spec:
+      # hygiene-exempt: readonly-rootfs downloads/caches ML models (embeddings, whisper) to
+      # paths outside /app/backend/data; write footprint not fully mapped
       containers:
         - name: open-webui
           image: ghcr.io/open-webui/open-webui:v0.11.3

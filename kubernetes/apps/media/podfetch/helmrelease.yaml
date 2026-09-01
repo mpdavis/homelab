@@ -28,6 +28,8 @@ spec:
             image:
               repository: samuel19982/podfetch
               tag: v5.2.3
+            securityContext:
+              readOnlyRootFilesystem: true
             env:
               TZ: ${TZ}
               POLLING_INTERVAL: "60"
@@ -53,3 +55,7 @@ spec:
         path: ${NAS_DATA_PATH}/media/podcasts
         globalMounts:
           - path: /app/podcasts
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp

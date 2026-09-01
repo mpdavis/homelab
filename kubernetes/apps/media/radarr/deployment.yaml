@@ -14,6 +14,8 @@ spec:
       labels:
         app: radarr
     spec:
+      # hygiene-exempt: readonly-rootfs LinuxServer/s6-overlay writes to multiple system
+      # paths at init and runtime beyond /config
       containers:
         - name: radarr
           image: linuxserver/radarr:6.2.1.10461-ls305

@@ -28,6 +28,8 @@ spec:
             image:
               repository: ghcr.io/sethwv/game-thumbs
               tag: v2.2.0
+            securityContext:
+              readOnlyRootFilesystem: true
             env:
               TZ: ${TZ}
             probes:
@@ -56,3 +58,7 @@ spec:
         existingClaim: game-thumbs
         globalMounts:
           - path: /app/.cache
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp

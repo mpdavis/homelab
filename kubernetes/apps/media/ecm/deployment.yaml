@@ -22,6 +22,8 @@ spec:
       containers:
         - name: ecm
           image: ghcr.io/motwakorb/enhancedchannelmanager:latest@sha256:2ef4645a618283264f2966b1db2ae387c9629ed254831fea4365bfec604fa0fb
+          securityContext:
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 6100
               name: http
@@ -37,8 +39,12 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /config
+            - name: tmp
+              mountPath: /tmp
         - name: ecm-mcp
           image: ghcr.io/motwakorb/enhancedchannelmanager-mcp:latest@sha256:4312802781d7e82b6d860520d16f2af99a2bd6b78a07880bcc26cb4569ab7b07
+          securityContext:
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 6101
               name: mcp
@@ -51,7 +57,13 @@ spec:
             - name: config
               mountPath: /config
               readOnly: true
+            - name: mcp-tmp
+              mountPath: /tmp
       volumes:
         - name: config
           persistentVolumeClaim:
             claimName: ecm-config
+        - name: tmp
+          emptyDir: {}
+        - name: mcp-tmp
+          emptyDir: {}

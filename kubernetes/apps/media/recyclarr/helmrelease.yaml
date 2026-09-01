@@ -34,6 +34,8 @@ spec:
             image:
               repository: ghcr.io/recyclarr/recyclarr
               tag: 8.7.1
+            securityContext:
+              readOnlyRootFilesystem: true
             command:
               - recyclarr
               - sync
@@ -60,3 +62,7 @@ spec:
             main:
               - path: /config/recyclarr.yml
                 subPath: recyclarr.yml
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp

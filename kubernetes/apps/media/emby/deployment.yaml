@@ -15,6 +15,8 @@ spec:
         app: emby
     spec:
       runtimeClassName: nvidia
+      # hygiene-exempt: readonly-rootfs transcode cache paths configurable in the Emby UI
+      # and not verified; known to need writable scratch beyond /config
       containers:
         - name: emby
           image: emby/embyserver:4.10.0.30

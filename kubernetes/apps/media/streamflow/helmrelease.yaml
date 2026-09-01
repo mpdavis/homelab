@@ -24,6 +24,7 @@ spec:
     controllers:
       main:
         containers:
+          # hygiene-exempt: readonly-rootfs dev-tag prerelease, write behavior not verified
           main:
             image:
               repository: ghcr.io/krinkuto11/streamflow
