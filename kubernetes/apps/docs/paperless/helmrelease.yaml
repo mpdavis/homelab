@@ -28,7 +28,7 @@ spec:
           main:
             image:
               repository: ghcr.io/paperless-ngx/paperless-ngx
-              tag: 2.20.15
+              tag: 3.1.2
             env:
               TZ: ${TZ}
               PAPERLESS_TIME_ZONE: ${TZ}
