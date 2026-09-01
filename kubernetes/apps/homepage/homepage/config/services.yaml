@@ -52,10 +52,6 @@
         icon: mdi-key-variant
         href: https://ecm.${DOMAIN}
         description: ECM server
-    - StreamFlow:
-        icon: mdi-sort-variant
-        href: https://streamflow.${DOMAIN}
-        description: IPTV stream quality ordering
 - AI:
     - Open WebUI:
         icon: open-webui.png
