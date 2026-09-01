@@ -14,9 +14,13 @@ spec:
       labels:
         app: ecm
     spec:
+      # ECM's entrypoint starts as root, applies PUID/PGID via usermod/groupmod,
+      # then drops privileges itself (`exec gosu appuser ...`). gosu is not
+      # setuid, so pinning runAsUser/runAsGroup here makes it fail with
+      # "failed switching to appuser: operation not permitted" -- both in the
+      # /config write probe (reported as the misleading "Config directory is not
+      # writable") and in the final exec. Only fsGroup is safe to set.
       securityContext:
-        runAsUser: 1000
-        runAsGroup: 1000
         fsGroup: 1000
         fsGroupChangePolicy: OnRootMismatch
       containers:
@@ -26,6 +30,12 @@ spec:
             - containerPort: 6100
               name: http
           env:
+            # Honoured by the entrypoint (PUID=${PUID:-1000} + usermod/groupmod);
+            # this image is not a no-op LinuxServer-style consumer of them.
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
             - name: CONFIG_DIR
               value: /config
             - name: ECM_PORT
