@@ -95,8 +95,8 @@ customChecks:
   # KNOWN GAP: verify-container-capabilities only evaluates containers that already
   # have a securityContext.capabilities block. A container with no securityContext at
   # all — the single most common finding in the review history this replaced — passes
-  # silently. Tracked in the follow-up issue; closing it needs a Kyverno/conftest
-  # policy, which kube-linter's templates cannot express.
+  # silently. Tracked in #562; closing it needs a Kyverno/conftest policy, which
+  # kube-linter's check templates cannot express.
   - name: must-drop-all-capabilities
     template: verify-container-capabilities
     params:

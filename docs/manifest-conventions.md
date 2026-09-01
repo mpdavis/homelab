@@ -37,8 +37,8 @@ Three rules in this document are **documented but not currently machine-checked*
 | PUID/PGID vs `runAsUser` by image family (§1) | Conditioning on image family is homelab-specific; no linter models it. |
 | Gatus / Homepage registration (§6) | Being replaced by generated config rather than a lint rule. |
 
-These are tracked in the manifest-hygiene follow-up issue. Until then they are review
-concerns, which is what the `k8s-review` reviewer is for.
+These are tracked in #562. Until then they are review concerns, which is what the
+`k8s-review` reviewer is for.
 
 ---
 
@@ -262,7 +262,7 @@ Advisory, not enforced — "which endpoint means healthy" isn't mechanically dec
 
 ## 6. Monitoring registration for anything with a hostname
 
-**Not machine-checked** — see the follow-up issue. Cross-file referential integrity
+**Not machine-checked** — see #562. Cross-file referential integrity
 between an IngressRoute and two unrelated files is not something a workload linter can
 express, and the better fix is to stop requiring the edits at all: `gatus-sidecar`
 generates Gatus endpoints from IngressRoute annotations, and Homepage has native
