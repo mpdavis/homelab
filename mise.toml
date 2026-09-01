@@ -31,9 +31,13 @@ kube-linter = "0.8.3"
 
 [env]
 # flate's parallel reconcile has a non-deterministic DAG-scheduler race
-# (home-operations/flate#828) that parks the scheduler forever on ~half of runs with
-# two or more concurrent nodes. This tree renders in a few seconds, so serialising
-# costs nothing. Same setting the workflows use.
+# (home-operations/flate#828) that can park the scheduler until the step times out.
+#
+# Deliberately 1 here, where render-validate.yml uses 8. CI is tuning throughput
+# against a stall it documents as "a mitigation, not a proven fix", and eats the
+# occasional 5-minute timeout when it loses. Locally the whole tree renders in a few
+# seconds, so serialising costs nothing and buys a render that never hangs — the
+# wrong trade for CI, the right one for a command you run before pushing.
 FLATE_CONCURRENCY = "1"
 
 [tasks."lint:render"]
