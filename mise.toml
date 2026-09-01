@@ -1,0 +1,106 @@
+# Local dev tooling, pinned to the versions CI uses.
+#
+# The manifest hygiene check is not something you can meaningfully reproduce by
+# reading the workflow: it lints the *rendered* tree, and it reports only findings
+# your branch introduces relative to main. Both halves need real tooling, so they get
+# a task rather than a paragraph in a doc that drifts.
+#
+#   brew install mise     # once
+#   mise trust            # once per clone — mise will not run an untrusted config
+#   mise install          # fetch the pinned tools
+#
+#   mise run lint      # what this branch introduces  <- the one you want
+#   mise run lint:all  # the whole backlog, for deliberate cleanup
+#   mise tasks            # list everything
+#
+# `lint` exits non-zero when your branch introduces a finding, so it works as a
+# pre-push hook. It compares against origin/main; override with
+# `LINT_BASE=<ref> mise run lint`.
+#
+# Keep the versions below in sync with .github/workflows/manifest-hygiene-check.yml
+# (KUBE_LINTER_VERSION) and render-validate.yml (the flate action tag). Renovate
+# tracks them via the comments above each entry.
+
+[tools]
+# renovate: datasource=github-releases depName=stackrox/kube-linter
+kube-linter = "0.8.3"
+
+# Not in mise's registry, so it comes from GitHub releases via the ubi backend.
+# renovate: datasource=github-releases depName=home-operations/flate
+"ubi:home-operations/flate" = "0.6.2"
+
+[env]
+# flate's parallel reconcile has a non-deterministic DAG-scheduler race
+# (home-operations/flate#828) that can park the scheduler until the step times out.
+#
+# Deliberately 1 here, where render-validate.yml uses 8. CI is tuning throughput
+# against a stall it documents as "a mitigation, not a proven fix", and eats the
+# occasional 5-minute timeout when it loses. Locally the whole tree renders in a few
+# seconds, so serialising costs nothing and buys a render that never hangs — the
+# wrong trade for CI, the right one for a command you run before pushing.
+FLATE_CONCURRENCY = "1"
+
+[tasks."lint:render"]
+description = "Render the whole tree the way Flux would, to rendered.yaml"
+run = """
+set -euo pipefail
+flate build all --path ./kubernetes --no-progress > rendered.yaml
+objects=$(grep -c '^kind:' rendered.yaml || true)
+# A render that silently produced nothing would make every later check pass
+# vacuously — the same guard the workflow applies.
+if [ "${objects:-0}" -lt 50 ]; then
+  echo "rendered.yaml has only ${objects:-0} objects; expected the whole tree." >&2
+  exit 1
+fi
+echo "Rendered ${objects} objects to rendered.yaml"
+"""
+
+[tasks."lint:all"]
+description = "Lint the whole rendered tree, including the pre-existing backlog"
+depends = ["lint:render"]
+run = "kube-linter lint --config .kube-linter.yaml rendered.yaml"
+
+[tasks.lint]
+description = "Show only the findings this branch introduces vs origin/main"
+run = """
+set -euo pipefail
+
+# Override to compare against something else, e.g. when a PR targets a stack:
+#   LINT_BASE=origin/some-branch mise run lint
+base_ref="${LINT_BASE:-origin/main}"
+work=$(mktemp -d)
+# The baseline worktree and the rendered YAML are scratch; never leave them behind,
+# including on failure, or a stale worktree blocks the next run.
+trap 'git worktree remove --force "$work/base" 2>/dev/null || true; rm -rf "$work"' EXIT
+
+echo "Rendering this branch..."
+flate build all --path ./kubernetes --no-progress > "$work/head.yaml"
+
+echo "Rendering ${base_ref}..."
+git worktree add --detach "$work/base" "$base_ref" >/dev/null
+flate build all --path "$work/base/kubernetes" --no-progress > "$work/base.yaml"
+
+# kube-linter exits non-zero whenever it finds anything, which is the normal case
+# here — the tree carries a backlog. Only the diff decides pass/fail. Its stderr is
+# silenced for the same reason: "Error: found 367 lint errors" is the expected
+# outcome of the baseline run, and printing it reads like a failure.
+set +e
+kube-linter lint --config .kube-linter.yaml --format json "$work/head.yaml" > "$work/head.json" 2>/dev/null
+kube-linter lint --config .kube-linter.yaml --format json "$work/base.yaml" > "$work/base.json" 2>/dev/null
+set -e
+
+python3 .github/scripts/kube-linter-diff.py "$work/base.json" "$work/head.json"
+"""
+
+[tasks."lint:selftest"]
+description = "Prove every configured kube-linter check still fires"
+run = """
+set -euo pipefail
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+# Findings are the whole point here — the fixture is deliberately non-compliant — so
+# kube-linter's non-zero exit and "found N lint errors" are both expected, not news.
+kube-linter lint --config .kube-linter.yaml --format json \
+  .github/tests/kube-linter-canary.yaml > "$work/canary.json" 2>/dev/null || true
+python3 .github/scripts/kube-linter-selftest.py .kube-linter.yaml "$work/canary.json"
+"""
