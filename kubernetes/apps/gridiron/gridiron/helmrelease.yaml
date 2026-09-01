@@ -42,14 +42,6 @@ spec:
               repository: ghcr.io/mpdavis/gridiron
               # build-gridiron.yml publishes only from main, so every tag in the
               # registry is merged code and Renovate's bump can be taken as read.
-              #
-              # FIRST DEPLOY: this tag is 1.0.<run_number> of that workflow, and
-              # the run number is not knowable before the merge — the pull
-              # request's own build consumes run 1 without publishing. Check
-              # what the main build actually pushed and correct this if it
-              # differs, or wait for Renovate to open the bump. Until the tag
-              # exists the pod sits in ImagePullBackOff, which is visible and
-              # harmless rather than silently wrong.
               tag: 1.0.4
             env:
               TZ: ${TZ}
