@@ -1,0 +1,112 @@
+# kube-linter configuration — the mechanically checkable subset of
+# docs/manifest-conventions.md.
+#
+# Run against the *rendered* tree (`flate build all`), not the source manifests.
+# That is the whole reason this replaced a bespoke checker: by the time flate has
+# reconciled the tree, an app-template HelmRelease and a hand-written Deployment are
+# both just a Deployment, and so are the ~20 third-party charts whose values schema
+# nothing in this repo can reason about. Linting source YAML meant re-implementing
+# Helm badly and giving up on every chart that wasn't app-template.
+#
+# Exemptions are per-object annotations, which survive rendering (a YAML comment does
+# not) and can be set from app-template values:
+#
+#   metadata:
+#     annotations:
+#       ignore-check.kube-linter.io/no-read-only-root-fs: "writes into its install tree"
+#
+# The annotation value is the reason. Leave it meaningful — it is the record of the
+# decision, which is the entire point of having the rule.
+
+checks:
+  # Only the checks named below. Without this, kube-linter silently adds its default
+  # set on top and the config stops describing what actually runs.
+  doNotAutoAddDefaults: true
+
+  include:
+    # --- Section 1: runtime identity --------------------------------------------
+    # Fires on LinuxServer images too, which is correct-by-policy but wrong-by-intent:
+    # s6-overlay must start as root (see docs section 1). Those four workloads carry
+    # an ignore-check annotation naming s6 as the reason.
+    - run-as-non-root
+
+    # --- Section 2: container hardening -----------------------------------------
+    - no-read-only-root-fs
+
+    # --- Section 3: resources ----------------------------------------------------
+    # Both built-ins happen to encode exactly what section 3 asks for, despite
+    # descriptions that say otherwise. Their real params:
+    #   unset-cpu-requirements    -> requirementsType: request  (no CPU *limit* demanded,
+    #                                which is what the doc wants — CPU is compressible,
+    #                                so a limit buys throttling and nothing else)
+    #   unset-memory-requirements -> requirementsType: limit
+    # Between them that is requests.cpu + limits.memory. requests.memory is the gap,
+    # covered by the custom check below.
+    - unset-cpu-requirements
+    - unset-memory-requirements
+
+customChecks:
+  # --- Section 4: image pinning --------------------------------------------------
+  # The built-in latest-tag blocks only an explicit `:latest` and untagged references.
+  # Section 4 rejects the whole family of names that move under you, so the block list
+  # is widened to match the document rather than the document narrowed to match the
+  # tool. Complements image-pin-check.yml: this says *pinned*, that says *real*.
+  #
+  # Every pattern is anchored at end-of-string, which is what makes a digest-pinned
+  # floating tag (`:latest@sha256:…`) pass — correctly, since the digest is what
+  # actually gets deployed and Renovate can bump it.
+  - name: floating-tag
+    template: latest-tag
+    params:
+      BlockList:
+        # Tags that move. Keep in sync with section 4 of the conventions doc.
+        - ".*:(latest|edge|stable|main|master|develop|development|nightly|rolling|release)$"
+        # No colon anywhere: an untagged reference, which resolves to :latest.
+        - "^[^:]*$"
+        # A repository path whose final segment carries no tag, same reason.
+        - "(.*/[^:]+)$"
+    remediation: >-
+      Pin an immutable version tag, or append a digest so Renovate can propose a
+      reviewable bump. A floating tag means the running version depends on when a pod
+      last restarted, and deploy-canary cannot attribute a regression to a merge.
+      See docs/manifest-conventions.md section 4.
+    scope:
+      objectKinds:
+        - DeploymentLike
+
+  # --- Section 3: resources, continued -------------------------------------------
+  # The bound pair [0,0] is how the built-ins spell "unset" — flag containers whose
+  # declared value falls in that range. A lower bound of 1 would invert the check and
+  # flag every container that *does* declare a request.
+  - name: unset-memory-request
+    template: memory-requirements
+    params:
+      requirementsType: request
+      lowerBoundMB: 0
+      upperBoundMB: 0
+    remediation: >-
+      Set resources.requests.memory. Without it the scheduler treats the pod as free,
+      and this is a two-node cluster. See docs/manifest-conventions.md section 3.
+    scope:
+      objectKinds:
+        - DeploymentLike
+
+  # --- Section 2: container hardening (partial) ---------------------------------
+  # KNOWN GAP: verify-container-capabilities only evaluates containers that already
+  # have a securityContext.capabilities block. A container with no securityContext at
+  # all — the single most common finding in the review history this replaced — passes
+  # silently. Tracked in #562; closing it needs a Kyverno/conftest policy, which
+  # kube-linter's check templates cannot express.
+  - name: must-drop-all-capabilities
+    template: verify-container-capabilities
+    params:
+      forbiddenCapabilities:
+        - all
+    remediation: >-
+      Set securityContext.capabilities.drop: [ALL] and add back only what the app
+      genuinely needs (gluetun needs NET_ADMIN). LinuxServer images are the exception —
+      dropping ALL breaks s6 init — and carry an ignore-check annotation.
+      See docs/manifest-conventions.md section 2.
+    scope:
+      objectKinds:
+        - DeploymentLike
