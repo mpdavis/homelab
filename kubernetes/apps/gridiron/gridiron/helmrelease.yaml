@@ -50,7 +50,7 @@ spec:
               # differs, or wait for Renovate to open the bump. Until the tag
               # exists the pod sits in ImagePullBackOff, which is visible and
               # harmless rather than silently wrong.
-              tag: 1.0.2
+              tag: 1.0.4
             env:
               TZ: ${TZ}
               GRIDIRON_DATA_DIR: /data
