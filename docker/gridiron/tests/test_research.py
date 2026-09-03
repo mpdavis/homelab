@@ -318,6 +318,22 @@ def test_status_summary_reports_the_partition_and_the_bar(featured, monkeypatch)
 # ---------------------------------------------------------------------------
 
 
+def test_the_sdk_surface_the_proposer_depends_on_exists():
+    """Pin the assumption rather than discover it at the first proposal.
+
+    `messages.parse(output_format=...)` is not on anthropic 0.x, and a resolver
+    given a loose floor would install a version that imports fine and fails
+    only when someone actually asks for a hypothesis.
+    """
+    import inspect
+
+    import anthropic
+
+    client = anthropic.Anthropic(api_key="not-a-real-key")
+    assert hasattr(client.messages, "parse")
+    assert "output_format" in inspect.signature(client.messages.parse).parameters
+
+
 def test_the_proposer_refuses_without_a_key_and_says_what_still_works(conn, monkeypatch):
     from gridiron.config import settings
     from gridiron.research import propose
