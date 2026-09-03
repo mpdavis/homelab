@@ -126,15 +126,20 @@ trusted.
 18 HelmRepositories, 536 rendered objects — measures **~5 seconds** and produces a
 ~7 MB cache, so the job is dominated by runner startup rather than by rendering.
 
-**Known flakiness in flate 0.5.0 — read this before debugging a slow run.** flate has
-been observed **wedging** rather than failing. Twice locally, and once in CI where
-`flate build` sat for 11+ minutes on a tree that `flate test` had rendered seconds
-earlier in the same job. It is not repo-specific and not reproducible on demand.
+**Known flakiness — read this before debugging a slow run.** flate has been observed
+**wedging** rather than failing: `flate build` sitting for 11+ minutes on a tree that
+`flate test` had rendered seconds earlier in the same job. Root cause is a
+non-deterministic race in flate's parallel DAG scheduler
+([home-operations/flate#828](https://github.com/home-operations/flate/issues/828)) —
+with two or more concurrent nodes the reconcile→require→refresh loop never reaches a
+fixed point and a goroutine parks in `sync.Cond.Wait` forever. It reproduced on a
+large fraction of runs regardless of content.
 
-Mitigations, none of them a proven fix:
+Mitigations:
 
-- `FLATE_CONCURRENCY: 8` — the default of 40 parallel reconcile bodies is a lot to
-  schedule onto a 4-vCPU runner, and narrows the window for whatever the stall is.
+- `FLATE_CONCURRENCY: 1` — serialising the reconcile is the only reliable avoidance
+  upstream has found. `FLATE_CONCURRENCY: 8` was tried first and still hung on ~1 run
+  in 6. This tree renders in ~2s serially, so the lost parallelism costs nothing.
 - **Per-step `timeout-minutes`** (5 for render and build, 8 for diff) on top of the
   15-minute job cap, so a wedge fails in minutes and names the step that hung instead
   of reporting a generic job timeout.
