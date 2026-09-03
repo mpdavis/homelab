@@ -14,6 +14,38 @@ scripts with no LLM and no secrets.
 | `deploy-canary.yml` | Push to `main` (+ manual re-run) | Waits for Flux to reconcile the merged commit, then polls the Gatus API (`status.mpdavis.com`) until every synthetic check reports a healthy result **newer than the reconcile** — proving services actually serve traffic, not just that manifests applied. Snapshots which endpoints were already failing *before* the deploy and only blames the merge for **pass→fail transitions**: those fail the `canary/gatus` commit status and **auto-open a revert PR**; pre-existing failures are exempt (chronic breakage alerts via Prometheus instead of spamming a revert PR per merge). Post-merge only — a red canary reverts, it does not block the next PR. A flake? Close the revert PR and re-run via workflow_dispatch. Requires the repo setting "Allow GitHub Actions to create and approve pull requests". |
 | `claude.yml` | `@claude` mention in an issue/PR comment | On-demand assistant — explain, review, or make changes when asked. |
 | `new-service.yml` | Issue labeled `new service` | Runs the `add-service` skill against the issue, scaffolds the manifests into `kubernetes/apps/<namespace>/<service>/`, and **opens a PR** (`Closes #<issue>`). Defaults to a HelmRelease (official chart, else bjw-s `app-template`). Never merges — the PR still goes through `k8s-review` / `image-pin-check`. |
+| `lint-dockerfile.yml` | PRs touching `docker/**/Dockerfile` (advisory) | hadolint over the changed Dockerfiles. Config `.hadolint.yaml`. See [Lint checks](#lint-checks). |
+| `lint-shell.yml` | PRs touching `**/*.sh` (advisory) | shellcheck over the changed shell scripts. Config `.shellcheckrc`. |
+| `lint-markdown.yml` | PRs touching `**/*.md` (advisory) | markdownlint-cli2 over the changed Markdown files. Config `.markdownlint-cli2.jsonc`. |
+| `lint-secrets.yml` | All PRs + push to `main` (advisory, no `paths` filter) | gitleaks over the commit range the PR/push adds. Config `.gitleaks.toml`. Backstop for a credential that bypasses the External Secrets pattern. |
+| `lint-helm.yml` | PRs touching `charts/**` (advisory) | `helm lint --strict` over first-party charts under `charts/*/`. Dormant until the first local chart lands. |
+
+## Lint checks
+
+Five stack-wide linters, added together. All are **advisory** — none is on main's
+ruleset — and all are **`paths`-filtered** to the file type they own, so this is the
+opposite of the required checks: a lint workflow that does not run is fine, and the
+filter keeps it off PRs it has nothing to say about. On a pull request each one lints
+only the files that PR changed (`git diff` against the base SHA), so the existing
+backlog in docs and images does not wall off unrelated work; `workflow_dispatch` runs
+the same tool over the whole tree for a deliberate cleanup pass.
+
+| Tool | Scope | Config | Notes |
+|---|---|---|---|
+| [hadolint](https://github.com/hadolint/hadolint) | `docker/**/Dockerfile` | `.hadolint.yaml` | `DL3008/DL3013/DL3018` (distro package pinning) and `DL4006` start disabled — the images pin *tool* versions via renovate-annotated ARGs and leave the distro package set to the base image. |
+| [shellcheck](https://github.com/koalaman/shellcheck) | tracked `*.sh` | `.shellcheckrc` | Scripts embedded in workflow `run:` blocks are **not** covered — that needs actionlint, which this repo does not run yet. |
+| [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) | `*.md` | `.markdownlint-cli2.jsonc` | `MD013`/`MD033`/`MD041` disabled; vendored trees (`.claude/`, `.venv`, caches) in `ignores`. |
+| [gitleaks](https://github.com/gitleaks/gitleaks) | whole repo, commit range only | `.gitleaks.toml` | No `paths` filter — a leak can be anywhere. Allowlists lockfiles, test fixtures, BWS UUIDs, and the git-ignored local files. |
+| [helm](https://helm.sh) `lint --strict` | `charts/*/` | — | No first-party charts exist yet; third-party charts are HelmReleases and `render-validate.yml` already covers those. Starts linting automatically when `charts/<name>/` appears. |
+
+**Version pins** live as renovate-annotated `*_VERSION` env vars in each workflow —
+the same custom manager that tracks `kubeconform` in `render-validate.yml` keeps
+these current (see `renovate.json`).
+
+**Promoting one to required.** Get the tool to green over the whole tree
+(`workflow_dispatch`), then — exactly as with `Render & Validate` — drop the `paths`
+filter (a required check that gets skipped never reports and blocks the PR forever)
+and add the job to main's ruleset.
 
 ## Render & Validate
 

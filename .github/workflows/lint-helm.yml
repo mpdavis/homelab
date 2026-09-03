@@ -1,0 +1,62 @@
+name: Lint · Helm charts
+
+# `helm lint` over first-party charts under charts/*. Advisory: NOT on main's
+# ruleset, paths-filtered to charts/**.
+#
+# There are no local charts today — every third-party chart is consumed as a
+# HelmRelease and render-validate.yml already renders and schema-checks those. This
+# workflow is here for when a hand-written chart lands under charts/<name>/: it then
+# starts linting automatically, no wiring needed. Until then it only runs on manual
+# dispatch and reports "nothing to lint".
+
+on:
+  pull_request:
+    paths:
+      - 'charts/**'
+      - '.github/workflows/lint-helm.yml'
+  # No `push: main` trigger — see lint-dockerfile.yml.
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-helm-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # renovate: datasource=github-releases depName=helm/helm
+  HELM_VERSION: "v3.16.3"
+
+jobs:
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install helm
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -sSfL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP" linux-amd64/helm
+          mv "$RUNNER_TEMP/linux-amd64/helm" "$RUNNER_TEMP/bin/helm"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Lint charts
+        run: |
+          shopt -s nullglob
+          charts=(charts/*/Chart.yaml)
+          if [ "${#charts[@]}" -eq 0 ]; then
+            echo "No charts under charts/*/ yet; nothing to lint."
+            exit 0
+          fi
+          rc=0
+          for c in "${charts[@]}"; do
+            d=$(dirname "$c")
+            echo "::group::helm lint $d"
+            # Pull chart dependencies if the chart declares any; ignore if none.
+            helm dependency build "$d" 2>/dev/null || true
+            helm lint --strict "$d" || rc=1
+            echo "::endgroup::"
+          done
+          exit $rc

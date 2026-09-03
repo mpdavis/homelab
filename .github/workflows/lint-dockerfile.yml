@@ -1,0 +1,77 @@
+name: Lint · Dockerfiles
+
+# hadolint over the custom images in docker/*/. Advisory: NOT on main's ruleset,
+# and paths-filtered — it only runs when a Dockerfile (or its config) changes, and
+# then lints only the Dockerfiles that PR touched, so a pre-existing finding in one
+# image never reddens an unrelated PR. Promote to a required check per the README
+# once both images lint clean, at which point the paths filter has to go.
+
+on:
+  pull_request:
+    paths:
+      - 'docker/**/Dockerfile'
+      - '.hadolint.yaml'
+      - '.github/workflows/lint-dockerfile.yml'
+  # No `push: main` trigger: a full-tree run on main would stand red on any
+  # pre-existing finding. This is a PR-time diff check; `workflow_dispatch` covers
+  # the whole tree on demand for a cleanup pass.
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-dockerfile-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # renovate: datasource=github-releases depName=hadolint/hadolint
+  HADOLINT_VERSION: "v2.12.0"
+
+jobs:
+  hadolint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install hadolint
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -sSfL \
+            "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-Linux-x86_64" \
+            -o "$RUNNER_TEMP/bin/hadolint"
+          chmod +x "$RUNNER_TEMP/bin/hadolint"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Select Dockerfiles in scope
+        id: select
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Only what this PR changed (deletes excluded).
+            git diff --name-only --diff-filter=d \
+              "${{ github.event.pull_request.base.sha }}" HEAD \
+              | { grep -E '^docker/.*Dockerfile$' || true; } > files.txt
+          else
+            git ls-files | { grep -E '^docker/.*Dockerfile$' || true; } > files.txt
+          fi
+          count=$(wc -l < files.txt | tr -d ' ')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          if [ "$count" -eq 0 ]; then
+            echo "No Dockerfiles in scope; nothing to lint."
+          else
+            echo "Linting:"; cat files.txt
+          fi
+
+      - name: Run hadolint
+        if: steps.select.outputs.count != '0'
+        run: |
+          rc=0
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            echo "::group::$f"
+            hadolint --config .hadolint.yaml "$f" || rc=1
+            echo "::endgroup::"
+          done < files.txt
+          exit $rc
