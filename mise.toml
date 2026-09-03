@@ -27,7 +27,7 @@ kube-linter = "0.8.3"
 
 # Not in mise's registry, so it comes from GitHub releases via the ubi backend.
 # renovate: datasource=github-releases depName=home-operations/flate
-"ubi:home-operations/flate" = "0.6.2"
+"ubi:home-operations/flate" = "0.6.5"
 
 [env]
 # flate's parallel reconcile has a non-deterministic DAG-scheduler race
