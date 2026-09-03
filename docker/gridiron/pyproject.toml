@@ -44,4 +44,15 @@ include = ["gridiron*"]
 testpaths = ["tests"]
 addopts = "--import-mode=importlib"
 pythonpath = ["tests"]
-filterwarnings = ["error"]
+filterwarnings = [
+    # Warnings are errors: a DeprecationWarning from pandas or numpy is usually
+    # this package doing something that is about to stop working, and it should
+    # fail a build rather than scroll past.
+    "error",
+    # The exception, scoped to one message. starlette's TestClient reaches for
+    # `anyio.abc.BlockingPortal`, which anyio 4.15 deprecated. It is inside the
+    # test harness, there is no call this package could make instead, and the
+    # fix has to come from starlette. Narrow rather than a blanket ignore of
+    # DeprecationWarning, so the next one still fails.
+    "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+]
