@@ -22,7 +22,7 @@ spec:
         fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: teamarr
-          image: ghcr.io/pharaoh-labs/teamarr:2.14.0
+          image: ghcr.io/pharaoh-labs/teamarr:2.15.0
           ports:
             - containerPort: 9195
               name: http
