@@ -32,6 +32,28 @@ A positive edge means the model likes the home side. Getting this backwards is
 the single most expensive bug available in this domain, so it is stated once,
 here and in `gridiron/__init__.py`, and never re-derived.
 
+## The market series
+
+Backtests grade against a market line, and which books CFBD publishes is not
+stable. A merged `consensus` provider exists through 2022 and stops; from 2023
+the same endpoint returns individual books (ESPN Bet, DraftKings, Bovada) whose
+mix changes again each season.
+
+So the default series is **built, not read**: the median spread across whatever
+books a game has. A median over two to four books is stable, is defined in every
+season, and estimates the market better than any single book. CFBD's own
+`consensus` rows are excluded where real books exist — that row is itself an
+aggregate, and counting it beside its own inputs would weight it twice.
+
+`--provider "ESPN Bet"` grades against one book instead, for asking how a model
+fares against the specific number that book hung.
+
+This was a live bug, and it is worth knowing what it looked like: pinning the
+default to the literal string `consensus` matched nothing from 2023 on. A game
+with no line is dropped rather than raising, so every analysis quietly lost the
+NIL era and went on reporting confident numbers over the seasons that remained
+— the failure mode this package warns about, built into its own defaults.
+
 ## Point-in-time discipline
 
 Leakage is the default failure mode of a backtest, so it is prevented
