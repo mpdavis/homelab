@@ -73,8 +73,29 @@ def refresh_odds_once() -> int:
             STATE.running = False
 
 
+def _is_empty() -> bool:
+    """True when no games have ever been ingested."""
+    from .db import cursor
+
+    with cursor() as conn:
+        return conn.execute("SELECT count(*) FROM games").fetchone()[0] == 0
+
+
 def refresh_data_once(seasons: list[int] | None = None) -> str:
-    """Re-ingest and rebuild features. Current season only, by default."""
+    """Re-ingest and rebuild features.
+
+    Defaults to the current season, which is all a routine refresh needs. The
+    exception is an empty database: there, the default would leave the service
+    permanently holding one season, and every backtest would have nothing to
+    train on. So a first run backfills the whole configured range instead.
+
+    That matters more than it looks, because this process is the *only* thing
+    that can write. DuckDB's lock is exclusive — a second process running
+    `gridiron ingest` against the same file cannot even open it read-only — so
+    there is no shell-in-and-seed-it fallback. If this function does not do the
+    backfill, nothing does.
+    """
+    from .config import season_range
     from .db import cursor
     from .features.build import build_team_game
     from .ingest import ingest_seasons
@@ -82,7 +103,13 @@ def refresh_data_once(seasons: list[int] | None = None) -> str:
     with STATE.lock:
         STATE.running = True
     try:
-        seasons = seasons or [current_season()]
+        if seasons is None:
+            if _is_empty():
+                first, last = season_range()
+                seasons = list(range(first, last + 1))
+                log.info("Empty database; backfilling seasons %d-%d", first, last)
+            else:
+                seasons = [current_season()]
         report = ingest_seasons(seasons)
         with cursor() as conn:
             build_team_game(conn, seasons)

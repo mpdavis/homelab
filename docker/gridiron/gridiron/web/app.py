@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -212,4 +213,56 @@ def create_app() -> FastAPI:
             "refresh": scheduler.STATE.snapshot(),
         }
 
+    @app.post("/api/refresh")
+    def api_refresh(
+        seasons: str | None = Query(
+            None, description='e.g. "2015-2026" or "2019,2021"; omitted = current season'
+        ),
+    ):
+        """Run an ingest now, in this process.
+
+        The only way to trigger one. DuckDB's lock is exclusive, so
+        `kubectl exec ... gridiron ingest` cannot open the file the server is
+        holding — a second writer is not a thing this design permits. Anything
+        that needs to write has to be asked of the process that owns the file,
+        which is what this endpoint is for.
+
+        Runs on a worker thread so a decade-long backfill does not hold the
+        request open for ten minutes. Poll /api/status for the outcome.
+        """
+        if scheduler.STATE.running:
+            return JSONResponse(
+                {"started": False, "reason": "a refresh is already running"},
+                status_code=409,
+            )
+        parsed = _parse_seasons(seasons)
+        threading.Thread(
+            target=scheduler.refresh_data_once,
+            args=(parsed,),
+            name="gridiron-manual-refresh",
+            daemon=True,
+        ).start()
+        return {
+            "started": True,
+            "seasons": parsed or "current season (or full backfill if empty)",
+            "poll": "/api/status",
+        }
+
     return app
+
+
+def _parse_seasons(text: str | None) -> list[int] | None:
+    """Accept "2019-2024", "2019,2021,2023" or a single year."""
+    if not text:
+        return None
+    seasons: list[int] = []
+    for part in text.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            start, end = part.split("-", 1)
+            seasons.extend(range(int(start), int(end) + 1))
+        else:
+            seasons.append(int(part))
+    return sorted(set(seasons)) or None

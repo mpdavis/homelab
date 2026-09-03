@@ -22,7 +22,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<10"]
+# httpx2 is what starlette's TestClient wants; with plain httpx it emits a
+# deprecation warning, and warnings are errors here. Test-only — the package
+# itself talks to CFBD and The Odds API over httpx.
+dev = ["pytest>=8,<10", "httpx2>=2,<3"]
 
 [project.scripts]
 gridiron = "gridiron.__main__:main"

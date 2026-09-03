@@ -183,6 +183,45 @@ Without an Odds API key the edge report falls back to CFBD's stored lines,
 which are often stale and never carry Fanatics. It is a consolation, not a
 substitute.
 
+## Seeding, and why you cannot just shell in and run the CLI
+
+DuckDB's lock is exclusive. While the server is up it holds the database file,
+and a second process cannot open it — **not even with `read_only=True`**. So
+`kubectl exec ... gridiron ingest` does not work against a running server, and
+the CLI says so rather than surfacing a raw `IOException` naming a pid.
+
+Everything that writes therefore has to be asked of the process that owns the
+file:
+
+```
+# start an ingest now (backgrounded; poll /api/status for the result)
+curl -X POST 'https://gridiron.mpdavis.com/api/refresh?seasons=2015-2026'
+curl -s   'https://gridiron.mpdavis.com/api/status' | jq .refresh
+```
+
+Usually you do not need to. **An empty database backfills itself**: the first
+scheduled data tick (about five minutes after the pod starts) sees no games and
+ingests the whole `GRIDIRON_FIRST_SEASON..GRIDIRON_LAST_SEASON` range rather
+than the current season. After that, refreshes are incremental — current season
+only, every six hours — because that is all a running service needs.
+
+The CLI is for a machine where no server is holding the file: your laptop, or a
+pod scaled to zero replicas.
+
+### Knowing it worked
+
+Three signals, in increasing order of how much they actually prove:
+
+| Signal | What it tells you |
+|---|---|
+| `/api/status` → `refresh.last_ingest_at` and `last_error` | The refresh ran, and whether it ended clean. This is the only place a wedged run shows, since there is no CronJob to inspect. |
+| `/status` → coverage by season | Per-season row counts. **A season with games but zero plays is the failure that looks like success**: play-by-play never landed, every hidden-yardage feature is null for it, and it contributes nothing to a backtest while looking present. The page flags it. |
+| `gridiron backtest --seasons 2023` returning bets with a sane `mae_market` | The whole pipeline — ingest, features, models — demonstrably worked end to end. Counts can be nonzero and still wrong; this cannot. |
+
+What tells you nothing about the data: the Gatus probe going green. It checks
+that the web server returns a 302 from the auth middleware, which it does
+perfectly well with an empty database.
+
 ## Why one process owns the database
 
 DuckDB is a single-writer engine. That is the right trade here — every query
