@@ -5,10 +5,13 @@
 # Built by .github/workflows/build-gridiron.yml and deployed from
 # kubernetes/apps/gridiron/gridiron/.
 #
-# Python 3.13 rather than 3.14: numpy, pandas and duckdb all publish manylinux
-# wheels for it, so the image builds without a toolchain. On 3.14 at least one
-# of the three falls back to a source build, which needs gcc in the image and
-# turns a one-minute build into a fifteen-minute one.
+# The version to match in a dev venv, since warnings are errors in this suite
+# and a different interpreter resolves different numpy/pandas.
+#
+# This pinned 3.13 originally, because numpy, pandas or duckdb would fall back
+# to a source build on 3.14 and need gcc in the image. That is no longer true —
+# all three publish 3.14 wheels, Renovate moved the pin in #577, and the image
+# still builds in under a minute.
 FROM python:3.14-slim-bookworm
 
 # ca-certificates is the only runtime OS dependency — every fetch is HTTPS.
