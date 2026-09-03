@@ -42,7 +42,7 @@ spec:
               repository: ghcr.io/mpdavis/gridiron
               # build-gridiron.yml publishes only from main, so every tag in the
               # registry is merged code and Renovate's bump can be taken as read.
-              tag: 1.0.10
+              tag: 1.0.12
             env:
               TZ: ${TZ}
               GRIDIRON_DATA_DIR: /data
