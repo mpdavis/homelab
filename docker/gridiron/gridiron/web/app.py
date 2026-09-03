@@ -248,7 +248,103 @@ def create_app() -> FastAPI:
             "poll": "/api/status",
         }
 
+    # --- automated research ------------------------------------------------
+    # Same constraint as /api/refresh: the search writes to the ledger and the
+    # server holds the only connection, so the loop has to run in this process.
+    # The CLI covers the other case — a copy of the database on a laptop, where
+    # nothing is holding it.
+
+    @app.get("/api/research")
+    def api_research():
+        from ..research import registry
+
+        with cursor() as conn:
+            hypotheses = conn.execute(
+                "SELECT hypothesis_id, created_at, name, mechanism, status, source "
+                "FROM research_hypotheses ORDER BY created_at DESC LIMIT 50"
+            ).df()
+            trials = conn.execute(
+                "SELECT trial_id, hypothesis_id, stage, passed, statistic, created_at "
+                "FROM research_trials ORDER BY created_at DESC LIMIT 100"
+            ).df()
+        return {
+            "summary": registry.summary(),
+            "hypotheses": _records(hypotheses),
+            "recent_trials": _records(trials),
+        }
+
+    @app.post("/api/research/run")
+    def api_research_run(
+        count: int = Query(1, ge=1, le=25),
+        hint: str = Query("", description="steer the proposer"),
+        stop_at: str = Query("backtest", pattern="^(market|backtest)$"),
+    ):
+        """Propose and evaluate N hypotheses, in the background.
+
+        Every one raises the significance bar for everything after it, hence
+        the cap: a loop that could be handed 10,000 in one call would make the
+        ledger's correction the only thing standing between you and a strategy
+        that is purely the best of 10,000 coin flips. It still would — but
+        having to ask 400 times is a useful moment to reconsider.
+        """
+        from ..config import settings as _settings
+        from ..research import registry
+
+        if not _settings().anthropic_api_key:
+            return JSONResponse(
+                {
+                    "started": False,
+                    "reason": "GRIDIRON_ANTHROPIC_API_KEY is not set; the "
+                    "proposer cannot run. Hypotheses can still be added by hand "
+                    "with the CLI.",
+                },
+                status_code=503,
+            )
+        if _RESEARCH["running"]:
+            return JSONResponse(
+                {"started": False, "reason": "a search is already running"},
+                status_code=409,
+            )
+
+        threading.Thread(
+            target=_run_research,
+            args=(count, hint, stop_at),
+            name="gridiron-research",
+            daemon=True,
+        ).start()
+        return {
+            "started": True,
+            "count": count,
+            "bar_before": registry.summary()["required_t_now"],
+            "poll": "/api/research",
+        }
+
     return app
+
+
+_RESEARCH: dict = {"running": False, "last": []}
+
+
+def _run_research(count: int, hint: str, stop_at: str) -> None:
+    from ..research import evaluate as ev
+    from ..research import propose as pr
+    from ..research import registry
+
+    _RESEARCH["running"] = True
+    outcomes = []
+    try:
+        for _ in range(count):
+            try:
+                hypothesis = pr.propose(hint=hint)
+                registry.record_hypothesis(hypothesis)
+                report = ev.evaluate(hypothesis, stage_limit=stop_at)
+                outcomes.append({"name": hypothesis.name, "outcome": report["outcome"]})
+            except Exception as exc:  # noqa: BLE001 — one bad idea must not stop the run
+                log.exception("Research iteration failed")
+                outcomes.append({"name": "?", "outcome": f"error: {exc}"})
+    finally:
+        _RESEARCH["running"] = False
+        _RESEARCH["last"] = outcomes
 
 
 def _parse_seasons(text: str | None) -> list[int] | None:
