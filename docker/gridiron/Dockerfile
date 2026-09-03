@@ -9,7 +9,7 @@
 # wheels for it, so the image builds without a toolchain. On 3.14 at least one
 # of the three falls back to a source build, which needs gcc in the image and
 # turns a one-minute build into a fifteen-minute one.
-FROM python:3.13-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 # ca-certificates is the only runtime OS dependency — every fetch is HTTPS.
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
