@@ -29,6 +29,9 @@ log = logging.getLogger(__name__)
 # least efficient, so they are never skipped.
 SEASON_TYPES = ("regular", "postseason")
 
+# Books CFBD has spelled more than one way. Keyed on the lowercased name.
+PROVIDER_ALIASES = {"draft kings": "DraftKings"}
+
 # CFBD's play endpoint requires a week. Regular seasons run to 15 with the
 # conference championship weekend; asking past the end is a cheap empty list.
 MAX_REGULAR_WEEK = 16
@@ -262,10 +265,13 @@ class CFBDClient:
     def lines(self, season: int) -> list[dict]:
         """Historical betting lines, flattened to one row per game per book.
 
-        CFBD nests a list of providers under each game. Consensus is kept
-        alongside the individual books: it is the most complete series and so
-        the most honest thing to backtest against, while DraftKings is the one
-        that can be compared with what you would actually have been offered.
+        CFBD nests a list of providers under each game, and *which* providers
+        is not stable: a merged ``consensus`` row exists through 2022 and not
+        after, and the individual books come and go season to season. Every
+        provider is stored rather than a chosen one, so the market series can
+        be built at read time from whatever a season actually has — see
+        `backtest.line_series`. Pinning to one name here would bake in the
+        gap instead.
         """
         out: list[dict] = []
         for season_type in SEASON_TYPES:
@@ -277,6 +283,12 @@ class CFBDClient:
                     provider = pick(book, "provider")
                     if not provider:
                         continue
+                    # CFBD has spelled the same book two ways ("DraftKings" and
+                    # "Draft Kings" both appear in 2025); left alone they are
+                    # two providers and neither has the full season.
+                    provider = PROVIDER_ALIASES.get(
+                        provider.strip().lower(), provider.strip()
+                    )
                     out.append(
                         {
                             "game_id": game_id,

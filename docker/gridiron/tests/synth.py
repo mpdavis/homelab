@@ -61,6 +61,41 @@ SALVAGE_SKILL = {
 }
 
 
+# The provider mix CFBD actually returns, which changes partway through the
+# decade: a merged `consensus` row exists through 2022 and vanishes after, and
+# the individual books rotate. Reproducing that here is the point — it is the
+# shape that silently emptied the NIL-era seasons out of every analysis.
+CONSENSUS_LAST_SEASON = 2022
+MODERN_BOOKS = ("ESPN Bet", "DraftKings", "Bovada")
+LEGACY_BOOKS = ("William Hill (New Jersey)", "Bovada")
+
+
+def _lines(rng, game_id: int, season: int, priced: float) -> list[dict]:
+    """One row per book, priced around `priced` with a little book-to-book spread."""
+    if season <= CONSENSUS_LAST_SEASON:
+        providers = ("consensus",) + LEGACY_BOOKS
+    else:
+        providers = MODERN_BOOKS
+    out = []
+    for provider in providers:
+        # Books disagree by a fraction of a point; the median across them is
+        # what `line_series` reconstructs.
+        jitter = 0.0 if provider == "consensus" else float(rng.normal(0, 0.35))
+        out.append(
+            {
+                "game_id": game_id,
+                "provider": provider,
+                "spread": -round((priced + jitter) * 2) / 2,
+                "spread_open": -round((priced + jitter + rng.normal(0, 0.6)) * 2) / 2,
+                "over_under": 52.5,
+                "over_under_open": 52.5,
+                "home_moneyline": -200,
+                "away_moneyline": 170,
+            }
+        )
+    return out
+
+
 def _scoreline(margin: float, rng) -> tuple[int, int]:
     """A plausible scoreline with *exactly* this margin.
 
@@ -195,17 +230,8 @@ def build(
                 # that it overpays for brand by `brand_premium` per SD of gap.
                 gap = prestige[home] - prestige[away]
                 priced = expected - brand_premium * gap
-                lines.append(
-                    {
-                        "game_id": game_id,
-                        "provider": "consensus",
-                        "spread": -round(priced * 2) / 2,
-                        "spread_open": -round((priced + rng.normal(0, 0.6)) * 2) / 2,
-                        "over_under": 52.5,
-                        "over_under_open": 52.5,
-                        "home_moneyline": -200,
-                        "away_moneyline": 170,
-                    }
+                lines.extend(
+                    _lines(rng, game_id, season, priced)
                 )
                 drives.extend(_drives(rng, game_id, season, home, away))
                 plays.extend(_plays(rng, game_id, season, home, away))
@@ -437,18 +463,7 @@ def build_wide(
                         "venue": home,
                     }
                 )
-                lines.append(
-                    {
-                        "game_id": game_id,
-                        "provider": "consensus",
-                        "spread": -round(priced * 2) / 2,
-                        "spread_open": -round(priced * 2) / 2,
-                        "over_under": 52.5,
-                        "over_under_open": 52.5,
-                        "home_moneyline": -150,
-                        "away_moneyline": 130,
-                    }
-                )
+                lines.extend(_lines(rng, game_id, season, priced))
 
     for table in (
         "teams", "games", "drives", "plays", "lines", "recruiting", "talent", "portal"

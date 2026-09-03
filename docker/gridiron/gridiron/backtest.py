@@ -45,10 +45,12 @@ log = logging.getLogger(__name__)
 # 0.909 units and breaks even at 52.38%.
 DEFAULT_PRICE = -110
 
-# CFBD's merged line across books. It is the most complete series by a distance
-# — individual books have gaps in older seasons that would silently shrink the
-# sample and bias it toward the games books cared about.
+# Not a provider name: a per-game median across whatever books CFBD has for
+# that game. See `line_series` for why this is computed rather than read.
 DEFAULT_PROVIDER = "consensus"
+
+# Books whose names CFBD has spelled more than one way.
+PROVIDER_ALIASES = {"draft kings": "DraftKings"}
 
 
 def american_to_profit(price: int) -> float:
@@ -78,6 +80,67 @@ class BacktestConfig:
     label: str = ""
 
 
+def line_series(provider: str) -> tuple[str, list]:
+    """SQL for one line per game, and its parameters.
+
+    WHY THIS IS COMPUTED RATHER THAN READ. CFBD used to publish a merged
+    ``consensus`` provider and stopped after 2022 — from 2023 the same endpoint
+    returns only individual books (ESPN Bet, DraftKings, Bovada), and the
+    provider mix changes again from season to season. Joining on a fixed
+    provider name therefore matches nothing for recent seasons, and because a
+    missing line drops a game rather than raising, the whole NIL era vanished
+    from every analysis while the numbers still looked plausible. That is the
+    exact failure this package warns about elsewhere, so the fix is to stop
+    depending on a name that upstream does not guarantee.
+
+    The default builds its own consensus: the median spread across whatever
+    books exist for that game. A median over two to four books is stable, it is
+    defined in every season, and it is a better estimate of the market than any
+    single book — which is what a backtest wants. CFBD's own ``consensus`` rows
+    are excluded where real books exist, since that row is itself an aggregate
+    and counting it alongside its own inputs would double-weight it.
+
+    Passing an explicit provider still gives that book alone, for asking how a
+    model fares against the specific number one book hung.
+    """
+    if provider != DEFAULT_PROVIDER:
+        return (
+            """
+            SELECT game_id, spread, spread_open
+            FROM lines
+            WHERE lower(provider) = lower(?)
+            """,
+            [provider],
+        )
+    return (
+        """
+        WITH books AS (
+            SELECT game_id, spread, spread_open,
+                   CASE WHEN lower(provider) = 'consensus' THEN 1 ELSE 0 END
+                       AS is_aggregate
+            FROM lines
+            WHERE spread IS NOT NULL
+        ),
+        ranked AS (
+            SELECT *,
+                   -- 0 when this game has at least one real book quoted, 1
+                   -- when CFBD's merged row is all there is. Comparing each
+                   -- row against it keeps the books where books exist and
+                   -- falls back to the aggregate only where they do not.
+                   min(is_aggregate) OVER (PARTITION BY game_id) AS keep_level
+            FROM books
+        )
+        SELECT game_id,
+               median(spread)      AS spread,
+               median(spread_open) AS spread_open
+        FROM ranked
+        WHERE is_aggregate = keep_level
+        GROUP BY game_id
+        """,
+        [],
+    )
+
+
 def load_frame(conn, provider: str = DEFAULT_PROVIDER) -> pd.DataFrame:
     """One row per completed game, home perspective, with everything attached.
 
@@ -86,8 +149,10 @@ def load_frame(conn, provider: str = DEFAULT_PROVIDER) -> pd.DataFrame:
     the load to the test seasons would leave week one of the sample with
     nothing to learn from.
     """
+    line_sql, line_params = line_series(provider)
     games = conn.execute(
-        """
+        f"""
+        WITH market AS ({line_sql})
         SELECT
             tg.game_id, tg.season, tg.week, tg.kickoff,
             tg.team      AS home_team,
@@ -104,11 +169,11 @@ def load_frame(conn, provider: str = DEFAULT_PROVIDER) -> pd.DataFrame:
             l.spread_open
         FROM team_game tg
         JOIN games g ON g.game_id = tg.game_id
-        LEFT JOIN lines l ON l.game_id = tg.game_id AND l.provider = ?
+        LEFT JOIN market l ON l.game_id = tg.game_id
         WHERE tg.is_home
         ORDER BY tg.kickoff
         """,
-        [provider],
+        line_params,
     ).df()
 
     if games.empty:
