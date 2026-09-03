@@ -42,7 +42,7 @@ jobs:
         with:
           # The version the image ships, so the suite runs on what actually
           # runs. See the Dockerfile for why it is 3.13 and not 3.14.
-          python-version: '3.13'
+          python-version: '3.14'
 
       - name: Install the package and its test dependencies
         working-directory: docker/gridiron
