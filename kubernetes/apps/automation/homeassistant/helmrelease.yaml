@@ -30,7 +30,7 @@ spec:
           seed-config:
             image:
               repository: ghcr.io/home-assistant/home-assistant
-              tag: "2026.8.3"
+              tag: "2026.9.0"
             command:
               - /bin/sh
               - -c
@@ -42,7 +42,7 @@ spec:
           main:
             image:
               repository: ghcr.io/home-assistant/home-assistant
-              tag: "2026.8.3"
+              tag: "2026.9.0"
             # Container-level hardening. HA runs as root (host integrations), so
             # no runAsNonRoot — just drop escalation and all capabilities.
             # hygiene-exempt: runtime-identity HA intentionally runs as root for host
