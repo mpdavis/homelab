@@ -26,7 +26,7 @@ concurrency:
 
 env:
   # renovate: datasource=github-releases depName=hadolint/hadolint
-  HADOLINT_VERSION: "v2.12.0"
+  HADOLINT_VERSION: "v2.15.1"
 
 jobs:
   hadolint:
