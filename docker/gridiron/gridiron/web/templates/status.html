@@ -53,10 +53,15 @@
   <div class="note">
     A season with games but no plays has not had its play-by-play pulled, so every
     hidden-yardage feature is null for it and it silently contributes nothing to a
-    backtest. Fix with <code>gridiron ingest --seasons YYYY</code>.
+    backtest — the row above is the only place that shows. Re-pull it with
+    <code>curl -X POST '/api/refresh?seasons=YYYY'</code>.
   </div>
   {% else %}
-  <p class="empty">Nothing ingested yet. Start with <code>gridiron ingest</code>.</p>
+  <p class="empty">
+    Nothing ingested yet. The first scheduled refresh backfills the whole
+    configured range on its own, a few minutes after this process started.
+    To start one now: <code>curl -X POST '/api/refresh'</code>.
+  </p>
   {% endif %}
 </div>
 

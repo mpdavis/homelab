@@ -279,10 +279,33 @@ CREATE INDEX IF NOT EXISTS team_game_team ON team_game (team, kickoff);
 """
 
 
+class DatabaseLocked(RuntimeError):
+    """Another process already holds the database file."""
+
+
 def _open(path: Path | None = None) -> duckdb.DuckDBPyConnection:
     path = path or settings().db_path
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = duckdb.connect(str(path))
+    try:
+        conn = duckdb.connect(str(path))
+    except duckdb.IOException as exc:
+        if "lock" not in str(exc).lower():
+            raise
+        # The single-writer constraint, surfacing where someone will actually
+        # meet it: running the CLI in a pod whose server is already up. The
+        # raw error names a pid and a path and explains none of that, and the
+        # obvious next move — retry with read_only=True — fails identically,
+        # so it is worth saying outright that there is no second connection to
+        # be had and where the work has to go instead.
+        raise DatabaseLocked(
+            f"{path} is held by another process (the running server).\n"
+            "DuckDB allows one connection to a database file, and read-only "
+            "does not get you a second one.\n"
+            "To ingest, ask the server to do it instead:\n"
+            "    curl -X POST 'http://localhost:8080/api/refresh?seasons=2015-2026'\n"
+            "then watch /api/status. To run the CLI against this file directly, "
+            "stop the server first."
+        ) from exc
     conn.execute("SET TimeZone = 'UTC'")
     return conn
 
