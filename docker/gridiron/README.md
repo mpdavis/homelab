@@ -21,7 +21,7 @@ Only then does it become a bet (`gridiron edges`).
 Everything in this package is a **home margin in points**. There is exactly one
 conversion from book convention, and it lives in `backtest.load_frame`:
 
-```
+```text
 actual_margin  = home_points - away_points
 model_margin   = the model's prediction of that same quantity
 market_margin  = -spread          # a book quotes the favourite negative
@@ -84,7 +84,7 @@ half-life in **days**, plus a `season_carryover` multiplier per offseason
 boundary crossed (a summer is not ordinary time — coordinators, quarterbacks
 and portal classes all turn over). Both are swept:
 
-```
+```console
 gridiron sweep --model decomposed --seasons 2019-2025
 ```
 
@@ -129,7 +129,7 @@ are overvalued and the teams absorbing that talent are undervalued.
 Note that the right move is **not** to add prestige as a model covariate. The
 test is to regress *the market's own error* on the prestige gap:
 
-```
+```console
 gridiron analyze brand-premium
 ```
 
@@ -146,7 +146,7 @@ every point in time so a shrinking premium is tracked rather than assumed.
 
 ## Commands
 
-```
+```console
 gridiron status                          # what is loaded
 gridiron ingest --seasons 2015-2026      # CFBD history
 gridiron features build                  # rebuild team_game
@@ -215,7 +215,7 @@ the CLI says so rather than surfacing a raw `IOException` naming a pid.
 Everything that writes therefore has to be asked of the process that owns the
 file:
 
-```
+```console
 # start an ingest now (backgrounded; poll /api/status for the result)
 curl -X POST 'https://gridiron.mpdavis.com/api/refresh?seasons=2015-2026'
 curl -s   'https://gridiron.mpdavis.com/api/status' | jq .refresh
@@ -262,7 +262,7 @@ succeeded and what it last failed with. Check there first.
 
 **Use Python 3.13** — the version the image ships and CI runs:
 
-```
+```console
 mise use python@3.13          # or any 3.13 interpreter
 python3.13 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
