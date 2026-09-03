@@ -16,4 +16,3 @@ resources:
   - dcgm-exporter.yaml
   - ecowitt-exporter.yaml
   - gatus.yaml
-  - tailscale-operator.yaml
