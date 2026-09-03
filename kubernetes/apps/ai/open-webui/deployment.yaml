@@ -31,6 +31,8 @@ spec:
               value: http://ollama.ai.svc.cluster.local:11434
             - name: WEBUI_AUTH
               value: "False"
+            - name: WEBUI_SECRET_KEY_FILE
+              value: /app/backend/data/.webui_secret_key
           volumeMounts:
             - name: data
               mountPath: /app/backend/data
