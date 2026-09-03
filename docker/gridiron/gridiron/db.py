@@ -243,6 +243,47 @@ CREATE TABLE IF NOT EXISTS fp_curve (
 -- one you ran a month ago instead of re-run from memory.
 -- ---------------------------------------------------------------------------
 
+-- ---------------------------------------------------------------------------
+-- Automated research. These exist to make a *search* honest rather than to
+-- make it possible: searching is easy, and searching without counting how many
+-- times you looked is how a system manufactures a strategy that loses money.
+-- ---------------------------------------------------------------------------
+
+-- One row per idea ever proposed, whether or not it survived. Never deleted:
+-- the count of rows here is the multiple-testing denominator, so pruning it
+-- would inflate every significance claim the system makes.
+CREATE TABLE IF NOT EXISTS research_hypotheses (
+    hypothesis_id TEXT PRIMARY KEY,
+    created_at    TIMESTAMP,
+    name          TEXT,
+    -- Why this should be true, written down BEFORE the numbers came back.
+    -- A hypothesis that exists only because it fit is worthless out of sample,
+    -- and this column is what makes that distinguishable after the fact.
+    mechanism     TEXT,
+    expected_sign TEXT,      -- 'positive' | 'negative'
+    sql           TEXT,      -- the feature block, one read-only SELECT
+    source        TEXT,      -- model id, or 'human'
+    status        TEXT       -- proposed | rejected | survived | promoted | spent
+);
+
+-- One row per *evaluation*, which is the thing that has to be counted. A
+-- hypothesis re-run with different parameters is another look at the same
+-- data and gets another row.
+CREATE TABLE IF NOT EXISTS research_trials (
+    trial_id      TEXT PRIMARY KEY,
+    hypothesis_id TEXT,
+    created_at    TIMESTAMP,
+    stage         TEXT,      -- persistence | market | backtest | holdout
+    seasons       TEXT,
+    passed        BOOLEAN,
+    statistic     DOUBLE,    -- the t (or r) the stage produced
+    metrics       JSON,
+    note          TEXT
+);
+
+CREATE INDEX IF NOT EXISTS research_trials_hypothesis
+    ON research_trials (hypothesis_id);
+
 CREATE TABLE IF NOT EXISTS backtest_runs (
     run_id       TEXT PRIMARY KEY,
     created_at   TIMESTAMP,

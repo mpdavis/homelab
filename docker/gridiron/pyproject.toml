@@ -19,6 +19,9 @@ dependencies = [
     # Kickoff cutoffs are compared in a named zone, and slim base images do not
     # reliably ship the system zoneinfo database.
     "tzdata>=2024.1",
+    # The hypothesis proposer. Optional at runtime — without a key the rest of
+    # the research harness still works and you write the SQL yourself.
+    "anthropic>=0.40",
 ]
 
 [project.optional-dependencies]

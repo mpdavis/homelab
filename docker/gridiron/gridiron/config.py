@@ -70,6 +70,17 @@ class Settings:
     # key-number's worth and keeps the bet count honest.
     default_edge_threshold: float = 2.5
 
+    # --- automated research -------------------------------------------------
+    # Seasons from here on are the holdout: the search never sees them, and a
+    # finalist gets exactly one look. Everything the search touches is spent
+    # data, so this line is the only real defence against a strategy that is
+    # just the best of N coin flips.
+    holdout_from_season: int = 2024
+    # Anthropic key for the hypothesis proposer. Absent, `research propose`
+    # refuses and the rest of the harness still works by hand.
+    anthropic_api_key: str = ""
+    research_model: str = "claude-opus-5"
+
     # --- web ---------------------------------------------------------------
     host: str = "0.0.0.0"
     port: int = 8080
@@ -109,6 +120,9 @@ def settings() -> Settings:
         default_half_life_days=_float("GRIDIRON_HALF_LIFE_DAYS", 240.0),
         default_ridge_lambda=_float("GRIDIRON_RIDGE_LAMBDA", 12.0),
         default_edge_threshold=_float("GRIDIRON_EDGE_THRESHOLD", 2.5),
+        holdout_from_season=_int("GRIDIRON_HOLDOUT_FROM_SEASON", 2024),
+        anthropic_api_key=os.environ.get("GRIDIRON_ANTHROPIC_API_KEY", ""),
+        research_model=os.environ.get("GRIDIRON_RESEARCH_MODEL", "claude-opus-5"),
         host=os.environ.get("GRIDIRON_HOST", "0.0.0.0"),
         port=_int("GRIDIRON_PORT", 8080),
         timezone=os.environ.get("TZ", "America/Chicago"),
