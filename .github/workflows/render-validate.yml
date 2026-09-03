@@ -50,12 +50,15 @@ permissions:
 env:
   # renovate: datasource=github-releases depName=yannh/kubeconform
   KUBECONFORM_VERSION: "v0.8.0"
-  # flate defaults to 40 parallel reconcile bodies, which is a lot to schedule onto a
-  # 4-vCPU runner. `flate build` was observed wedging for 11+ minutes at the default
-  # immediately after `flate test` had rendered the same tree in seconds, so this is
-  # both a fit to the runner and a narrowing of the window for that stall. See the
-  # "Known flakiness" note in README.md — it is a mitigation, not a proven fix.
-  FLATE_CONCURRENCY: "8"
+  # flate's parallel reconcile has a non-deterministic DAG-scheduler race
+  # (home-operations/flate#828): with two or more concurrent nodes the
+  # reconcile→require→refresh loop never reaches a fixed point and a goroutine parks
+  # in sync.Cond.Wait forever. It reproduces on a large fraction of runs regardless of
+  # content and is what the 5-minute step timeouts keep catching. Serialising with
+  # `--concurrency 1` is the only reliable avoidance upstream has found, and this tree
+  # renders in ~2s so the loss of parallelism is irrelevant. See the "Known flakiness"
+  # note in README.md.
+  FLATE_CONCURRENCY: "1"
 
 jobs:
   render:
