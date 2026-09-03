@@ -260,11 +260,13 @@ succeeded and what it last failed with. Check there first.
 
 ## Development
 
-**Use Python 3.13** — the version the image ships and CI runs:
+**Use the version the image ships**, which the Dockerfile's `FROM` line and
+`.github/workflows/gridiron-tests.yml` agree on — currently 3.14, and Renovate
+moves it:
 
 ```console
-mise use python@3.13          # or any 3.13 interpreter
-python3.13 -m venv .venv
+mise use python@3.14          # whatever the Dockerfile says today
+python3.14 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 .venv/bin/python -m pytest -q
 ```
