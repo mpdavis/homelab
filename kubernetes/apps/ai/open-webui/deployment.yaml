@@ -33,6 +33,8 @@ spec:
               value: "False"
             - name: WEBUI_SECRET_KEY_FILE
               value: /app/backend/data/.webui_secret_key
+            - name: STATIC_DIR
+              value: /app/backend/data/static
           volumeMounts:
             - name: data
               mountPath: /app/backend/data
