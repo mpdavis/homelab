@@ -19,7 +19,7 @@ spec:
       # may need root or specific group membership, entrypoint privilege-drop behavior not verified
       containers:
         - name: emby
-          image: emby/embyserver:4.10.0.30
+          image: emby/embyserver:4.10.0.31
           ports:
             - containerPort: 8096
               name: http
