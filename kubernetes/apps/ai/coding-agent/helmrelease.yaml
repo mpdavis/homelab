@@ -46,7 +46,7 @@ spec:
               # build-coding-agent.yml publishes only from main, so every tag in
               # the registry is merged code and renovate's bump can be taken as
               # read. Tags below 1.0.48 predate that and may be branch builds.
-              tag: 1.0.155
+              tag: 1.0.157
             env:
               TZ: ${TZ}
               GIT_REPO_URL: ${GIT_REPO_URL}
