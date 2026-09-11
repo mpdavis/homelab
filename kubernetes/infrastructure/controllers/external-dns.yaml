@@ -42,6 +42,13 @@ spec:
     # provide a target.) That annotation is injected into every IngressRoute via
     # a kustomize patch in kubernetes/{apps,infrastructure}/kustomization.yaml,
     # pointing at the public IP that forwards to Traefik's VIP (10.0.1.200).
+    # v0.22.0 changed the default annotationPrefix from external-dns.alpha.
+    # kubernetes.io/ to external-dns.kubernetes.io/ with no fallback, so a
+    # patch-level chart bump silently stopped matching every IngressRoute's
+    # target annotation. Combined with policy: sync, that made every managed
+    # record look undesired and deleted them all. Pin the prefix explicitly so
+    # a future default change can't do that again.
+    annotationPrefix: external-dns.alpha.kubernetes.io/
     # Full GitOps: create and delete records to match IngressRoutes. The TXT
     # registry (txtOwnerId) scopes deletion to records this instance created,
     # so manually-managed records (e.g. the apex) are never touched.
