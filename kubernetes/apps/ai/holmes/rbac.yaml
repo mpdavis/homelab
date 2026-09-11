@@ -1,0 +1,61 @@
+# Read-only cluster access for the alert-triage job, mirroring the coding-agent
+# posture: Holmes may inspect anything, read no secret data, and change nothing.
+# It also reads the apps Kustomization's lastAppliedRevision to decide which
+# deploy thread its findings belong in.
+#
+# The ServiceAccount itself is created by the app-template chart
+# (serviceAccount.holmes, forceRename).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: holmes-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: ServiceAccount
+    name: holmes
+    namespace: ai
+---
+# Cluster-scoped resources and CRDs that the built-in `view` role misses.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: holmes-extra-view
+rules:
+  - apiGroups: [""]
+    resources: [nodes, namespaces, persistentvolumes]
+    verbs: [get, list, watch]
+  - apiGroups:
+      - storage.k8s.io
+      - networking.k8s.io
+      - apiextensions.k8s.io
+      - metrics.k8s.io
+    resources: ["*"]
+    verbs: [get, list, watch]
+  - apiGroups:
+      - kustomize.toolkit.fluxcd.io
+      - source.toolkit.fluxcd.io
+      - helm.toolkit.fluxcd.io
+      - notification.toolkit.fluxcd.io
+      - fluxcd.controlplane.io
+      - traefik.io
+      - external-secrets.io
+      - cert-manager.io
+      - monitoring.coreos.com
+    resources: ["*"]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: holmes-extra-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: holmes-extra-view
+subjects:
+  - kind: ServiceAccount
+    name: holmes
+    namespace: ai

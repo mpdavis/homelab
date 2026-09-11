@@ -1,0 +1,281 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: holmes-scripts
+data:
+  # Step 1 of the CronJob: choose which alerts are worth paying for.
+  #
+  # Holmes bills per investigation and its own `investigate alertmanager` pull
+  # re-investigates every still-firing alert on every run. So the selection
+  # happens here instead, BEFORE any LLM call: fetch what is firing, drop what
+  # has already been investigated, cap the rest, and hand Holmes the survivors
+  # via --alertmanager-file.
+  #
+  # The ledger key is fingerprint@startsAt, mirroring Holmes' own alert identity
+  # ({alertname}-{fingerprint}-{startsAt}). fingerprint covers the label set, so
+  # the same alert on a different pod is a different incident; startsAt means an
+  # alert that resolves and later re-fires IS investigated again, rather than
+  # being silently suppressed forever.
+  select.py: |
+    #!/usr/bin/env python3
+    import json
+    import os
+    import sys
+    import urllib.parse
+    import urllib.request
+    from datetime import datetime, timedelta, timezone
+    from pathlib import Path
+
+    ALERTMANAGER = os.environ["ALERTMANAGER_URL"]
+    LABEL_FILTER = os.environ.get("ALERT_LABEL_FILTER", 'ai_triage="true"')
+    MAX_PER_RUN = int(os.environ.get("MAX_PER_RUN", "3"))
+    LEDGER = Path(os.environ.get("LEDGER_FILE", "/state/investigated.json"))
+    PENDING = Path(os.environ.get("PENDING_FILE", "/state/pending.json"))
+    PENDING_KEYS = Path(os.environ.get("PENDING_KEYS_FILE", "/state/pending-keys.json"))
+    RETAIN_DAYS = int(os.environ.get("LEDGER_RETAIN_DAYS", "14"))
+
+
+    def key_for(alert):
+        return alert["fingerprint"] + "@" + alert["startsAt"]
+
+
+    def load_ledger():
+        if not LEDGER.exists():
+            return {}
+        try:
+            return json.loads(LEDGER.read_text())
+        except ValueError:
+            print("WARN: ledger corrupt, starting over", file=sys.stderr)
+            return {}
+
+
+    def prune(ledger):
+        cutoff = datetime.now(timezone.utc) - timedelta(days=RETAIN_DAYS)
+        kept = {}
+        for key, entry in ledger.items():
+            try:
+                seen = datetime.fromisoformat(entry["investigated_at"])
+            except (KeyError, ValueError):
+                continue  # unparseable entry: drop it
+            if seen > cutoff:
+                kept[key] = entry
+        return kept
+
+
+    def fetch_firing():
+        """Active, unsilenced, uninhibited alerts matching the opt-in label.
+
+        Converted to Holmes' PrometheusAlert shape — the only difference from
+        the API's representation is that status is the state string.
+        """
+        query = urllib.parse.urlencode(
+            {
+                "active": "true",
+                "silenced": "false",
+                "inhibited": "false",
+                "filter": LABEL_FILTER,
+            }
+        )
+        url = ALERTMANAGER + "/api/v2/alerts?" + query
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            raw = json.load(resp)
+        return [
+            {
+                "status": a.get("status", {}).get("state", "active"),
+                "labels": a.get("labels", {}),
+                "annotations": a.get("annotations", {}),
+                "startsAt": a["startsAt"],
+                "endsAt": a["endsAt"],
+                "generatorURL": a.get("generatorURL", ""),
+                "fingerprint": a["fingerprint"],
+            }
+            for a in raw
+        ]
+
+
+    def main():
+        ledger = prune(load_ledger())
+        firing = fetch_firing()
+        fresh = [a for a in firing if key_for(a) not in ledger]
+        selected = fresh[:MAX_PER_RUN]
+
+        PENDING.write_text(json.dumps(selected, indent=2))
+        PENDING_KEYS.write_text(json.dumps([key_for(a) for a in selected], indent=2))
+        # Rewrite the pruned ledger so expiry happens even on quiet runs.
+        LEDGER.write_text(json.dumps(ledger, indent=2))
+
+        print(
+            "firing=%d already-investigated=%d selected=%d (cap %d)"
+            % (len(firing), len(firing) - len(fresh), len(selected), MAX_PER_RUN)
+        )
+
+
+    if __name__ == "__main__":
+        main()
+  # Step 3: post the investigations into a per-deploy Discord forum thread, then
+  # record what was investigated so the next run skips it.
+  #
+  # Discord webhooks can create a thread (thread_name, forum channels only) and
+  # post into one (?thread_id=), but cannot SEARCH for a thread by name — so the
+  # revision -> thread_id mapping is kept on the PVC alongside the ledger.
+  # Creating a thread needs ?wait=true, whose response carries the new thread's
+  # id in channel_id.
+  #
+  # Stdlib only: the holmes image is a Python image, so no extra deps and no
+  # second image to pin.
+  notify.py: |
+    #!/usr/bin/env python3
+    import json
+    import os
+    import ssl
+    import sys
+    import urllib.request
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    RESULTS = Path(os.environ.get("RESULTS_FILE", "/state/results.json"))
+    REGISTRY = Path(os.environ.get("THREAD_REGISTRY", "/state/threads.json"))
+    LEDGER = Path(os.environ.get("LEDGER_FILE", "/state/investigated.json"))
+    PENDING_KEYS = Path(os.environ.get("PENDING_KEYS_FILE", "/state/pending-keys.json"))
+    WEBHOOK = os.environ["DISCORD_WEBHOOK_URL"]
+    MAX_CONTENT = 1900  # Discord caps a message at 2000 characters
+    KEEP_THREADS = 50   # prune the registry so it can't grow without bound
+
+    SA = "/var/run/secrets/kubernetes.io/serviceaccount"
+
+
+    def current_revision():
+        """Short git sha Flux last applied for the apps Kustomization.
+
+        Everything investigated under one revision shares a thread, which is
+        what makes a deploy and its fallout read as a single conversation.
+        """
+        try:
+            token = Path(SA + "/token").read_text()
+            ctx = ssl.create_default_context(cafile=SA + "/ca.crt")
+            req = urllib.request.Request(
+                "https://kubernetes.default.svc/apis/kustomize.toolkit.fluxcd.io"
+                "/v1/namespaces/flux-system/kustomizations/apps",
+                headers={"Authorization": "Bearer " + token},
+            )
+            with urllib.request.urlopen(req, context=ctx, timeout=15) as resp:
+                ks = json.load(resp)
+        except Exception as exc:
+            print("WARN: could not read apps Kustomization: %s" % exc, file=sys.stderr)
+            return "unknown"
+        # Flux formats this as "<branch>@sha1:<full sha>"
+        sha = ks.get("status", {}).get("lastAppliedRevision", "").split(":")[-1]
+        return sha[:7] if sha else "unknown"
+
+
+    def post(body, thread_id=None, wait=False):
+        params = []
+        if thread_id:
+            params.append("thread_id=" + thread_id)
+        if wait:
+            params.append("wait=true")
+        url = WEBHOOK + ("?" + "&".join(params) if params else "")
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(body).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            raw = resp.read()
+        return json.loads(raw) if raw else {}
+
+
+    def thread_for(revision):
+        registry = {}
+        if REGISTRY.exists():
+            try:
+                registry = json.loads(REGISTRY.read_text())
+            except ValueError:
+                print("WARN: thread registry corrupt, starting over", file=sys.stderr)
+        if revision in registry:
+            return registry[revision]
+
+        created = post(
+            {
+                "thread_name": "deploy " + revision,
+                "content": "Alert investigations for `" + revision + "`.",
+            },
+            wait=True,
+        )
+        # The opening message lands inside the new forum thread, so its
+        # channel_id IS the thread id.
+        thread_id = created.get("channel_id")
+        if not thread_id:
+            raise RuntimeError("webhook returned no channel_id: %s" % created)
+
+        registry[revision] = thread_id
+        for stale in list(registry)[:-KEEP_THREADS]:
+            del registry[stale]
+        REGISTRY.write_text(json.dumps(registry, indent=2))
+        return thread_id
+
+
+    def format_investigation(entry):
+        issue = entry.get("issue") or {}
+        result = entry.get("result") or {}
+        name = issue.get("name") or "unnamed alert"
+        analysis = (result.get("result") or "").strip() or "_no analysis returned_"
+        header = "**" + name + "**\n"
+        room = MAX_CONTENT - len(header) - len("\n… truncated")
+        if len(analysis) > room:
+            analysis = analysis[:room] + "\n… truncated"
+        return header + analysis
+
+
+    def record(entries):
+        """Mark this run's alerts investigated so they are never paid for twice.
+
+        Written only after every message posted. A crash mid-post leaves the
+        keys unrecorded, so the next run investigates them again — the error
+        costs another call rather than silently dropping the finding.
+        """
+        if not PENDING_KEYS.exists():
+            print("WARN: no pending-keys file; nothing recorded", file=sys.stderr)
+            return
+        keys = json.loads(PENDING_KEYS.read_text())
+        ledger = {}
+        if LEDGER.exists():
+            try:
+                ledger = json.loads(LEDGER.read_text())
+            except ValueError:
+                pass
+        now = datetime.now(timezone.utc).isoformat()
+        names = [(e.get("issue") or {}).get("name", "") for e in entries]
+        for i, key in enumerate(keys):
+            ledger[key] = {
+                "investigated_at": now,
+                "alertname": names[i] if i < len(names) else "",
+            }
+        LEDGER.write_text(json.dumps(ledger, indent=2))
+        print("recorded %d alert(s) as investigated" % len(keys))
+
+
+    def main():
+        if not RESULTS.exists():
+            print("no results file; nothing to post")
+            return
+        try:
+            entries = json.loads(RESULTS.read_text())
+        except ValueError as exc:
+            print("ERROR: results file is not valid JSON: %s" % exc, file=sys.stderr)
+            sys.exit(1)
+        if not entries:
+            # Nothing new was firing. Stay silent rather than open an empty
+            # thread — most runs land here and should cost nothing.
+            print("no investigations to post")
+            return
+
+        thread_id = thread_for(current_revision())
+        for entry in entries:
+            post({"content": format_investigation(entry)}, thread_id=thread_id)
+        print("posted %d investigation(s)" % len(entries))
+        record(entries)
+
+
+    if __name__ == "__main__":
+        main()
