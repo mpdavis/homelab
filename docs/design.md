@@ -40,7 +40,7 @@ Existing network-attached storage at `10.0.1.6`. Exports via NFS to all cluster 
 
 ## Architecture
 
-```
+```text
                      ┌─────────────────────────────────────────┐
                      │                  LAN                     │
                      │         DNS: Cloudflare                  │
@@ -154,7 +154,7 @@ For workloads where you want data to survive a node failure without manual resto
 
 ### Ingress
 
-```
+```text
 Internet → Cloudflare DNS (per-service A records, e.g. grafana.mpdavis.com)
          → Router port-forward 443 → MetalLB VIP (10.0.1.200)
          → Traefik (k8s IngressRoute)
@@ -399,7 +399,7 @@ Model storage on NAS (Tier 1). Inference scratch/KV cache uses local memory/GPU 
 
 ## Repository Structure
 
-```
+```text
 homelab/
 ├── docs/
 │   └── design.md              ← this file

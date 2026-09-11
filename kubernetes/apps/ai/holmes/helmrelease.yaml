@@ -21,6 +21,18 @@ spec:
       strategy: rollback
     crds: CreateReplace
   values:
+    defaultPodOptions:
+      # Neither image is a LinuxServer.io image, so runtime identity is pinned
+      # at the pod level rather than via PUID/PGID (which nothing would read).
+      # uid 1000 is the `node` user in Meridian's base image; the holmes image
+      # bakes in no user and would otherwise run as root. fsGroup (not
+      # supplementalGroups) because /state is an RWO local-path volume this pod
+      # owns and writes.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
     serviceAccount:
       holmes:
         # Fixed name so the ClusterRoleBindings in rbac.yaml can reference it.
@@ -65,6 +77,7 @@ spec:
               # this pod's network namespace, not via the pod IP (the image
               # default is 0.0.0.0).
               CLAUDE_PROXY_HOST: "127.0.0.1"
+              HOME: /tmp
               CLAUDE_CODE_OAUTH_TOKEN:
                 secretKeyRef:
                   name: holmes-secrets
@@ -102,6 +115,7 @@ spec:
                       - "const r=await fetch('http://127.0.0.1:3456/health');process.exit(r.ok?0:1)"
             securityContext:
               allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
               capabilities:
                 drop:
                   - ALL
@@ -130,6 +144,7 @@ spec:
               LEDGER_RETAIN_DAYS: "14"
             securityContext:
               allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
               capabilities:
                 drop:
                   - ALL
@@ -170,6 +185,7 @@ spec:
               ANTHROPIC_API_KEY: dummy
             securityContext:
               allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
               capabilities:
                 drop:
                   - ALL
@@ -201,6 +217,7 @@ spec:
                   key: discord-webhook-url
             securityContext:
               allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
               capabilities:
                 drop:
                   - ALL
@@ -218,6 +235,12 @@ spec:
         existingClaim: holmes
         globalMounts:
           - path: /state
+      # Scratch for the read-only root filesystems: Holmes writes tool
+      # results to a temp dir, and it is Meridian's HOME.
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp
       scripts:
         type: configMap
         name: holmes-scripts
