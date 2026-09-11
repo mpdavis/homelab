@@ -16,6 +16,7 @@ spec:
           for: 5m
           labels:
             severity: critical
+            ai_triage: "true"
           annotations:
             summary: "Synthetic check failing: {{ $labels.group }}/{{ $labels.name }}"
             description: "Gatus has reported {{ $labels.group }}/{{ $labels.name }} unhealthy for 5 minutes."

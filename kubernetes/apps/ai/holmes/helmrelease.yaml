@@ -1,0 +1,225 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: holmes
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: "~5.0"
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    crds: CreateReplace
+  values:
+    serviceAccount:
+      holmes:
+        # Fixed name so the ClusterRoleBindings in rbac.yaml can reference it.
+        forceRename: holmes
+    controllers:
+      main:
+        type: cronjob
+        cronjob:
+          # Every 10m. With the ledger, a run whose alerts have all been
+          # investigated hands Holmes an empty file and makes no LLM call, so
+          # frequent polling costs nothing and just lowers the worst-case delay
+          # between an alert firing and its investigation.
+          schedule: "*/10 * * * *"
+          concurrencyPolicy: Forbid
+          successfulJobsHistory: 3
+          failedJobsHistory: 3
+        serviceAccount:
+          identifier: holmes
+        initContainers:
+          # Numbered because app-template renders initContainers in key order:
+          # the proxy must be up before the investigation, and selection must
+          # happen before the investigation it scopes.
+          #
+          # Meridian (github.com/rynfar/meridian): local Anthropic-compatible
+          # API bridging requests onto the Claude subscription via the Agent
+          # SDK, so Holmes spends the subscription instead of a metered API
+          # key. Declared as a NATIVE SIDECAR — an initContainer with
+          # restartPolicy: Always — because a plain extra container would keep
+          # the CronJob's pod running forever and the Job would never complete.
+          # The kubelet starts it, waits for its startupProbe, runs the
+          # remaining init containers and the main container, then terminates
+          # it with the pod.
+          00-meridian:
+            image:
+              repository: ghcr.io/rynfar/meridian
+              tag: "1.71.0"
+            restartPolicy: Always
+            env:
+              TZ: ${TZ}
+              # The proxy is unauthenticated and spends the Claude
+              # subscription: bind loopback so it is reachable only inside
+              # this pod's network namespace, not via the pod IP (the image
+              # default is 0.0.0.0).
+              CLAUDE_PROXY_HOST: "127.0.0.1"
+              CLAUDE_CODE_OAUTH_TOKEN:
+                secretKeyRef:
+                  name: holmes-secrets
+                  key: claude-code-oauth-token
+              # $(...) is Kubernetes dependent-env expansion of the secret var
+              # above. app-template renders env alphabetically, so
+              # CLAUDE_CODE_OAUTH_TOKEN precedes this and expansion resolves.
+              MERIDIAN_PROFILES: '[{"id":"default","oauthToken":"$(CLAUDE_CODE_OAUTH_TOKEN)"}]'
+              MERIDIAN_DEFAULT_PROFILE: default
+            probes:
+              # exec, not httpGet: kubelet httpGet probes target the pod IP and
+              # Meridian binds loopback. The startupProbe is load-bearing here —
+              # it is what makes the kubelet hold 01-select/02-investigate until
+              # the proxy is actually accepting connections, rather than merely
+              # started.
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  exec:
+                    command:
+                      - node
+                      - -e
+                      - "const r=await fetch('http://127.0.0.1:3456/health');process.exit(r.ok?0:1)"
+                  periodSeconds: 3
+                  failureThreshold: 20
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  exec:
+                    command:
+                      - node
+                      - -e
+                      - "const r=await fetch('http://127.0.0.1:3456/health');process.exit(r.ok?0:1)"
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                memory: 1Gi
+          01-select:
+            image:
+              repository: robustadev/holmes
+              tag: "0.41.0"
+            command:
+              - python
+              - /scripts/select.py
+            env:
+              TZ: ${TZ}
+              ALERTMANAGER_URL: http://monitoring-kube-prometheus-alertmanager.monitoring.svc.cluster.local:9093
+              # Opt-in gate: only rules labelled ai_triage="true" are ever
+              # considered. Widening this is a label change on a PrometheusRule.
+              ALERT_LABEL_FILTER: ai_triage="true"
+              # Ceiling per run, applied after the ledger filter — a burst of
+              # genuinely new alerts still cannot run up an unbounded bill.
+              MAX_PER_RUN: "3"
+              LEDGER_RETAIN_DAYS: "14"
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                memory: 256Mi
+          02-investigate:
+            image:
+              repository: robustadev/holmes
+              tag: "0.41.0"
+            # The image's entrypoint is already `python holmes_cli.py`, so these
+            # are appended to it rather than replacing it.
+            args:
+              - investigate
+              - alertmanager
+              # Reads the set 01-select chose rather than pulling from
+              # Alertmanager, so an alert already investigated is never sent to
+              # the model a second time. An empty file is a no-op run.
+              - --alertmanager-file=/state/pending.json
+              # Dedup is what makes the expensive model affordable: each firing
+              # episode is investigated exactly once.
+              - --model=anthropic/claude-opus-5
+              - --json-output-file=/state/results.json
+            env:
+              TZ: ${TZ}
+              # Holmes writes a token store under HOME; point it at the PVC so
+              # it isn't writing into the image.
+              HOME: /state
+              # litellm resolves the Anthropic base as ANTHROPIC_API_BASE →
+              # ANTHROPIC_BASE_URL → api.anthropic.com, so this sends the
+              # Messages API calls to the Meridian sidecar. Meridian ignores
+              # the key (auth is the OAuth profile), but litellm requires one
+              # to be present.
+              ANTHROPIC_API_BASE: http://127.0.0.1:3456
+              ANTHROPIC_API_KEY: dummy
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+            resources:
+              requests:
+                cpu: 100m
+                memory: 512Mi
+              limits:
+                memory: 2Gi
+        containers:
+          main:
+            # Same image as the investigate step — the notifier is stdlib
+            # Python, so this avoids pinning a second image just to POST JSON.
+            image:
+              repository: robustadev/holmes
+              tag: "0.41.0"
+            command:
+              - python
+              - /scripts/notify.py
+            env:
+              TZ: ${TZ}
+              RESULTS_FILE: /state/results.json
+              THREAD_REGISTRY: /state/threads.json
+              LEDGER_FILE: /state/investigated.json
+              PENDING_KEYS_FILE: /state/pending-keys.json
+              DISCORD_WEBHOOK_URL:
+                secretKeyRef:
+                  name: holmes-secrets
+                  key: discord-webhook-url
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                memory: 256Mi
+    persistence:
+      # Carries results.json between steps and, across runs, both
+      # investigated.json (the dedup ledger) and threads.json (the revision ->
+      # Discord thread mapping a webhook cannot look up).
+      state:
+        existingClaim: holmes
+        globalMounts:
+          - path: /state
+      scripts:
+        type: configMap
+        name: holmes-scripts
+        globalMounts:
+          - path: /scripts

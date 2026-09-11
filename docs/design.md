@@ -278,6 +278,86 @@ Gatus as env vars — Gatus expands `${VAR}` in its config.
 The canary is a post-merge check, not a gate: nothing blocks a PR on the health of the
 previous deploy. A bad merge is caught by the canary's verdict and its auto-opened revert PR.
 
+### AI alert triage (HolmesGPT)
+
+`kubernetes/apps/ai/holmes/` runs HolmesGPT as a CronJob every 30 minutes. It pulls the
+currently-firing alerts from Alertmanager, investigates them against live cluster state,
+and posts the findings to a Discord forum thread.
+
+Why a pull loop rather than a webhook: HolmesGPT has a first-class Alertmanager
+integration (`holmes investigate alertmanager`), but it is a **pull** — there is no HTTP
+endpoint Alertmanager can POST to, and the operator's only trigger type is
+`deploymentRollout`. Rather than write a webhook shim, the CronJob uses the supported CLI
+path. The cost is latency: an alert waits up to one interval for its investigation.
+
+**Each firing episode is investigated exactly once.** Holmes' own pull re-investigates
+every still-firing alert on every run, which at a 10-minute interval would re-bill the
+same broken service six times an hour. So the job runs in three steps and does the
+selection itself, before any LLM call:
+
+1. `01-select` fetches the firing alerts matching the opt-in label, drops any already in
+   the ledger (`investigated.json` on the PVC), caps what is left, and writes the
+   survivors to `pending.json`
+2. `02-investigate` runs Holmes with `--alertmanager-file pending.json` instead of a URL,
+   so it investigates exactly that set. An empty file means no model call at all
+3. the notifier posts the findings and only then records their keys in the ledger — a
+   crash mid-post costs a repeat investigation rather than a silently dropped finding
+
+The ledger key is `fingerprint@startsAt`, mirroring Holmes' own alert identity
+(`{alertname}-{fingerprint}-{startsAt}`). `fingerprint` covers the label set, so the same
+alert on a different pod is a distinct incident; `startsAt` means an alert that resolves
+and later re-fires *is* investigated again rather than being suppressed forever. Entries
+expire after 14 days, so a chronically firing alert is revisited roughly fortnightly.
+
+Because idle runs are free, the schedule is 10 minutes rather than 30 — the interval now
+buys latency instead of costing money. Dedup is also what makes **Opus** the model here:
+paying once per incident for a good answer beats paying repeatedly for a cheap one.
+
+**Model auth goes through the Claude subscription, not a metered API key.** A Meridian
+sidecar (`ghcr.io/rynfar/meridian`) exposes an Anthropic-compatible API on loopback and
+bridges it onto the subscription via the Agent SDK, authenticated with the same
+`claude-code-oauth-token` BWS secret the coding agent uses. Holmes reaches it because
+litellm resolves its Anthropic base as `ANTHROPIC_API_BASE` → `ANTHROPIC_BASE_URL` →
+`api.anthropic.com`.
+
+Two structural notes on that sidecar:
+
+- It is a **native sidecar** — an initContainer with `restartPolicy: Always` — not an
+  ordinary second container. In a CronJob an ordinary sidecar never exits, so the Job
+  would never complete. The kubelet starts a native sidecar, waits for its `startupProbe`,
+  runs the remaining steps, then tears it down with the pod. The startup probe is
+  load-bearing: without it the investigation could start before the proxy is listening
+- It binds `127.0.0.1` rather than the image default `0.0.0.0`, because the proxy is
+  unauthenticated and spends the subscription — loopback keeps it reachable only inside
+  the pod's network namespace. Probes are `exec` for the same reason, since kubelet
+  httpGet probes target the pod IP
+
+The tradeoff accepted here: Holmes' unattended Opus usage draws on the same subscription
+rate limits as interactive Claude Code sessions, so a burst of investigations can compete
+with them, and the subscription is intended for interactive use in a way a metered API key
+is not. Switching back is two env vars — drop `ANTHROPIC_API_BASE` and point
+`ANTHROPIC_API_KEY` at a console key.
+
+Two further guardrails:
+
+- **Opt-in scope** — only rules labelled `ai_triage: "true"` are ever considered; widening
+  coverage is a label change on a PrometheusRule
+- **Read-only** — the ServiceAccount is `view` plus read on cluster-scoped CRDs, matching
+  the coding agent. Holmes diagnoses; it never mutates the cluster
+
+**One thread per deploy.** Investigations are grouped by the git SHA in the `apps`
+Kustomization's `status.lastAppliedRevision`, so everything that breaks under one revision
+accumulates in a single Discord thread instead of scattering across a channel. Discord
+webhooks can create a thread (`thread_name`, forum channels only) and post into one
+(`?thread_id=`) but cannot *search* for one by name — so the revision → thread-id mapping
+is kept in `threads.json` on the job's PVC, written when a thread is first created
+(`?wait=true` returns the new thread's id as the message's `channel_id`).
+
+That registry is only reachable from inside the cluster, so the GitHub Actions canary
+cannot post into the deploy thread; its verdict stays on the commit status and its revert
+PR. Closing that gap would mean a Discord **bot** token, which can look a thread up by
+name and needs no shared state.
+
 ## GPU Setup
 
 ### Proxmox GPU Passthrough
@@ -308,6 +388,12 @@ resources:
   Custom image (`docker/coding-agent/`, built by GitHub Actions to
   `ghcr.io/mpdavis/coding-agent`) bundles kubectl/flux/gh/git; the pod runs with
   a read-only cluster ServiceAccount and proposes fixes via branches + PRs
+- **HolmesGPT alert triage**: CronJob (`kubernetes/apps/ai/holmes/`) that pulls
+  firing alerts from Alertmanager every 10m and asks Claude Opus to investigate
+  the ones it has not already seen, then posts the findings to Discord.
+  Read-only ServiceAccount, same posture as the coding agent. Scope is opt-in:
+  only rules labelled `ai_triage: "true"` are ever considered. Design detail
+  under "AI alert triage (HolmesGPT)"
 
 Model storage on NAS (Tier 1). Inference scratch/KV cache uses local memory/GPU VRAM.
 
@@ -326,7 +412,7 @@ homelab/
 │   ├── kustomization.yaml     # Entry point — includes only Flux plumbing
 │   ├── apps/                  # grouped by namespace, one dir per service
 │   │   ├── kustomization.yaml
-│   │   ├── ai/                # ollama, open-webui, coding-agent
+│   │   ├── ai/                # ollama, open-webui, coding-agent, holmes
 │   │   ├── automation/        # home-assistant (home automation)
 │   │   ├── docs/              # paperless-ngx (document management)
 │   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
