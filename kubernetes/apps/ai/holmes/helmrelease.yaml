@@ -68,7 +68,7 @@ spec:
           00-meridian:
             image:
               repository: ghcr.io/rynfar/meridian
-              tag: "1.71.0"
+              tag: "1.71.1"
             restartPolicy: Always
             env:
               TZ: ${TZ}
