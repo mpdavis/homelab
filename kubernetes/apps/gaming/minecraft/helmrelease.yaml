@@ -1,0 +1,57 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: minecraft
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: minecraft
+      version: "~5.1"
+      sourceRef:
+        kind: HelmRepository
+        name: minecraft
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    crds: CreateReplace
+  values:
+    image:
+      repository: itzg/minecraft-server
+      # Pinned to a stable, immutable date tag (digest
+      # sha256:b76b9298a2a60d5cf9d223e009cd0b8ad620c2080abd83f9a1fa5084fa87f9ab).
+      # Controls the itzg tooling + Java runtime (Java 21); the Minecraft game
+      # version is set separately via minecraftServer.version below.
+      tag: "2026.8.0-java21"
+      pullPolicy: IfNotPresent
+    minecraftServer:
+      # Accepting the Minecraft EULA (https://www.minecraft.net/en-us/eula) is
+      # required for the server to start.
+      eula: "TRUE"
+      # LATEST tracks the newest Minecraft release; pin to an explicit version
+      # (e.g. "1.21.4") if world/mod compatibility must be held stable.
+      version: "LATEST"
+      difficulty: normal
+      memory: 2048M
+      # Minecraft speaks its own TCP protocol on 25565 — not HTTP — so it is
+      # exposed via a MetalLB LoadBalancer rather than a Traefik IngressRoute.
+      serviceType: LoadBalancer
+      # loadBalancerIP left unset — MetalLB assigns one from lan-pool. Point the
+      # minecraft.mpdavis.com DNS record at the assigned IP (see PR notes).
+      rcon:
+        enabled: false
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        memory: 3Gi
+    persistence:
+      dataDir:
+        enabled: true
+        existingClaim: minecraft

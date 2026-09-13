@@ -426,6 +426,7 @@ homelab/
 │   │   ├── ai/                # ollama, open-webui, coding-agent, holmes
 │   │   ├── automation/        # home-assistant (home automation)
 │   │   ├── docs/              # paperless-ngx (document management)
+│   │   ├── gaming/            # minecraft (game server)
 │   │   ├── gridiron/          # gridiron (college football betting research)
 │   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
 │   │   ├── ntfy/              # ntfy (push notifications / Alertmanager sink)
