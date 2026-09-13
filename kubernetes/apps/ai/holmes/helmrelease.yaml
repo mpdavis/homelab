@@ -47,6 +47,13 @@ spec:
           # between an alert firing and its investigation.
           schedule: "*/10 * * * *"
           concurrencyPolicy: Forbid
+          # Bounded failure. With Forbid, a job that keeps retrying blocks every
+          # scheduled run behind it — the select.py shadowing bug retried six
+          # times over 72 minutes and skipped ~7 runs. One retry and a 20-minute
+          # ceiling mean a broken or hung run costs at most two slots, and the
+          # next scheduled run is only 10 minutes away regardless.
+          backoffLimit: 1
+          activeDeadlineSeconds: 1200
           successfulJobsHistory: 3
           failedJobsHistory: 3
         serviceAccount:
@@ -131,7 +138,10 @@ spec:
               tag: "0.41.0"
             command:
               - python
-              - /scripts/select.py
+              # -P keeps the script's own directory off sys.path, so a file in
+              # /scripts can never shadow a stdlib module (see configmap.yaml).
+              - -P
+              - /scripts/select_alerts.py
             env:
               TZ: ${TZ}
               ALERTMANAGER_URL: http://monitoring-kube-prometheus-alertmanager.monitoring.svc.cluster.local:9093
@@ -204,6 +214,7 @@ spec:
               tag: "0.41.0"
             command:
               - python
+              - -P
               - /scripts/notify.py
             env:
               TZ: ${TZ}
