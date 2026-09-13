@@ -5,6 +5,12 @@ metadata:
 data:
   # Step 1 of the CronJob: choose which alerts are worth paying for.
   #
+  # NOT named select.py: Python puts a script's own directory first on
+  # sys.path, so /scripts/select.py shadowed the stdlib `select` module and
+  # every run died in `import urllib.request` with
+  # "module 'select' has no attribute 'select'". The containers also run
+  # python -P, which keeps the script directory off sys.path entirely.
+  #
   # Holmes bills per investigation and its own `investigate alertmanager` pull
   # re-investigates every still-firing alert on every run. So the selection
   # happens here instead, BEFORE any LLM call: fetch what is firing, drop what
@@ -16,7 +22,7 @@ data:
   # the same alert on a different pod is a different incident; startsAt means an
   # alert that resolves and later re-fires IS investigated again, rather than
   # being silently suppressed forever.
-  select.py: |
+  select_alerts.py: |
     #!/usr/bin/env python3
     import json
     import os
