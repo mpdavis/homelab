@@ -12,6 +12,9 @@ spec:
       labels:
         app: hello-world
     spec:
+      # hygiene-exempt: runtime-identity trivial demo; stock nginx's default cache/pid
+      # dirs are root-owned in the image, forcing a non-root uid needs additional
+      # emptyDir remounts to avoid permission errors -- not worth it for a test page
       containers:
         - name: nginx
           image: nginx:alpine

@@ -58,13 +58,14 @@ spec:
                       - prowlarr.mpdavis.com
                       - radarr.mpdavis.com
                       - sonarr.mpdavis.com
-                      - streamflow.mpdavis.com
                       - teamarr.mpdavis.com
                       - flux.mpdavis.com
                       - trek.mpdavis.com
                       - birdnet.mpdavis.com
                       - proxmox.mpdavis.com
                       - council.mpdavis.com
+                      - gridiron.mpdavis.com
+                      - homeassistant.mpdavis.com
   values:
     resources:
       requests:
@@ -163,6 +164,13 @@ spec:
           group: external-open
           url: https://trek.mpdavis.com/
           conditions: *open-conditions
+        - name: homeassistant
+          group: external-open
+          # Home Assistant has its own login; onboarding/login page returns 200.
+          # Requires http.trusted_proxies configured in configuration.yaml for
+          # requests through Traefik (else HA returns 400 to proxied requests).
+          url: https://homeassistant.mpdavis.com/
+          conditions: *open-conditions
         # External (non-k8s) LAN hosts routed through Traefik via
         # Service+Endpoints — probed exactly like in-cluster open services.
         - name: birdnet
@@ -229,12 +237,6 @@ spec:
           client: *auth-client
           headers: *auth-headers
           conditions: *auth-conditions
-        - name: streamflow
-          group: external-auth
-          url: https://streamflow.mpdavis.com/
-          client: *auth-client
-          headers: *auth-headers
-          conditions: *auth-conditions
         - name: teamarr
           group: external-auth
           url: https://teamarr.mpdavis.com/
@@ -250,6 +252,12 @@ spec:
         - name: council-digest
           group: external-auth
           url: https://council.mpdavis.com/
+          client: *auth-client
+          headers: *auth-headers
+          conditions: *auth-conditions
+        - name: gridiron
+          group: external-auth
+          url: https://gridiron.mpdavis.com/
           client: *auth-client
           headers: *auth-headers
           conditions: *auth-conditions

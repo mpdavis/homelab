@@ -1,0 +1,23 @@
+# local-path, not NFS, and ReadWriteOnce on purpose.
+#
+# The store is a single DuckDB file. DuckDB's file locking over NFS is not
+# something to bet a dataset on, and the workload is a columnar scan over
+# millions of plays — exactly the case where local SSD beats a network share by
+# an order of magnitude. ReadWriteOnce matches the engine: DuckDB takes one
+# writer, and the Deployment uses `strategy: Recreate` so two pods never hold
+# the file at once.
+#
+# Sizing: a decade of FBS play-by-play is roughly 10M plays. DuckDB's
+# compression puts that near 2GB, and the WAL plus a compaction headroom wants
+# room beside it.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gridiron-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 20Gi

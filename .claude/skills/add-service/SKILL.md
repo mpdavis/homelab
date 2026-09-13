@@ -17,6 +17,17 @@ arguments: [service_name]
 
 Add a new service to the k3s cluster following the exact patterns established in this repository.
 
+**Read `docs/manifest-conventions.md` before writing manifests.** It is the source of truth for
+the workload baseline — runtime uid/gid, container hardening, resource requests, image pinning,
+and monitoring registration — and `manifest-hygiene-check.yml` enforces the checkable parts of it
+with kube-linter, against the rendered tree, on every finding a PR introduces. Step 3.5 below is
+the short version; the doc has the reasoning and the exception cases.
+
+A new service is where this bites hardest: it has no baseline, so *every* violation it carries is
+a new finding. Get the container `securityContext`, the resource requests and the pinned tag right
+the first time rather than in a review round-trip. Real exceptions go in an
+`ignore-check.kube-linter.io/<check>` annotation with the reason as the value.
+
 **Default to a HelmRelease.** Every new service should be a HelmRelease unless there is a
 strong reason not to. Services with an official/well-maintained chart use that chart;
 everything else uses the generic **bjw-s `app-template`** chart (already proven in this repo by
@@ -177,12 +188,36 @@ spec:
   values:
     controllers:
       main:
+        # For any service with a local-path RWO PVC, force Recreate so a rolling
+        # update doesn't hang: the new pod can't mount the volume still attached
+        # to the old pod. Stateless services may omit this.
+        strategy: Recreate
         # type: cronjob        # for scheduled jobs (see recyclarr); omit for long-running
         containers:
           main:
             image:
               repository: <image-repo>     # e.g. ghcr.io/org/app
               tag: <pinned-tag>            # pin — no latest/edge
+            # Container-level hardening. Do NOT add runAsNonRoot here — many
+            # images (Home Assistant, unpackerr, etc.) legitimately run as root
+            # and pin uid/gid at the pod level instead (see defaultPodOptions
+            # note below). Keep allowPrivilegeEscalation: false + drop ALL.
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+              # readOnlyRootFilesystem: true   # only if the app can run read-only
+              #                                   # (needs a tmp emptyDir — see unpackerr)
+            # Always set requests; limits only where a runaway process is a risk
+            # (memory-hungry apps like HA, or long-lived Python/Node services).
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              # limits:
+              #   cpu: "1"
+              #   memory: 1Gi
             env:
               TZ: ${TZ}
               # PUID: "1000"               # LinuxServer.io images only
@@ -191,6 +226,13 @@ spec:
               #   secretKeyRef:
               #     name: <service-name>-secrets
               #     key: some-api-key
+    # If the app needs to write files owned by a specific uid/gid (e.g. the media
+    # share), pin it at the pod level (see listenarr/unpackerr):
+    # defaultPodOptions:
+    #   securityContext:
+    #     runAsUser: 1000
+    #     runAsGroup: 1000
+    #     fsGroup: 1000
     service:
       main:
         controller: main
@@ -219,6 +261,13 @@ app-template conventions (v5):
   `globalMounts` for a simple mount, `advancedMounts` to target a specific container/path.
 - Leave the chart's `ingress:` disabled — this repo uses a standalone Traefik `IngressRoute`.
 - `${TZ}`, `${NAS_IP}`, `${NAS_DATA_PATH}` are substituted by Flux postBuild from cluster-vars.
+- **Hardening is mandatory, not optional** — reviewers flag its absence on every PR:
+  - `controllers.main.strategy: Recreate` whenever the service has a `local-path` RWO PVC
+    (stateful). Rolling updates hang on an attached RWO volume without it.
+  - Container-level `securityContext` with `allowPrivilegeEscalation: false` +
+    `capabilities.drop: [ALL]`. Never `runAsNonRoot` — many images run as root and pin
+    uid/gid at the pod level instead.
+  - `resources.requests` on the container (limits where the app is memory-hungry).
 
 > **Gotcha — service-link env collision.** If the app reads config from env vars prefixed with
 > its own name (`<NAME>_PORT`, `<NAME>_HOST`, …), disable Kubernetes service-link env injection so
@@ -443,6 +492,9 @@ render without errors. If kustomize is not available locally, at minimum verify:
 - Variable references use `${VAR}` syntax (not `$VAR` or `{{ }}`)
 - For app-template: `controllers`/`service`/`persistence` keys are consistent and the
   `existingClaim` matches the PVC name
+- `controllers.main.strategy: Recreate` is present if the service uses a `local-path` RWO PVC
+- Container `securityContext` is set (`allowPrivilegeEscalation: false` + `capabilities.drop: [ALL]`)
+- Container `resources.requests` are set
 - Port numbers are consistent across HelmRelease/Service and IngressRoute
 - The image tag is pinned (no `latest`/`edge`)
 - If the service uses secrets, every `remoteRef.key` is a `${BWS_*}` placeholder backed by a key
@@ -471,6 +523,9 @@ Before considering the service complete, verify:
 - [ ] **Service with an IngressRoute has a Homepage tile** in `apps/homepage/configmap.yaml` (correct section, `href` matches the route)
 - [ ] **Service with an IngressRoute has a Gatus check** — endpoint entry (correct group: `external-open` vs `external-auth`) **and** hostname in the `hostAliases` patch, both in `infrastructure/controllers/gatus.yaml`
 - [ ] PVC uses the right StorageClass (`local-path` RWO config/DB; `nfs-data`/`nfs-homelab` RWX bulk)
+- [ ] `controllers.main.strategy: Recreate` set whenever the service has a `local-path` RWO PVC (stateful)
+- [ ] Container `securityContext` set: `allowPrivilegeEscalation: false` + `capabilities.drop: [ALL]` (no `runAsNonRoot`)
+- [ ] Container `resources.requests` set (limits added for memory-hungry apps)
 - [ ] For an official-chart service: HelmRepository added to `infrastructure/sources/` and its `kustomization.yaml`
 - [ ] No plaintext secrets — ExternalSecret + inline `secretKeyRef` for anything sensitive
 - [ ] BWS secret UUIDs registered in the central `bws-secret-ids` ConfigMap; ExternalSecret `remoteRef.key` uses a `${BWS_*}` placeholder (never a hardcoded UUID)

@@ -1,0 +1,19 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: gridiron
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`gridiron.${DOMAIN}`)
+      kind: Rule
+      middlewares:
+        # Behind Authentik. The page reports where money could be placed and
+        # the pod holds two paid API keys; neither belongs on the open internet.
+        - name: authentik-forward-auth
+          namespace: authentik
+      services:
+        - name: gridiron
+          port: 8080
+  tls: {}

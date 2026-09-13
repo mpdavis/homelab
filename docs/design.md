@@ -40,7 +40,7 @@ Existing network-attached storage at `10.0.1.6`. Exports via NFS to all cluster 
 
 ## Architecture
 
-```
+```text
                      ┌─────────────────────────────────────────┐
                      │                  LAN                     │
                      │         DNS: Cloudflare                  │
@@ -134,11 +134,21 @@ For bulk data that doesn't need low-latency random I/O.
 For latency-sensitive, random-I/O workloads. Data lives on the node's local
 disk. Not replicated — rely on backups.
 
-- **What**: SQL databases, SQLite files, Prometheus TSDB, Loki WAL/index
+- **What**: SQL databases, SQLite files, DuckDB files, Prometheus TSDB, Loki WAL/index
 - **Where**: Local SSD on the Proxmox host, passed through to container/VM disk
 - **K8s mechanism**: `local-path-provisioner` (bundled with k3s)
 - **Access mode**: ReadWriteOnce (pinned to the node where the PV lives)
 - **StorageClass name**: `local-path`
+
+Embedded single-writer engines belong here rather than on NFS, and the choice
+constrains the workload's deployment shape as well as its storage. `gridiron`
+is the worked example: DuckDB takes one writer, so its ingest runs on a daemon
+thread *inside* the web process instead of as a separate CronJob (a CronJob
+would be locked out of the file the server holds open), and the Deployment uses
+`strategy: Recreate` so a rolling update never starts a second pod against the
+same file. The cost is that a wedged refresh does not appear in
+`kubectl get jobs`, so the service reports its own refresh state on a `/status`
+page.
 
 ### Tier 3: Replicated (future, optional)
 
@@ -154,7 +164,7 @@ For workloads where you want data to survive a node failure without manual resto
 
 ### Ingress
 
-```
+```text
 Internet → Cloudflare DNS (per-service A records, e.g. grafana.mpdavis.com)
          → Router port-forward 443 → MetalLB VIP (10.0.1.200)
          → Traefik (k8s IngressRoute)
@@ -278,6 +288,86 @@ Gatus as env vars — Gatus expands `${VAR}` in its config.
 The canary is a post-merge check, not a gate: nothing blocks a PR on the health of the
 previous deploy. A bad merge is caught by the canary's verdict and its auto-opened revert PR.
 
+### AI alert triage (HolmesGPT)
+
+`kubernetes/apps/ai/holmes/` runs HolmesGPT as a CronJob every 30 minutes. It pulls the
+currently-firing alerts from Alertmanager, investigates them against live cluster state,
+and posts the findings to a Discord forum thread.
+
+Why a pull loop rather than a webhook: HolmesGPT has a first-class Alertmanager
+integration (`holmes investigate alertmanager`), but it is a **pull** — there is no HTTP
+endpoint Alertmanager can POST to, and the operator's only trigger type is
+`deploymentRollout`. Rather than write a webhook shim, the CronJob uses the supported CLI
+path. The cost is latency: an alert waits up to one interval for its investigation.
+
+**Each firing episode is investigated exactly once.** Holmes' own pull re-investigates
+every still-firing alert on every run, which at a 10-minute interval would re-bill the
+same broken service six times an hour. So the job runs in three steps and does the
+selection itself, before any LLM call:
+
+1. `01-select` fetches the firing alerts matching the opt-in label, drops any already in
+   the ledger (`investigated.json` on the PVC), caps what is left, and writes the
+   survivors to `pending.json`
+2. `02-investigate` runs Holmes with `--alertmanager-file pending.json` instead of a URL,
+   so it investigates exactly that set. An empty file means no model call at all
+3. the notifier posts the findings and only then records their keys in the ledger — a
+   crash mid-post costs a repeat investigation rather than a silently dropped finding
+
+The ledger key is `fingerprint@startsAt`, mirroring Holmes' own alert identity
+(`{alertname}-{fingerprint}-{startsAt}`). `fingerprint` covers the label set, so the same
+alert on a different pod is a distinct incident; `startsAt` means an alert that resolves
+and later re-fires *is* investigated again rather than being suppressed forever. Entries
+expire after 14 days, so a chronically firing alert is revisited roughly fortnightly.
+
+Because idle runs are free, the schedule is 10 minutes rather than 30 — the interval now
+buys latency instead of costing money. Dedup is also what makes **Opus** the model here:
+paying once per incident for a good answer beats paying repeatedly for a cheap one.
+
+**Model auth goes through the Claude subscription, not a metered API key.** A Meridian
+sidecar (`ghcr.io/rynfar/meridian`) exposes an Anthropic-compatible API on loopback and
+bridges it onto the subscription via the Agent SDK, authenticated with the same
+`claude-code-oauth-token` BWS secret the coding agent uses. Holmes reaches it because
+litellm resolves its Anthropic base as `ANTHROPIC_API_BASE` → `ANTHROPIC_BASE_URL` →
+`api.anthropic.com`.
+
+Two structural notes on that sidecar:
+
+- It is a **native sidecar** — an initContainer with `restartPolicy: Always` — not an
+  ordinary second container. In a CronJob an ordinary sidecar never exits, so the Job
+  would never complete. The kubelet starts a native sidecar, waits for its `startupProbe`,
+  runs the remaining steps, then tears it down with the pod. The startup probe is
+  load-bearing: without it the investigation could start before the proxy is listening
+- It binds `127.0.0.1` rather than the image default `0.0.0.0`, because the proxy is
+  unauthenticated and spends the subscription — loopback keeps it reachable only inside
+  the pod's network namespace. Probes are `exec` for the same reason, since kubelet
+  httpGet probes target the pod IP
+
+The tradeoff accepted here: Holmes' unattended Opus usage draws on the same subscription
+rate limits as interactive Claude Code sessions, so a burst of investigations can compete
+with them, and the subscription is intended for interactive use in a way a metered API key
+is not. Switching back is two env vars — drop `ANTHROPIC_API_BASE` and point
+`ANTHROPIC_API_KEY` at a console key.
+
+Two further guardrails:
+
+- **Opt-in scope** — only rules labelled `ai_triage: "true"` are ever considered; widening
+  coverage is a label change on a PrometheusRule
+- **Read-only** — the ServiceAccount is `view` plus read on cluster-scoped CRDs, matching
+  the coding agent. Holmes diagnoses; it never mutates the cluster
+
+**One thread per deploy.** Investigations are grouped by the git SHA in the `apps`
+Kustomization's `status.lastAppliedRevision`, so everything that breaks under one revision
+accumulates in a single Discord thread instead of scattering across a channel. Discord
+webhooks can create a thread (`thread_name`, forum channels only) and post into one
+(`?thread_id=`) but cannot *search* for one by name — so the revision → thread-id mapping
+is kept in `threads.json` on the job's PVC, written when a thread is first created
+(`?wait=true` returns the new thread's id as the message's `channel_id`).
+
+That registry is only reachable from inside the cluster, so the GitHub Actions canary
+cannot post into the deploy thread; its verdict stays on the commit status and its revert
+PR. Closing that gap would mean a Discord **bot** token, which can look a thread up by
+name and needs no shared state.
+
 ## GPU Setup
 
 ### Proxmox GPU Passthrough
@@ -308,12 +398,18 @@ resources:
   Custom image (`docker/coding-agent/`, built by GitHub Actions to
   `ghcr.io/mpdavis/coding-agent`) bundles kubectl/flux/gh/git; the pod runs with
   a read-only cluster ServiceAccount and proposes fixes via branches + PRs
+- **HolmesGPT alert triage**: CronJob (`kubernetes/apps/ai/holmes/`) that pulls
+  firing alerts from Alertmanager every 10m and asks Claude Opus to investigate
+  the ones it has not already seen, then posts the findings to Discord.
+  Read-only ServiceAccount, same posture as the coding agent. Scope is opt-in:
+  only rules labelled `ai_triage: "true"` are ever considered. Design detail
+  under "AI alert triage (HolmesGPT)"
 
 Model storage on NAS (Tier 1). Inference scratch/KV cache uses local memory/GPU VRAM.
 
 ## Repository Structure
 
-```
+```text
 homelab/
 ├── docs/
 │   └── design.md              ← this file
@@ -321,14 +417,17 @@ homelab/
 │   ├── tofu/                  # OpenTofu — LXC/VM provisioning
 │   └── ansible/               # Ansible — node config, k3s install, Flux bootstrap
 ├── docker/                    # Custom images built by GitHub Actions → ghcr.io
-│   └── coding-agent/          # CloudCLI + claude/opencode CLIs + k8s tooling
+│   ├── coding-agent/          # CloudCLI + claude/opencode CLIs + k8s tooling
+│   └── gridiron/              # college football betting research (DuckDB + FastAPI)
 ├── kubernetes/                # Flux-managed cluster state (sync root)
 │   ├── kustomization.yaml     # Entry point — includes only Flux plumbing
 │   ├── apps/                  # grouped by namespace, one dir per service
 │   │   ├── kustomization.yaml
-│   │   ├── ai/                # ollama, open-webui, coding-agent
+│   │   ├── ai/                # ollama, open-webui, coding-agent, holmes
+│   │   ├── automation/        # home-assistant (home automation)
 │   │   ├── docs/              # paperless-ngx (document management)
 │   │   ├── gaming/            # minecraft (game server)
+│   │   ├── gridiron/          # gridiron (college football betting research)
 │   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
 │   │   ├── ntfy/              # ntfy (push notifications / Alertmanager sink)
 │   │   ├── travel/            # trek (travel planning)
@@ -379,6 +478,7 @@ homelab/
 | 2025-05-27 | LXC containers over VMs | Lower overhead; VM only for GPU node (VFIO requires it) |
 | 2025-05-27 | Traefik as single ingress for all services | Routes to both k8s and external services via Service+Endpoints |
 | 2026-07-17 | Gatus for synthetic monitoring + deploy canary | One declarative tool serves both continuous health checks (→ Prometheus alerts) and post-merge deploy verification (→ commit status + auto-revert PR); baseline comparison exempts pre-existing failures from reverts |
+| 2026-09-01 | DuckDB (not Postgres) for gridiron, ingest inside the server pod | Every query is an analytical scan over ~10M plays, which an embedded columnar engine answers in the time a Postgres round trip would take — no second pod, no second PVC, backup is one file. The price is a single writer, which is why ingest is an in-process thread and the Deployment is `Recreate` on an RWO local-path PVC |
 
 ## Deploy Sequence
 

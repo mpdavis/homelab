@@ -1,0 +1,32 @@
+# gitleaks config — see .github/workflows/lint-secrets.yml
+#
+# Defence in depth. This repo is built so secret *data* never lands in git:
+# External Secrets Operator syncs from Bitwarden and every ExternalSecret holds
+# only store names and UUIDs (see CLAUDE.md). gitleaks is the backstop for a
+# mistake that bypasses that pattern — a pasted kubeconfig, an inline token.
+
+title = "homelab gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known non-secrets in this repo"
+
+paths = [
+  # Local-only, git-ignored, but listed so a stray `git add -f` still can't trip it.
+  '''(^|/)kubeconfig\.yaml$''',
+  '''(^|/)local\.md$''',
+  '''(^|/)\.mcp\.json$''',
+  # Lockfiles carry integrity hashes that look high-entropy but are not secrets.
+  '''\.lock$''',
+  '''(^|/)uv\.lock$''',
+  # Test fixtures and cassettes use fake credentials on purpose.
+  '''(^|/)tests?/''',
+]
+
+regexes = [
+  # Bitwarden Secrets Manager UUIDs in bws-secret-ids.yaml and ExternalSecrets are
+  # opaque identifiers, not secret material.
+  '''[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}''',
+]

@@ -52,10 +52,6 @@
         icon: mdi-key-variant
         href: https://ecm.${DOMAIN}
         description: ECM server
-    - StreamFlow:
-        icon: mdi-sort-variant
-        href: https://streamflow.${DOMAIN}
-        description: IPTV stream quality ordering
 - AI:
     - Open WebUI:
         icon: open-webui.png
@@ -65,21 +61,27 @@
         icon: claude-ai.png
         href: https://code.${DOMAIN}
         description: Claude Code / opencode web UI (CloudCLI)
-- Documents:
+- Personal:
+    - Home Assistant:
+        icon: home-assistant.png
+        href: https://homeassistant.${DOMAIN}
+        description: Home automation platform
     - Paperless:
         icon: paperless-ngx.png
         href: https://paperless.${DOMAIN}
         description: Document management & OCR
-- Travel:
-    - Trek:
-        icon: mdi-airplane
-        href: https://trek.${DOMAIN}
-        description: Travel planning
-- Civic:
     - Council Digest:
         icon: mdi-gavel
         href: https://council.${DOMAIN}
         description: Ames city council meeting digests
+    - Trek:
+        icon: mdi-airplane
+        href: https://trek.${DOMAIN}
+        description: Travel planning
+    - Gridiron:
+        icon: mdi-football
+        href: https://gridiron.${DOMAIN}
+        description: College football model vs. betting lines
 - Infrastructure:
     - Authentik:
         icon: authentik.png

@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homeassistant-config
+data:
+  # Seeds a brand-new /config volume that has no configuration.yaml yet, so a
+  # fresh instance's one-time boot picks up the http: block below before
+  # onboarding even runs.
+  configuration.yaml: |
+    # Loads default set of integrations. Do not remove.
+    default_config:
+
+    # Trust the in-cluster reverse proxy (Traefik). Without this Home Assistant
+    # rejects proxied requests with 400 (invalid X-Forwarded-For).
+    #
+    # NOTE: as of Home Assistant 2026.8 the `http:` YAML block is imported into
+    # internal storage ONLY on an instance's very first boot (before onboarding
+    # completes) — every boot after that permanently ignores it (yaml_migration
+    # _done flag) and just raises a cosmetic repair issue if it's still present.
+    # So this block is only useful for genuinely new installs; it does nothing
+    # for an already-onboarded instance. Once HA has imported it, delete this
+    # block to silence the repair issue.
+    http:
+      use_x_forwarded_for: true
+      trusted_proxies:
+        - 10.42.0.0/16
+        - 10.0.1.200
+        - 127.0.0.1

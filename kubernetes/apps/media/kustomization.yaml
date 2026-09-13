@@ -16,6 +16,5 @@ resources:
   - recyclarr
   - seerr
   - sonarr
-  - streamflow
   - teamarr
   - unpackerr

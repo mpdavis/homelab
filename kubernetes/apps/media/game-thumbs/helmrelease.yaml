@@ -21,13 +21,20 @@ spec:
       strategy: rollback
     crds: CreateReplace
   values:
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
     controllers:
       main:
         containers:
           main:
             image:
               repository: ghcr.io/sethwv/game-thumbs
-              tag: v2.1.0
+              tag: v2.3.0
             env:
               TZ: ${TZ}
             probes:

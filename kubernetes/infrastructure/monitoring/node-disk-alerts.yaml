@@ -28,6 +28,7 @@ spec:
           for: 30m
           labels:
             severity: warning
+            ai_triage: "true"
           annotations:
             summary: "Disk over 80% full on {{ $labels.instance }} ({{ $labels.mountpoint }})"
             description: >-
@@ -41,6 +42,7 @@ spec:
           for: 2m
           labels:
             severity: critical
+            ai_triage: "true"
           annotations:
             summary: "Node {{ $labels.node }} under DiskPressure"
             description: >-

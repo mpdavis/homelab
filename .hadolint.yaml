@@ -1,0 +1,23 @@
+# hadolint config for docker/*/Dockerfile — see .github/workflows/lint-dockerfile.yml
+#
+# Advisory check (not on main's ruleset). The intent is to catch new problems in
+# custom images, not to relitigate choices this repo makes deliberately, so a few
+# rules start disabled. Tighten by removing entries here once a Dockerfile is clean.
+
+failure-threshold: warning
+
+ignored:
+  # This repo pins *tool* versions as renovate-annotated ARGs (see the Dockerfiles)
+  # and treats the distro package set as "whatever the base image ships". Pinning
+  # apt/pip/apk versions on top of that buys churn, not reproducibility.
+  - DL3008  # pin versions in apt-get install
+  - DL3013  # pin versions in pip install
+  - DL3018  # pin versions in apk add
+  # `curl ... | tar` in a RUN. Every such pipe here is `set -o pipefail`-safe by
+  # construction (curl -f, single-producer pipe); adding a SHELL directive to each
+  # image just to satisfy the check is noise. Revisit if a multi-stage pipe appears.
+  - DL4006  # set SHELL with -o pipefail before RUN with a pipe
+
+trustedRegistries:
+  - docker.io
+  - ghcr.io

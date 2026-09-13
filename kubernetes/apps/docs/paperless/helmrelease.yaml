@@ -25,10 +25,14 @@ spec:
       main:
         containers:
           # paperless-ngx web/consumer/scheduler — single image runs all roles
+          # hygiene-exempt: runtime-identity paperless-ngx's own Dockerfile uses s6-overlay
+          # (ENTRYPOINT /init, useradd --uid 1000 paperless) -- same architecture as
+          # LinuxServer images. It must start as root; the image already drops
+          # privileges internally to uid 1000. Forcing pod-level runAsUser breaks s6 init.
           main:
             image:
               repository: ghcr.io/paperless-ngx/paperless-ngx
-              tag: 2.20.15
+              tag: 3.1.3
             env:
               TZ: ${TZ}
               PAPERLESS_TIME_ZONE: ${TZ}

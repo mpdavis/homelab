@@ -1,0 +1,61 @@
+# Deliberately non-compliant manifests. Every check configured in .kube-linter.yaml
+# MUST fire on this file — .github/scripts/kube-linter-selftest.py asserts exactly that,
+# and the hygiene workflow runs it before trusting a clean result.
+#
+# The failure mode this exists to catch: kube-linter exits 0 with `Reports: null` when it
+# resolves no objects, and a renamed or mistyped check in the config is silently dropped
+# rather than erroring. Either one turns the hygiene gate into a check that passes
+# everything while appearing to work — worse than no check at all, because it is trusted.
+#
+# If you add a check to .kube-linter.yaml, add a violation of it here.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canary-unhardened
+  namespace: canary
+spec:
+  selector:
+    matchLabels: {app: canary}
+  template:
+    metadata:
+      labels: {app: canary}
+    spec:
+      containers:
+        # Violates: floating-tag (":latest"), run-as-non-root, no-read-only-root-fs,
+        # unset-cpu-requirements, unset-memory-request, unset-memory-requirements.
+        - name: unhardened
+          image: example.invalid/canary/app:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canary-bad-capabilities
+  namespace: canary
+  # Everything except the capabilities rule is already correct here, so this object
+  # isolates must-drop-all-capabilities. Note that check only evaluates containers that
+  # HAVE a capabilities block — a container with no securityContext at all passes it,
+  # which is the known gap documented in .kube-linter.yaml.
+  annotations:
+    ignore-check.kube-linter.io/no-read-only-root-fs: "canary fixture, not a real workload"
+spec:
+  selector:
+    matchLabels: {app: canary}
+  template:
+    metadata:
+      labels: {app: canary}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: bad-caps
+          image: example.invalid/canary/app:1.0.0
+          securityContext:
+            readOnlyRootFilesystem: true
+            capabilities:
+              # Should be `drop: [ALL]`.
+              drop: []
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 64Mi}

@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Theories</h1>
+<p class="lede">
+  Whether the mechanisms behind the models are actually there. These ask a
+  different question from a backtest: not "did this make money in the sample"
+  but "is the thing it depends on real".
+</p>
+
+<h2>Blue-blood premium</h2>
+<div class="panel">
+  {% if premium.error %}
+    <p class="empty">{{ premium.error }}</p>
+  {% else %}
+  <dl class="kv">
+    <div><dt>Premium</dt><dd class="{{ 'good' if premium.premium_pts_per_sd < 0 else 'bad' }}">{{ '%+.2f'|format(premium.premium_pts_per_sd) }}</dd></div>
+    <div><dt>Std error</dt><dd>{{ '%.2f'|format(premium.se) }}</dd></div>
+    <div><dt>t</dt><dd>{{ '%+.2f'|format(premium.t) }}</dd></div>
+    <div><dt>Games</dt><dd>{{ '{:,}'.format(premium.games) }}</dd></div>
+  </dl>
+  <p style="margin-top:14px">{{ premium.interpretation }}</p>
+  <p class="muted" style="font-size:13.5px">
+    Points per standard deviation of prestige, from regressing how far each result
+    missed the closing line on the prestige gap between the teams. Zero means the
+    market prices brands correctly. Negative means it overpays for them.
+  </p>
+
+  <h2 style="margin-top:22px">Season by season — the NIL drift</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Season</th><th class="num">Premium</th><th class="num">SE</th><th class="num">t</th><th class="num">Games</th></tr></thead>
+      <tbody>
+        {% for row in premium.by_season %}
+        <tr>
+          <td>{{ row.season }}</td>
+          <td class="num {{ 'good' if row.premium_pts_per_sd < 0 else '' }}">{{ '%+.2f'|format(row.premium_pts_per_sd) }}</td>
+          <td class="num muted">{{ '%.2f'|format(row.se) }}</td>
+          <td class="num">{{ '%+.2f'|format(row.t) }}</td>
+          <td class="num muted">{{ row.games }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="note">
+    This is the series that speaks to the portal hypothesis. If the premium was
+    consistently negative through the late 2010s and has trended toward zero since
+    2021, the depth advantage is being arbitraged away and the market has been
+    slow to reprice it. A single season's estimate is noisy — read the trend.
+  </div>
+
+  <h2 style="margin-top:22px">By prestige matchup</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Matchup</th><th class="num">Games</th><th class="num">Mean miss</th><th class="num">Home cover rate</th></tr></thead>
+      <tbody>
+        {% for row in premium.by_prestige_bucket %}
+        <tr>
+          <td>{{ row.bucket }}</td>
+          <td class="num muted">{{ '{:,}'.format(row.games) }}</td>
+          <td class="num">{{ '%+.2f'|format(row.mean_miss_pts) }}</td>
+          <td class="num">{{ '%.1f%%'|format(row.home_cover_rate * 100) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<h2>Is hidden yardage a skill?</h2>
+<div class="panel">
+  {% if persistence.error %}
+    <p class="empty">{{ persistence.error }}</p>
+  {% else %}
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Metric</th><th class="num">Split-half r</th><th class="num">Full-season r</th><th class="num">Team-seasons</th></tr></thead>
+      <tbody>
+        {% for row in persistence.metrics %}
+        <tr>
+          <td>{{ row.metric }}</td>
+          <td class="num">{{ '%.3f'|format(row.split_half_r) }}</td>
+          <td class="num">{{ '%.3f'|format(row.full_season_r) }}</td>
+          <td class="num muted">{{ '{:,}'.format(row.team_seasons) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p style="margin-top:14px">{{ persistence.interpretation }}</p>
+  <p class="muted" style="font-size:13.5px">
+    Each team's season is split into odd and even games; a metric that measures a
+    real property of a team correlates with itself across the two halves. One that
+    measures what happened to it does not.
+  </p>
+  {% endif %}
+</div>
+
+<h2>Does the market already know?</h2>
+<div class="panel">
+  {% if market_test.error %}
+    <p class="empty">{{ market_test.error }}</p>
+  {% else %}
+  <dl class="kv">
+    <div><dt>Coefficient</dt><dd>{{ '%+.4f'|format(market_test.coefficient) }}</dd></div>
+    <div><dt>Std error</dt><dd>{{ '%.4f'|format(market_test.se) }}</dd></div>
+    <div><dt>t</dt><dd>{{ '%+.2f'|format(market_test.t) }}</dd></div>
+    <div><dt>Games</dt><dd>{{ '{:,}'.format(market_test.games) }}</dd></div>
+  </dl>
+  <p style="margin-top:14px">{{ market_test.interpretation }}</p>
+  <div class="note">
+    A metric has to clear both bars to be worth betting: repeatable (above) and
+    unpriced (here). Plenty of real football insights fail the second one.
+  </div>
+  {% endif %}
+</div>
+
+{% if portal %}
+<h2>Portal flow against prestige</h2>
+<div class="panel scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Season</th><th class="num">Slope per SD</th><th class="num">t</th>
+        <th class="num">Teams</th>
+        <th class="num">Net, top quartile</th><th class="num">Net, bottom quartile</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in portal %}
+      <tr>
+        <td>{{ row.season }}</td>
+        <td class="num">{{ '%+.2f'|format(row.slope_rating_per_sd) }}</td>
+        <td class="num">{{ '%+.2f'|format(row.t) }}</td>
+        <td class="num muted">{{ row.teams }}</td>
+        <td class="num">{{ '%+.1f'|format(row.mean_net_top_quartile) }}</td>
+        <td class="num">{{ '%+.1f'|format(row.mean_net_bottom_quartile) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="note">
+    The mechanism check. A negative slope means the most prestigious programs are
+    net exporters of transfer talent — the bench emptying out, which is what the
+    thesis requires actually be happening.
+  </div>
+</div>
+{% endif %}
+
+{% if curve %}
+<h2>Expected points by starting field position</h2>
+<div class="panel scroll">
+  <table>
+    <thead><tr><th class="num">Yards to goal</th><th class="num">Expected points</th><th class="num">Drives</th></tr></thead>
+    <tbody>
+      {% for row in curve %}
+      <tr>
+        <td class="num">{{ row.yards_to_goal_bin }}</td>
+        <td class="num">{{ '%+.3f'|format(row.expected_points) }}</td>
+        <td class="num muted">{{ '{:,}'.format(row.drives) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="note">
+    The ruler. Every "hidden yardage" number on this site is starting field
+    position converted through this curve into points.
+  </div>
+</div>
+{% endif %}
+{% endblock %}

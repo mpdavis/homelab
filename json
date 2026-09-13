@@ -171,25 +171,6 @@ subjects:
 ---
 apiVersion: v1
 data:
-  opencode.json: |
-    {
-      "$schema": "https://opencode.ai/config.json",
-      "provider": {
-        "anthropic": {
-          "options": {
-            "baseURL": "http://127.0.0.1:3456",
-            "apiKey": "dummy"
-          }
-        }
-      }
-    }
-kind: ConfigMap
-metadata:
-  name: coding-agent-opencode
-  namespace: ai
----
-apiVersion: v1
-data:
   default.conf: |
     server {
         listen 8080;
@@ -2103,7 +2084,6 @@ spec:
                   key: github-token
                   name: coding-agent-secrets
               HOST: 0.0.0.0
-              OPENCODE_CONFIG: /etc/opencode/opencode.json
               SERVER_PORT: "3001"
               TZ: ${TZ}
             image:
@@ -2116,38 +2096,6 @@ spec:
               requests:
                 cpu: 100m
                 memory: 512Mi
-            securityContext:
-              allowPrivilegeEscalation: false
-          meridian:
-            env:
-              CLAUDE_CODE_OAUTH_TOKEN:
-                secretKeyRef:
-                  key: claude-code-oauth-token
-                  name: coding-agent-secrets
-              CLAUDE_PROXY_HOST: 127.0.0.1
-              MERIDIAN_DEFAULT_PROFILE: default
-              MERIDIAN_PROFILES: '[{"id":"default","oauthToken":"$(CLAUDE_CODE_OAUTH_TOKEN)"}]'
-              TZ: ${TZ}
-            image:
-              repository: ghcr.io/rynfar/meridian
-              tag: 1.60.0
-            probes:
-              liveness:
-                custom: true
-                enabled: true
-                spec:
-                  exec:
-                    command:
-                    - node
-                    - -e
-                    - const r=await fetch('http://127.0.0.1:3456/health');process.exit(r.ok?0:1)
-            resources:
-              limits:
-                cpu: "1"
-                memory: 2Gi
-              requests:
-                cpu: 50m
-                memory: 256Mi
             securityContext:
               allowPrivilegeEscalation: false
         serviceAccount:
@@ -2165,14 +2113,6 @@ spec:
             main:
             - path: /home/agent
         existingClaim: coding-agent
-      opencode-config:
-        advancedMounts:
-          main:
-            main:
-            - path: /etc/opencode
-              readOnly: true
-        name: coding-agent-opencode
-        type: configMap
     service:
       main:
         controller: main

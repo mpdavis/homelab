@@ -1,0 +1,30 @@
+// markdownlint-cli2 config for *.md — see .github/workflows/lint-markdown.yml
+//
+// Advisory check (not on main's ruleset). On a PR it lints only the Markdown files
+// that PR changed, so the existing docs are not a wall of red; `workflow_dispatch`
+// runs it over the whole tree.
+{
+  "config": {
+    "default": true,
+
+    // Prose in this repo is hand-wrapped inconsistently and that is fine.
+    "MD013": false, // line length
+    // READMEs and design docs use inline HTML (<details>, <img align>, <br>).
+    "MD033": false, // inline HTML
+    // Several files open with an HTML comment or front matter, not an H1.
+    "MD041": false, // first line in a file should be a top-level heading
+
+    // Allow the same heading text under different parents (e.g. repeated "Why").
+    "MD024": { "siblings_only": true },
+    // Ordered lists may use "1." for every item.
+    "MD029": { "style": "one_or_ordered" }
+  },
+  "ignores": [
+    ".claude/**",
+    "**/node_modules/**",
+    "**/.venv/**",
+    "**/.pytest_cache/**",
+    "**/.ruff_cache/**",
+    "**/*.egg-info/**"
+  ]
+}

@@ -24,10 +24,12 @@ spec:
     controllers:
       main:
         containers:
+          # hygiene-exempt: runtime-identity likely a Laravel app (php-fpm/www-data
+          # conventions); uid/entrypoint behavior not verified
           main:
             image:
               repository: mauriceboe/trek
-              tag: "3.4.1"
+              tag: "4.2.1"
             env:
               TZ: ${TZ}
               APP_URL: https://trek.${DOMAIN}

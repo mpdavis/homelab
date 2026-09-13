@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Backtests</h1>
+<p class="lede">
+  Every run the CLI has saved. Read the confidence interval, not the win rate — at
+  a few hundred bets those two tell very different stories.
+</p>
+
+{% if not runs %}
+<div class="panel">
+  <p class="empty">
+    No runs yet. Try
+    <code>gridiron backtest --model decomposed --seasons 2019-2025</code>
+    or a full sweep with
+    <code>gridiron sweep --model decomposed --seasons 2019-2025</code>.
+  </p>
+</div>
+{% else %}
+<div class="panel scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Run</th><th>Label</th><th>Model</th><th>Seasons</th>
+        <th class="num">Bets</th><th class="num">Win rate</th>
+        <th class="num">ROI</th><th class="num">95% CI</th>
+        <th class="num">MAE model</th><th class="num">MAE market</th>
+        <th>Verdict</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run in runs %}
+      {% set m = run.metrics %}
+      <tr>
+        <td class="muted" style="font-family:var(--mono);font-size:12px">{{ run.run_id }}</td>
+        <td>{{ run.label }}</td>
+        <td class="muted">{{ run.model }}</td>
+        <td class="num muted">{{ run.first_season }}–{{ run.last_season }}</td>
+        <td class="num">{{ '{:,}'.format(m.bets) if m.bets is defined else '—' }}</td>
+        <td class="num">
+          {% if m.win_rate is defined %}
+            <span class="{{ 'good' if m.win_rate > m.breakeven_rate else 'bad' }}">
+              {{ '%.1f%%'|format(m.win_rate * 100) }}
+            </span>
+          {% endif %}
+        </td>
+        <td class="num {{ 'good' if m.roi is defined and m.roi > 0 else 'bad' }}">
+          {{ '%+.2f%%'|format(m.roi * 100) if m.roi is defined }}
+        </td>
+        <td class="num muted">
+          {% if m.roi_ci_low is defined %}
+            {{ '%+.1f'|format(m.roi_ci_low * 100) }} … {{ '%+.1f'|format(m.roi_ci_high * 100) }}
+          {% endif %}
+        </td>
+        <td class="num">{{ m.mae_model if m.mae_model is defined }}</td>
+        <td class="num muted">{{ m.mae_market if m.mae_market is defined }}</td>
+        <td>
+          {% if m.beats_breakeven %}
+            <span class="pill good">clears zero</span>
+          {% else %}
+            <span class="pill">noise</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="note">
+  <strong>MAE model vs MAE market</strong> is the honest comparison. If the model's
+  mean absolute error is materially worse than the market's, any profit in the ROI
+  column came from a handful of games rather than from knowing more, and it will
+  not repeat.
+</div>
+<div class="note">
+  A run marked <em>noise</em> is not a failed idea, it is an unproven one. The
+  sample cannot separate it from a coin flip. Betting it anyway is a decision to
+  pay the vig for the privilege of finding out.
+</div>
+{% endif %}
+{% endblock %}
