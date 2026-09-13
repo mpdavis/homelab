@@ -27,7 +27,7 @@ spec:
       # sha256:b76b9298a2a60d5cf9d223e009cd0b8ad620c2080abd83f9a1fa5084fa87f9ab).
       # Controls the itzg tooling + Java runtime (Java 21); the Minecraft game
       # version is set separately via minecraftServer.version below.
-      tag: "2026.8.0-java21"
+      tag: "2026.9.1-java21"
       pullPolicy: IfNotPresent
     minecraftServer:
       # Accepting the Minecraft EULA (https://www.minecraft.net/en-us/eula) is
