@@ -163,6 +163,66 @@ gridiron serve                           # web UI on :8080
 deliberately small slice. Lowering it below a couple of hundred games buys
 confident nonsense from the opening Saturday of a sample.
 
+## Automated search, and why it needs guardrails
+
+`gridiron research` asks a model for hypotheses and runs them through the
+funnel. The search is the easy half. The hard half is that **running many
+strategies against one sample and keeping the best manufactures a strategy that
+loses money**, and the bootstrap interval `backtest` reports assumes you asked
+once.
+
+Under a pure null, the largest |t| you expect from N tries is about √(2 ln N):
+
+| tries | best t from pure noise |
+|---|---|
+| 20 | 2.4 |
+| 200 | 3.3 |
+| 2,000 | 3.9 |
+
+A candidate showing t = 3.0 after 200 attempts is the *expected* result of
+attempting 200 times. Three things keep this honest:
+
+**A locked holdout.** Seasons from `GRIDIRON_HOLDOUT_FROM_SEASON` (default 2024)
+are invisible to the search — `guard_seasons` raises rather than filtering, so
+a search stage cannot quietly reach into them. A finalist gets one look, and
+looking spends it permanently.
+
+**A trial count that cannot be pruned.** Every backtest evaluation is a row in
+`research_trials`, and the count is the denominator of every significance claim.
+The Šidák-corrected bar rises as you search; `gridiron research status` shows
+what it currently is.
+
+**A mechanism recorded before the result.** The proposer must say why an effect
+should exist before it learns whether it does. This is the only thing a language
+model does here that a grid search cannot, and it is the reason to involve one:
+a hypothesis with a reason attached is the kind that survives out of sample.
+
+The funnel runs cheap filters first — does it repeat (split-half r *and* a
+Fisher z, because at 48 team-seasons an r of 0.2 is noise), is it already priced
+— because those cost one scan and kill most ideas before anything consumes the
+sample.
+
+```console
+gridiron research status                    # the partition and the current bar
+gridiron research propose --count 5         # propose and evaluate, needs a key
+gridiron research add --name x --mechanism "why" --sql-file x.sql
+gridiron research evaluate --id <id>
+gridiron research holdout --id <id>         # one shot; spends it
+```
+
+In the cluster the CLI cannot open the database (the server holds it), so the
+loop runs in the server: `POST /api/research/run?count=5`, read `GET
+/api/research`. The CLI is for a copy of the file on a laptop.
+
+Generated SQL is parsed, not keyword-scanned: DuckDB reports the statement type
+and anything that is not a single `SELECT` is refused, along with the functions
+that read outside the database.
+
+A note on expectations: both theories that ship were killed by the "is it
+already priced" gate, and that is the normal outcome. The most reliable edge in
+this market is probably line shopping, which is on the edges page already and
+needs no model to be right.
+
 ## Adding a theory
 
 Two extension points, both one decorator.

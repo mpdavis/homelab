@@ -246,6 +246,132 @@ def cmd_edges(args) -> int:
     return 0
 
 
+def cmd_research(args) -> int:
+    from pathlib import Path
+
+    from .db import cursor
+    from .research import evaluate as ev
+    from .research import registry
+
+    if args.action == "status":
+        state = registry.summary()
+        print(f"search seasons   {state['search_seasons']}")
+        print(f"holdout seasons  {state['holdout_seasons']}  (locked)")
+        print(f"backtest trials  {state['backtest_trials']}")
+        print(
+            f"significance bar |t| >= {state['required_t_now']} "
+            f"(noise alone reaches {state['expected_max_t_under_null']} "
+            f"over this many looks)"
+        )
+        print(f"hypotheses       {state['by_status'] or 'none yet'}")
+        for stage, counts in state["by_stage"].items():
+            print(f"  {stage:<12} {counts['trials']:>4} trials, {counts['passed']:>3} passed")
+        return 0
+
+    if args.action == "list":
+        with cursor() as conn:
+            frame = conn.execute(
+                "SELECT hypothesis_id, status, name, source, created_at "
+                "FROM research_hypotheses ORDER BY created_at DESC LIMIT 50"
+            ).df()
+        _print_table(frame)
+        return 0
+
+    if args.action == "add":
+        if not (args.name and args.mechanism and args.sql_file):
+            print("add needs --name, --mechanism and --sql-file", file=sys.stderr)
+            return 2
+        hypothesis = registry.Hypothesis(
+            name=args.name,
+            mechanism=args.mechanism,
+            sql=Path(args.sql_file).read_text(),
+        )
+        registry.record_hypothesis(hypothesis)
+        print(f"recorded {hypothesis.hypothesis_id}  {hypothesis.name}")
+        return 0
+
+    if args.action == "holdout":
+        if not args.hypothesis_id:
+            print("holdout needs --id", file=sys.stderr)
+            return 2
+        result = ev.holdout(
+            args.hypothesis_id, model=args.model, edge_threshold=args.edge
+        )
+        print(f"{result['name']}  seasons {result['seasons']}")
+        print(f"  bets {result['bets']:,}  roi {result['roi']:+.2%}  t {result['t']:+.2f}")
+        print(f"  95% CI {result['roi_ci'][0]:+.2%} .. {result['roi_ci'][1]:+.2%}")
+        print(f"  {result['outcome']}")
+        print("  the holdout for this hypothesis is now spent")
+        return 0
+
+    if args.action == "evaluate":
+        if not args.hypothesis_id:
+            print("evaluate needs --id", file=sys.stderr)
+            return 2
+        with cursor() as conn:
+            row = conn.execute(
+                "SELECT hypothesis_id, name, mechanism, expected_sign, sql, source "
+                "FROM research_hypotheses WHERE hypothesis_id = ?",
+                [args.hypothesis_id],
+            ).fetchone()
+        if row is None:
+            print(f"no hypothesis {args.hypothesis_id}", file=sys.stderr)
+            return 1
+        hypothesis = registry.Hypothesis(
+            hypothesis_id=row[0], name=row[1], mechanism=row[2],
+            expected_sign=row[3], sql=row[4], source=row[5],
+        )
+        _print_evaluation(ev.evaluate(
+            hypothesis, stage_limit=args.stop_at, model=args.model,
+            edge_threshold=args.edge,
+        ))
+        return 0
+
+    # propose
+    from .research import propose as pr
+
+    for i in range(max(1, args.count)):
+        try:
+            hypothesis = pr.propose(hint=args.hint)
+        except RuntimeError as exc:
+            print(exc, file=sys.stderr)
+            return 1
+        registry.record_hypothesis(hypothesis)
+        print(f"\n=== {hypothesis.name}  [{hypothesis.hypothesis_id}] ===")
+        print(f"mechanism: {hypothesis.mechanism}")
+        print(f"\n{hypothesis.sql.strip()}\n")
+        try:
+            _print_evaluation(ev.evaluate(
+                hypothesis, stage_limit=args.stop_at, model=args.model,
+                edge_threshold=args.edge,
+            ))
+        except Exception as exc:  # noqa: BLE001 — one bad idea must not stop the run
+            registry.set_status(hypothesis.hypothesis_id, "rejected")
+            registry.record_trial(
+                hypothesis.hypothesis_id, "persistence", seasons=[],
+                passed=False, statistic=None, note=str(exc)[:400],
+            )
+            print(f"  rejected: {exc}")
+    return 0
+
+
+def _print_evaluation(report: dict) -> None:
+    for stage, data in report.get("stages", {}).items():
+        mark = "pass" if data.get("passed") else "FAIL"
+        if stage == "persistence":
+            print(f"  [{mark}] persistence   split-half r={data['split_half_r']:+.3f} "
+                  f"over {data['team_seasons']} team-seasons")
+        elif stage == "market":
+            print(f"  [{mark}] market test   t={data.get('t', 0):+.2f} "
+                  f"on {data.get('games', 0):,} games")
+        elif stage == "backtest":
+            c = data["correction"]
+            print(f"  [{mark}] backtest      {data['bets']:,} bets, roi "
+                  f"{data['roi']:+.2%}, t={data['t']:+.2f}")
+            print(f"         bar |t| >= {c['required_t']} after {c['trials_so_far']} looks")
+    print(f"  -> {report.get('outcome', '')}")
+
+
 def cmd_analyze(args) -> int:
     import pandas as pd
 
@@ -430,6 +556,29 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser(
         "models", help="list registered models and feature blocks"
     ).set_defaults(func=cmd_models)
+
+    research = subparsers.add_parser(
+        "research", help="automated hypothesis search, with multiple-testing control"
+    )
+    research.add_argument(
+        "action",
+        choices=["status", "propose", "add", "list", "evaluate", "holdout"],
+    )
+    research.add_argument("--hint", default="", help="steer the proposer")
+    research.add_argument("--name", help="for `add`")
+    research.add_argument("--mechanism", help="for `add`: why this should be true")
+    research.add_argument("--sql-file", help="for `add`: file holding the SELECT")
+    research.add_argument("--id", dest="hypothesis_id", help="for evaluate/holdout")
+    research.add_argument("--model", default="decomposed")
+    research.add_argument("--threshold", dest="edge", type=float, default=2.0)
+    research.add_argument(
+        "--count", type=int, default=1, help="propose and evaluate N in a row"
+    )
+    research.add_argument(
+        "--stop-at", choices=["market", "backtest"], default="backtest",
+        help="stop before the stage that consumes the sample",
+    )
+    research.set_defaults(func=cmd_research)
 
     serve = subparsers.add_parser("serve", help="run the web UI")
     serve.add_argument("--no-refresh", action="store_true")

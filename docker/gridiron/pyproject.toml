@@ -19,6 +19,14 @@ dependencies = [
     # Kickoff cutoffs are compared in a named zone, and slim base images do not
     # reliably ship the system zoneinfo database.
     "tzdata>=2024.1",
+    # The hypothesis proposer. Optional at runtime — without a key the rest of
+    # the research harness still works and you write the SQL yourself.
+    #
+    # 1.3 is a real floor, not a guess: `messages.parse(output_format=...)` is
+    # what `research/propose.py` calls to get a schema-validated hypothesis
+    # back, and it does not exist on 0.x. A looser pin would resolve happily
+    # and then fail at the first proposal.
+    "anthropic>=1.3,<2",
 ]
 
 [project.optional-dependencies]
