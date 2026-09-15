@@ -392,9 +392,7 @@ hostname must be probed by the synthetic-monitoring stack, in **two places** in
 
 Pick the group by whether the IngressRoute has the `authelia` middleware: protected services are
 healthy when they 302 to the auth portal; open services when they return 200. Skipping this means
-the new service is invisible to the deploy canary and to `GatusEndpointDown` alerting — but note
-the canary treats an endpoint with no baseline entry as must-pass, so once added, the service's
-first failing deploy WILL trigger a revert PR (that's the point).
+the new service is invisible to `GatusEndpointDown` alerting.
 
 **external-secret.yaml** (only if the service needs secrets from Bitwarden).
 

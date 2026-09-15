@@ -239,8 +239,7 @@ kube-linter's stock `latest-tag` blocks only `:latest` and untagged references, 
 two lists in sync.
 
 A floating tag means the running version depends on when a pod last restarted, Renovate
-can't propose a reviewable bump, and `deploy-canary` can't attribute a regression to a
-merge. `image-pin-check.yml` separately verifies the pinned reference actually resolves in
+can't propose a reviewable bump, and a regression can't be attributed to a merge. `image-pin-check.yml` separately verifies the pinned reference actually resolves in
 its registry — the two checks are complementary: one says *pinned*, the other says *real*.
 
 Digest-pinned floating tags (`:latest@sha256:…`) are accepted — the digest is what's
@@ -290,8 +289,7 @@ A new `IngressRoute` means three more edits, none of which live next to the Ingr
 3. **Homepage tile** — `kubernetes/apps/homepage/homepage/config/services.yaml` (a
    `configMapGenerator` file, *not* an inline ConfigMap).
 
-Miss #1 or #2 and the service is invisible to `deploy-canary` and to `GatusEndpointDown`
-alerting — it can be down for days without a signal. Miss #3 and it's undiscoverable.
+Miss #1 or #2 and the service is invisible to `GatusEndpointDown` alerting — it can be down for days without a signal. Miss #3 and it's undiscoverable.
 
 Pick the Gatus group by whether the IngressRoute carries the `authentik-forward-auth`
 middleware:

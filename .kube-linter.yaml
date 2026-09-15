@@ -68,7 +68,7 @@ customChecks:
     remediation: >-
       Pin an immutable version tag, or append a digest so Renovate can propose a
       reviewable bump. A floating tag means the running version depends on when a pod
-      last restarted, and deploy-canary cannot attribute a regression to a merge.
+      last restarted, so a regression cannot be attributed to a merge.
       See docs/manifest-conventions.md section 4.
     scope:
       objectKinds:

@@ -13,18 +13,11 @@ See [docs/design.md](docs/design.md) for the full design document, hardware deta
 
 ## Deploy Pipeline & Health
 
-Merging to `main` *is* deploying — Flux reconciles the cluster from `main`, and CI verifies
-each deploy after the fact:
-
-1. **Gatus** ([status.mpdavis.com](https://status.mpdavis.com)) continuously probes every
-   service — HTTP status, TLS validity, and that Authelia-protected hosts actually redirect to
-   the auth portal. Results feed Prometheus; failing endpoints raise the `GatusEndpointDown`
-   alert.
-2. **Deploy canary** (`deploy-canary.yml`) runs on every merge: it waits for Flux to reconcile
-   the commit, then requires every Gatus endpoint to report healthy *after* the deploy. Only
-   endpoints that go **passing → failing** are blamed on the merge — the canary then fails and
-   **auto-opens a revert PR**. Pre-existing failures are exempt (they alert via Prometheus
-   instead of blocking merges).
+Merging to `main` *is* deploying — Flux reconciles the cluster from `main`.
+**Gatus** ([status.mpdavis.com](https://status.mpdavis.com)) continuously probes every
+service — HTTP status, TLS validity, and that Authentik-protected hosts actually redirect to
+the auth portal. Results feed Prometheus; failing endpoints raise the `GatusEndpointDown`
+alert.
 
 See [.github/workflows/README.md](.github/workflows/README.md) for the full workflow reference
 and [docs/design.md](docs/design.md#deploy-verification--synthetic-monitoring) for the design.

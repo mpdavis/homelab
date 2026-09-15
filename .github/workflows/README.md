@@ -2,7 +2,7 @@
 
 Automated PR checks for this repo. The Claude-powered reviewers use the official
 [`anthropics/claude-code-action@v1`](https://github.com/anthropics/claude-code-action);
-`render-validate.yml`, `image-pin-check.yml` and `deploy-canary.yml` are deterministic
+`render-validate.yml` and `image-pin-check.yml` are deterministic
 scripts with no LLM and no secrets.
 
 | Workflow | Trigger | What it does |
@@ -11,7 +11,6 @@ scripts with no LLM and no secrets.
 | `renovate-review.yml` | PRs authored by `renovate[bot]` | Reads the release notes / changelog in the PR, judges merge safety, posts a verdict comment, and **approves** clearly-safe bumps. |
 | `k8s-review.yml` | Human PRs touching `kubernetes/**` | Reviews Flux / Helm / Kustomize correctness, storage classes, security context, and repo conventions (per `CLAUDE.md`). Inline + summary comments. |
 | `image-pin-check.yml` | All PRs (**required check**) | Resolves every newly added `image:` reference against its registry and **fails the check** if any pinned tag/digest does not exist. Guards against typos like `teamarr:v2.6.0` (published tag is `2.6.0`) that would otherwise only surface at runtime as `ImagePullBackOff`. Runs `.github/scripts/verify-image-pins.py`. Its `verify` job is the required status check on main's ruleset, so it runs on **every** PR (no `paths` filter) — a required check that never runs blocks the PR forever. On PRs touching no manifests it exits 0 in ~5s. |
-| `deploy-canary.yml` | Push to `main` (+ manual re-run) | Waits for Flux to reconcile the merged commit, then polls the Gatus API (`status.mpdavis.com`) until every synthetic check reports a healthy result **newer than the reconcile** — proving services actually serve traffic, not just that manifests applied. Snapshots which endpoints were already failing *before* the deploy and only blames the merge for **pass→fail transitions**: those fail the `canary/gatus` commit status and **auto-open a revert PR**; pre-existing failures are exempt (chronic breakage alerts via Prometheus instead of spamming a revert PR per merge). Post-merge only — a red canary reverts, it does not block the next PR. A flake? Close the revert PR and re-run via workflow_dispatch. Requires the repo setting "Allow GitHub Actions to create and approve pull requests". |
 | `claude.yml` | `@claude` mention in an issue/PR comment | On-demand assistant — explain, review, or make changes when asked. |
 | `new-service.yml` | Issue labeled `new service` | Runs the `add-service` skill against the issue, scaffolds the manifests into `kubernetes/apps/<namespace>/<service>/`, and **opens a PR** (`Closes #<issue>`). Defaults to a HelmRelease (official chart, else bjw-s `app-template`). Never merges — the PR still goes through `k8s-review` / `image-pin-check`. |
 | `lint-dockerfile.yml` | PRs touching `docker/**/Dockerfile` (advisory) | hadolint over the changed Dockerfiles. Config `.hadolint.yaml`. See [Lint checks](#lint-checks). |
@@ -49,9 +48,9 @@ and add the job to main's ruleset.
 
 ## Render & Validate
 
-The deterministic pre-merge counterpart to the canary. Everything else here checks
-manifests either semantically (the Claude reviewers, which read intent) or after the
-fact (the canary, once `main` has already moved). Nothing rendered them, so a broken
+The deterministic pre-merge manifest check. The Claude reviewers check manifests
+semantically (they read intent), and Gatus only sees breakage once `main` has already
+moved. Nothing rendered them, so a broken
 patch target or an ignored Helm value merged green and only failed at reconcile —
 and because the `apps` Kustomization deliberately has no `wait:`, that could show up
 as a Gatus alert rather than a Flux error.
