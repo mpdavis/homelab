@@ -13,7 +13,6 @@ scripts with no LLM and no secrets.
 | `image-pin-check.yml` | All PRs (**required check**) | Resolves every newly added `image:` reference against its registry and **fails the check** if any pinned tag/digest does not exist. Guards against typos like `teamarr:v2.6.0` (published tag is `2.6.0`) that would otherwise only surface at runtime as `ImagePullBackOff`. Runs `.github/scripts/verify-image-pins.py`. Its `verify` job is the required status check on main's ruleset, so it runs on **every** PR (no `paths` filter) — a required check that never runs blocks the PR forever. On PRs touching no manifests it exits 0 in ~5s. |
 | `claude.yml` | `@claude` mention in an issue/PR comment | On-demand assistant — explain, review, or make changes when asked. |
 | `new-service.yml` | Issue labeled `new service` | Runs the `add-service` skill against the issue, scaffolds the manifests into `kubernetes/apps/<namespace>/<service>/`, and **opens a PR** (`Closes #<issue>`). Defaults to a HelmRelease (official chart, else bjw-s `app-template`). Never merges — the PR still goes through `k8s-review` / `image-pin-check`. |
-| `lint-dockerfile.yml` | PRs touching `docker/**/Dockerfile` (advisory) | hadolint over the changed Dockerfiles. Config `.hadolint.yaml`. See [Lint checks](#lint-checks). |
 | `lint-shell.yml` | PRs touching `**/*.sh` (advisory) | shellcheck over the changed shell scripts. Config `.shellcheckrc`. |
 | `lint-markdown.yml` | PRs touching `**/*.md` (advisory) | markdownlint-cli2 over the changed Markdown files. Config `.markdownlint-cli2.jsonc`. |
 | `lint-secrets.yml` | All PRs + push to `main` (advisory, no `paths` filter) | gitleaks over the commit range the PR/push adds. Config `.gitleaks.toml`. Backstop for a credential that bypasses the External Secrets pattern. |
@@ -21,17 +20,16 @@ scripts with no LLM and no secrets.
 
 ## Lint checks
 
-Five stack-wide linters, added together. All are **advisory** — none is on main's
+Four stack-wide linters. All are **advisory** — none is on main's
 ruleset — and all are **`paths`-filtered** to the file type they own, so this is the
 opposite of the required checks: a lint workflow that does not run is fine, and the
 filter keeps it off PRs it has nothing to say about. On a pull request each one lints
 only the files that PR changed (`git diff` against the base SHA), so the existing
-backlog in docs and images does not wall off unrelated work; `workflow_dispatch` runs
+backlog in docs does not wall off unrelated work; `workflow_dispatch` runs
 the same tool over the whole tree for a deliberate cleanup pass.
 
 | Tool | Scope | Config | Notes |
 |---|---|---|---|
-| [hadolint](https://github.com/hadolint/hadolint) | `docker/**/Dockerfile` | `.hadolint.yaml` | `DL3008/DL3013/DL3018` (distro package pinning) and `DL4006` start disabled — the images pin *tool* versions via renovate-annotated ARGs and leave the distro package set to the base image. |
 | [shellcheck](https://github.com/koalaman/shellcheck) | tracked `*.sh` | `.shellcheckrc` | Scripts embedded in workflow `run:` blocks are **not** covered — that needs actionlint, which this repo does not run yet. |
 | [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) | `*.md` | `.markdownlint-cli2.jsonc` | `MD013`/`MD033`/`MD041` disabled; vendored trees (`.claude/`, `.venv`, caches) in `ignores`. |
 | [gitleaks](https://github.com/gitleaks/gitleaks) | whole repo, commit range only | `.gitleaks.toml` | No `paths` filter — a leak can be anywhere. Allowlists lockfiles, test fixtures, BWS UUIDs, and the git-ignored local files. |
@@ -80,8 +78,7 @@ ruleset alongside `verify`. Note that Renovate's `automerge` only gates on **req
 checks — a check that merely runs does not hold auto-merge back, so until it is marked
 required it will not stop a bad patch bump from landing.
 
-**No `paths` filter, deliberately.** Same lesson as `image-pin-check` (#425) and
-`ames-council-digest-tests`: a required check that gets skipped never reports, and
+**No `paths` filter, deliberately.** Same lesson as `image-pin-check` (#425): a required check that gets skipped never reports, and
 GitHub waits for it forever. On a PR touching no manifests flate renders from cache in
 a couple of seconds.
 

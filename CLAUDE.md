@@ -20,7 +20,6 @@ GitOps repository for a homelab k3s cluster managed by FluxCD (via FluxOperator)
 bootstrap/          # Pre-Flux provisioning and configuration
   ansible/          # Ansible — node configuration, k3s install, Flux bootstrap
   tofu/             # OpenTofu — LXC container + VM provisioning on Proxmox
-docker/             # Custom images built by GitHub Actions to ghcr.io (e.g. gridiron)
 kubernetes/         # Flux-managed cluster state (sync root)
   apps/             # Per-service manifests, grouped by namespace (ai/, civic/, media/, homepage/)
   infrastructure/   # Cluster infrastructure — HelmReleases, HelmRepositories, companion manifests
@@ -39,6 +38,10 @@ kubernetes/         # Flux-managed cluster state (sync root)
   clusters/         # Flux Kustomization entrypoints (infra.yaml, apps.yaml, flux-system/)
 docs/               # Design documents
 ```
+
+Custom images (gridiron, ames-council-digest) live in their own repos —
+`mpdavis/<name>` — which publish `ghcr.io/mpdavis/<name>` from main; Renovate bumps
+the pinned tag here like any third-party image.
 
 ## Manifest Strategy
 

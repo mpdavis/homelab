@@ -388,8 +388,6 @@ homelab/
 ├── bootstrap/                 # Pre-Flux provisioning and configuration
 │   ├── tofu/                  # OpenTofu — LXC/VM provisioning
 │   └── ansible/               # Ansible — node config, k3s install, Flux bootstrap
-├── docker/                    # Custom images built by GitHub Actions → ghcr.io
-│   └── gridiron/              # college football betting research (DuckDB + FastAPI)
 ├── kubernetes/                # Flux-managed cluster state (sync root)
 │   ├── kustomization.yaml     # Entry point — includes only Flux plumbing
 │   ├── apps/                  # grouped by namespace, one dir per service
