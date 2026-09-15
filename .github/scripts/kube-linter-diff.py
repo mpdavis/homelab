@@ -7,9 +7,7 @@ But the tree predates docs/manifest-conventions.md and currently carries a backl
 findings, so a whole-tree gate would fail every unrelated PR.
 
 So: render and lint twice — the PR and its merge base — and blame the PR only for
-findings that appear in one and not the other. This is the same shape as the baseline
-deploy-canary.yml takes against Gatus, for the same reason: report the transition, not
-the state.
+findings that appear in one and not the other: report the transition, not the state.
 
     kube-linter-diff.py base.json head.json > comment.md
 
