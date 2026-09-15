@@ -11,7 +11,6 @@ resources:
   - media
   - ntfy
   - homepage
-  - hello-world
 
 # Exposure. Every IngressRoute is public by default; label it
 # `homelab.mpdavis.com/exposure: tailnet` to make it LAN/tailnet-only. The label

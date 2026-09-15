@@ -1,9 +1,9 @@
 name: Render & Validate
 
-# The deterministic pre-merge counterpart to deploy-canary.yml.
+# The deterministic pre-merge manifest check.
 #
 # Everything else in this repo checks manifests either semantically (the Claude
-# reviewers, which read intent) or after the fact (the canary, which watches real
+# reviewers, which read intent) or after the fact (Gatus, which watches real
 # traffic once main has already moved). Nothing rendered them. A patch whose target
 # does not exist, a resource missing from a kustomization.yaml, a Helm value the
 # chart silently ignores, an unresolved ${VAR} — all of that merged green and only

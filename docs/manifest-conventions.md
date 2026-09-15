@@ -18,7 +18,7 @@ Three things read this document:
 If you change a rule here, change it in all three places. Each section below names the
 kube-linter check that enforces it, which is the stable link between them.
 
-### What is and isn't enforced
+## What is and isn't enforced
 
 The check lints the **rendered** tree (`flate build all`), so an app-template
 HelmRelease, a hand-written Deployment and a third-party chart are all checked
@@ -220,7 +220,7 @@ resources:
   limit takes the node down instead of just itself.
 - **`limits.cpu` is optional and usually wrong.** CPU is compressible, so a limit buys
   nothing but throttling. Set it only to deliberately cap a workload
-  (`kubernetes/apps/ai/coding-agent/helmrelease.yaml` caps at 2 cores on purpose).
+  (`kubernetes/apps/civic/ames-council-digest/cronjob.yaml` caps at 1 core on purpose).
 
 Homelab-scale numbers are fine — `10m` / `32Mi` for a static file server is a real answer.
 The point is a declared number, not a large one.
@@ -239,8 +239,7 @@ kube-linter's stock `latest-tag` blocks only `:latest` and untagged references, 
 two lists in sync.
 
 A floating tag means the running version depends on when a pod last restarted, Renovate
-can't propose a reviewable bump, and `deploy-canary` can't attribute a regression to a
-merge. `image-pin-check.yml` separately verifies the pinned reference actually resolves in
+can't propose a reviewable bump, and a regression can't be attributed to a merge. `image-pin-check.yml` separately verifies the pinned reference actually resolves in
 its registry — the two checks are complementary: one says *pinned*, the other says *real*.
 
 Digest-pinned floating tags (`:latest@sha256:…`) are accepted — the digest is what's
@@ -292,8 +291,7 @@ A new `IngressRoute` means three more edits, none of which live next to the Ingr
 3. **Homepage tile** — `kubernetes/apps/homepage/homepage/config/services.yaml` (a
    `configMapGenerator` file, *not* an inline ConfigMap).
 
-Miss #1 or #2 and the service is invisible to `deploy-canary` and to `GatusEndpointDown`
-alerting — it can be down for days without a signal. Miss #3 and it's undiscoverable.
+Miss #1 or #2 and the service is invisible to `GatusEndpointDown` alerting — it can be down for days without a signal. Miss #3 and it's undiscoverable.
 
 Pick the Gatus group by whether the IngressRoute carries the `authentik-forward-auth`
 middleware:
@@ -321,8 +319,7 @@ Note the hostname formats differ by file and are not interchangeable: IngressRou
 the Homepage config use `${DOMAIN}` (Flux `postBuild` substitutes it); `gatus.yaml` uses
 the literal `mpdavis.com` in both the endpoint URL and the `hostAliases` list.
 
-Non-goal: a handful of hostnames are deliberately absent from Homepage (`hello-world`,
-Homepage itself, machine-facing endpoints like `thumbs`). Gatus coverage has no such
+Non-goal: a handful of hostnames are deliberately absent from Homepage (Homepage itself, machine-facing endpoints like `thumbs`). Gatus coverage has no such
 exemption — everything with a hostname gets probed.
 
 ---

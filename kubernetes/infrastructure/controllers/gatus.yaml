@@ -50,7 +50,6 @@ spec:
                       - homeassistant.mpdavis.com
                   - ip: ${TRAEFIK_TAILNET_IP}
                     hostnames:
-                      - hello.mpdavis.com
                       - home.mpdavis.com
                       - paperless.mpdavis.com
                       - podfetch.mpdavis.com
@@ -59,7 +58,6 @@ spec:
                       - mousehole.mpdavis.com
                       - grafana.mpdavis.com
                       - ai.mpdavis.com
-                      - code.mpdavis.com
                       - dispatcharr.mpdavis.com
                       - listenarr.mpdavis.com
                       - prowlarr.mpdavis.com
@@ -107,16 +105,12 @@ spec:
       # Endpoint checks run every 60s (Gatus default interval).
       endpoints:
         # --- external, no forward-auth: healthy == 200 after redirects ---
-        - name: hello
-          group: external-open
-          url: https://hello.mpdavis.com/
-          conditions: &open-conditions
-            - "[STATUS] == 200"
-            - "[CERTIFICATE_EXPIRATION] > 48h"
         - name: homepage
           group: external-open
           url: https://home.mpdavis.com/
-          conditions: *open-conditions
+          conditions: &open-conditions
+            - "[STATUS] == 200"
+            - "[CERTIFICATE_EXPIRATION] > 48h"
         - name: paperless
           group: external-open
           url: https://paperless.mpdavis.com/
@@ -195,12 +189,6 @@ spec:
           conditions: &auth-conditions
             - "[STATUS] == 302"
             - "[CERTIFICATE_EXPIRATION] > 48h"
-        - name: coding-agent
-          group: external-auth
-          url: https://code.mpdavis.com/
-          client: *auth-client
-          headers: *auth-headers
-          conditions: *auth-conditions
         - name: dispatcharr
           group: external-auth
           url: https://dispatcharr.mpdavis.com/
@@ -279,12 +267,3 @@ spec:
           group: internal
           url: http://ollama.ai.svc.cluster.local:11434/api/version
           conditions: *internal-conditions
-        # Minecraft speaks its own TCP protocol (not HTTP) on 25565, so it is
-        # probed with a TCP connect against the in-cluster Service rather than
-        # an HTTP GET. No hostAliases entry needed — this uses cluster DNS.
-        - name: minecraft
-          group: internal
-          url: tcp://minecraft.gaming.svc.cluster.local:25565
-          interval: 60s
-          conditions:
-            - "[CONNECTED] == true"

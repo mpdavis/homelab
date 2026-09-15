@@ -232,8 +232,8 @@ Current split:
   Authentik (`iam`, needed by any public forward-auth/OIDC login), Gatus status page,
   ntfy, Home Assistant, council digest.
 - **Tailnet:** the *arr stack, qBittorrent, mousehole, Dispatcharr, Teamarr, ECM,
-  Podfetch, Open WebUI, coding-agent, Flux UI, Grafana, Homepage, Paperless, Proxmox,
-  BirdNET, gridiron, hello-world.
+  Podfetch, Open WebUI, Flux UI, Grafana, Homepage, Paperless, Proxmox, BirdNET,
+  gridiron.
 
 ### DNS
 
@@ -281,8 +281,8 @@ wherever needed — instead of being duplicated across manifests.
 
 Flux applying manifests is necessary but not sufficient: the `infrastructure` and `apps`
 Kustomizations reconcile with `wait: false` (ExternalSecrets defeat kstatus health checking),
-so a merge could "deploy green" while pods crash-loop or Traefik routes nowhere. Two layers
-close that gap with one tool.
+so a merge could "deploy green" while pods crash-loop or Traefik routes nowhere. Gatus closes
+that gap by probing real traffic continuously.
 
 ### Gatus (continuous synthetic checks)
 
@@ -296,28 +296,11 @@ companions in `infrastructure/gatus/`) and probes every service every 60s:
 
 `*.mpdavis.com` probes resolve to the Traefik VIP via a `hostAliases` patch rather than public
 DNS, so checks exercise Traefik + wildcard TLS + Authentik without depending on NAT hairpin.
-The status page is public (read-only) at `status.mpdavis.com` — required so the deploy canary
-can query it from GitHub Actions. Results export to Prometheus
+The status page is public (read-only) at `status.mpdavis.com`. Results export to Prometheus
 (`gatus_results_endpoint_success`); the `GatusEndpointDown` and `GatusAbsent` PrometheusRules
 alert on failures and on the monitoring itself going dark. Deeper per-app API checks (e.g.
 Radarr `/api/v3/health` with an API key) can be added later via an ExternalSecret exposed to
 Gatus as env vars — Gatus expands `${VAR}` in its config.
-
-### Deploy canary (per-merge verification)
-
-`deploy-canary.yml` runs on every push to `main`:
-
-1. Snapshots which endpoints are **already failing** (the baseline) before Flux picks up the
-   commit
-2. Waits for Flux's `kustomization/apps/<digest>` commit status on that exact SHA
-3. Polls the Gatus API until every endpoint is healthy **with a result newer than the
-   reconcile** — a stale green from before the deploy proves nothing
-4. Verdict as the `canary/gatus` commit status: only **passing → failing transitions** are
-   blamed on the merge (canary fails, a revert PR auto-opens); pre-existing failures are
-   exempt so a chronically red service doesn't spawn revert PRs per merge or freeze the queue
-
-The canary is a post-merge check, not a gate: nothing blocks a PR on the health of the
-previous deploy. A bad merge is caught by the canary's verdict and its auto-opened revert PR.
 
 ### AI alert triage (HolmesGPT)
 
@@ -357,7 +340,7 @@ paying once per incident for a good answer beats paying repeatedly for a cheap o
 **Model auth goes through the Claude subscription, not a metered API key.** A Meridian
 sidecar (`ghcr.io/rynfar/meridian`) exposes an Anthropic-compatible API on loopback and
 bridges it onto the subscription via the Agent SDK, authenticated with the same
-`claude-code-oauth-token` BWS secret the coding agent uses. Holmes reaches it because
+`claude-code-oauth-token` BWS secret (`BWS_CODING_AGENT_CLAUDE_OAUTH_TOKEN`). Holmes reaches it because
 litellm resolves its Anthropic base as `ANTHROPIC_API_BASE` → `ANTHROPIC_BASE_URL` →
 `api.anthropic.com`.
 
@@ -383,8 +366,7 @@ Two further guardrails:
 
 - **Opt-in scope** — only rules labelled `ai_triage: "true"` are ever considered; widening
   coverage is a label change on a PrometheusRule
-- **Read-only** — the ServiceAccount is `view` plus read on cluster-scoped CRDs, matching
-  the coding agent. Holmes diagnoses; it never mutates the cluster
+- **Read-only** — the ServiceAccount is `view` plus read on cluster-scoped CRDs. Holmes diagnoses; it never mutates the cluster
 
 **One thread per deploy.** Investigations are grouped by the git SHA in the `apps`
 Kustomization's `status.lastAppliedRevision`, so everything that breaks under one revision
@@ -393,11 +375,6 @@ webhooks can create a thread (`thread_name`, forum channels only) and post into 
 (`?thread_id=`) but cannot *search* for one by name — so the revision → thread-id mapping
 is kept in `threads.json` on the job's PVC, written when a thread is first created
 (`?wait=true` returns the new thread's id as the message's `channel_id`).
-
-That registry is only reachable from inside the cluster, so the GitHub Actions canary
-cannot post into the deploy thread; its verdict stays on the commit status and its revert
-PR. Closing that gap would mean a Discord **bot** token, which can look a thread up by
-name and needs no shared state.
 
 ## GPU Setup
 
@@ -424,15 +401,10 @@ resources:
 
 - **Ollama**: Model management, OpenAI-compatible API
 - **Open WebUI**: Chat interface pointing at Ollama
-- **Coding Agent**: CloudCLI (claudecodeui) web UI driving the `claude` and
-  `opencode` CLIs from a phone/browser (`code.mpdavis.com`, Authentik-protected).
-  Custom image (`docker/coding-agent/`, built by GitHub Actions to
-  `ghcr.io/mpdavis/coding-agent`) bundles kubectl/flux/gh/git; the pod runs with
-  a read-only cluster ServiceAccount and proposes fixes via branches + PRs
 - **HolmesGPT alert triage**: CronJob (`kubernetes/apps/ai/holmes/`) that pulls
   firing alerts from Alertmanager every 10m and asks Claude Opus to investigate
   the ones it has not already seen, then posts the findings to Discord.
-  Read-only ServiceAccount, same posture as the coding agent. Scope is opt-in:
+  Read-only ServiceAccount. Scope is opt-in:
   only rules labelled `ai_triage: "true"` are ever considered. Design detail
   under "AI alert triage (HolmesGPT)"
 
@@ -448,21 +420,19 @@ homelab/
 │   ├── tofu/                  # OpenTofu — LXC/VM provisioning
 │   └── ansible/               # Ansible — node config, k3s install, Flux bootstrap
 ├── docker/                    # Custom images built by GitHub Actions → ghcr.io
-│   ├── coding-agent/          # CloudCLI + claude/opencode CLIs + k8s tooling
 │   └── gridiron/              # college football betting research (DuckDB + FastAPI)
 ├── kubernetes/                # Flux-managed cluster state (sync root)
 │   ├── kustomization.yaml     # Entry point — includes only Flux plumbing
 │   ├── apps/                  # grouped by namespace, one dir per service
 │   │   ├── kustomization.yaml
-│   │   ├── ai/                # ollama, open-webui, coding-agent, holmes
+│   │   ├── ai/                # ollama, open-webui, holmes
 │   │   ├── automation/        # home-assistant (home automation)
 │   │   ├── docs/              # paperless-ngx (document management)
 │   │   ├── gaming/            # minecraft (game server)
 │   │   ├── gridiron/          # gridiron (college football betting research)
 │   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
 │   │   ├── ntfy/              # ntfy (push notifications / Alertmanager sink)
-│   │   ├── homepage/
-│   │   └── hello-world/
+│   │   └── homepage/
 │   ├── infrastructure/
 │   │   ├── kustomization.yaml
 │   │   ├── sources/           # HelmRepository definitions
@@ -507,7 +477,8 @@ homelab/
 | 2025-05-27 | FluxCD over ArgoCD | Declarative, no UI to maintain, HelmRelease per component |
 | 2025-05-27 | LXC containers over VMs | Lower overhead; VM only for GPU node (VFIO requires it) |
 | 2025-05-27 | Traefik as single ingress for all services | Routes to both k8s and external services via Service+Endpoints |
-| 2026-07-17 | Gatus for synthetic monitoring + deploy canary | One declarative tool serves both continuous health checks (→ Prometheus alerts) and post-merge deploy verification (→ commit status + auto-revert PR); baseline comparison exempts pre-existing failures from reverts |
+| 2026-07-17 | Gatus for synthetic monitoring | One declarative tool for continuous health checks (→ Prometheus alerts) |
+| 2026-09-15 | Removed the post-merge deploy canary | Too brittle to keep relying on; Gatus probes and `GatusEndpointDown` alerting remain |
 | 2026-09-01 | DuckDB (not Postgres) for gridiron, ingest inside the server pod | Every query is an analytical scan over ~10M plays, which an embedded columnar engine answers in the time a Postgres round trip would take — no second pod, no second PVC, backup is one file. The price is a single writer, which is why ingest is an in-process thread and the Deployment is `Recreate` on an RWO local-path PVC |
 
 ## Deploy Sequence
