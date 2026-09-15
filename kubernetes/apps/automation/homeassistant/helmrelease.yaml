@@ -26,6 +26,8 @@ spec:
         # local-path RWO PVC — Recreate so rolling updates don't hang trying to
         # mount the volume still attached to the old pod.
         strategy: Recreate
+        annotations:
+          ignore-check.kube-linter.io/run-as-non-root: "HA runs as root for host integrations and its /config volume is root-owned, so install-hacs must write to it as root"
         initContainers:
           seed-config:
             image:
@@ -38,6 +40,49 @@ spec:
                 if [ ! -f /config/configuration.yaml ]; then
                   cp /config-init/configuration.yaml /config/configuration.yaml
                 fi
+          # Bootstrap HACS (https://hacs.xyz) into custom_components on first start
+          # only. HACS updates itself from the UI after that, so an existing install
+          # is left alone. Downloads the release zip directly instead of piping
+          # get.hacs.xyz into bash: that script re-downloads `latest` every run and
+          # exits non-zero before HA has written .HA_VERSION on a fresh PVC.
+          install-hacs:
+            image:
+              repository: ghcr.io/home-assistant/home-assistant
+              tag: "2026.9.2"
+            env:
+              HACS_VERSION: "2.0.5"
+            command:
+              - /bin/sh
+              - -c
+              - |
+                set -eu
+                if [ -d /config/custom_components/hacs ]; then
+                  echo "HACS already installed, skipping"
+                  exit 0
+                fi
+                # Stage on the config volume: root fs is read-only, and a same-fs
+                # mv means a failed download never leaves a partial hacs/ behind.
+                tmp=/config/.hacs-install
+                rm -rf "$tmp"
+                mkdir -p "$tmp" /config/custom_components
+                wget -O "$tmp/hacs.zip" \
+                  "https://github.com/hacs/integration/releases/download/$HACS_VERSION/hacs.zip"
+                unzip -q "$tmp/hacs.zip" -d "$tmp/hacs"
+                mv "$tmp/hacs" /config/custom_components/hacs
+                rm -rf "$tmp"
+                echo "Installed HACS $HACS_VERSION"
+            securityContext:
+              readOnlyRootFilesystem: true
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+            resources:
+              requests:
+                cpu: 10m
+                memory: 32Mi
+              limits:
+                memory: 128Mi
         containers:
           main:
             image:
