@@ -18,7 +18,7 @@ Three things read this document:
 If you change a rule here, change it in all three places. Each section below names the
 kube-linter check that enforces it, which is the stable link between them.
 
-### What is and isn't enforced
+## What is and isn't enforced
 
 The check lints the **rendered** tree (`flate build all`), so an app-template
 HelmRelease, a hand-written Deployment and a third-party chart are all checked
