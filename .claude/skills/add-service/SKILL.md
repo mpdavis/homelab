@@ -458,6 +458,7 @@ selector, `${TZ}`/`${NAS_IP}`/`${NAS_DATA_PATH}` for substituted values, port na
      - media
      - <namespace>   # ← add the new namespace dir
      - homepage
+     - hello-world
    ```
 3. **Sources kustomization** — for an official-chart service with a new HelmRepository, add it to
    `kubernetes/infrastructure/sources/kustomization.yaml`. (app-template needs nothing — `bjw-s`
