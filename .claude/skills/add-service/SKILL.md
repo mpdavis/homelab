@@ -389,6 +389,15 @@ hostname must be probed by the synthetic-monitoring stack, in **two places** in
 ```
 2. The hostname added to the `hostAliases` list in the `postRenderers` patch (same file) — in-cluster
    probes resolve `*.mpdavis.com` via the Traefik VIP, not public DNS.
+3. **Auth-protected services only:** the 302 comes from the middleware whether or not the app is
+   up, so if the app has an unauthenticated health endpoint (`/health`, `/healthz`, `/ping` on
+   *arr apps), also add an app-health check against the in-cluster Service:
+```yaml
+        - name: <service-name>
+          group: internal
+          url: http://<service-name>.<namespace>.svc.cluster.local:<port>/health
+          conditions: *internal-conditions
+```
 
 Pick the group by whether the IngressRoute has the `authelia` middleware: protected services are
 healthy when they 302 to the auth portal; open services when they return 200. Skipping this means

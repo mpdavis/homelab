@@ -75,7 +75,9 @@ via the `GatusEndpointDown` PrometheusRule. Check conventions:
 - Authentik-protected services: `ignore-redirect: true` + `Accept: text/html` header
   (`*auth-headers`) + `[STATUS] == 302` (`*auth-conditions`) — a 200 would mean the
   forward-auth middleware is missing. The header exercises the browser-style
-  redirect path to `iam.mpdavis.com`
+  redirect path to `iam.mpdavis.com`. The 302 proves only that Authentik answers, not that the
+  app is up, so if the app has an unauthenticated health endpoint also add an `internal` check
+  against its cluster-DNS Service
 - Internal services (no ingress): cluster-DNS health endpoint, `[STATUS] == 200`
 - `*.mpdavis.com` probes resolve via a `hostAliases` postRenderers patch to the Traefik VIP
   (no NAT-hairpin dependency)
