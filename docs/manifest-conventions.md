@@ -319,8 +319,7 @@ Note the hostname formats differ by file and are not interchangeable: IngressRou
 the Homepage config use `${DOMAIN}` (Flux `postBuild` substitutes it); `gatus.yaml` uses
 the literal `mpdavis.com` in both the endpoint URL and the `hostAliases` list.
 
-Non-goal: a handful of hostnames are deliberately absent from Homepage (`hello-world`,
-Homepage itself, machine-facing endpoints like `thumbs`). Gatus coverage has no such
+Non-goal: a handful of hostnames are deliberately absent from Homepage (Homepage itself, machine-facing endpoints like `thumbs`). Gatus coverage has no such
 exemption — everything with a hostname gets probed.
 
 ---

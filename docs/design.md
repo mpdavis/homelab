@@ -431,8 +431,7 @@ homelab/
 │   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
 │   │   ├── ntfy/              # ntfy (push notifications / Alertmanager sink)
 │   │   ├── travel/            # trek (travel planning)
-│   │   ├── homepage/
-│   │   └── hello-world/
+│   │   └── homepage/
 │   ├── infrastructure/
 │   │   ├── kustomization.yaml
 │   │   ├── sources/           # HelmRepository definitions
