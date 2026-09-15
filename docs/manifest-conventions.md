@@ -18,7 +18,7 @@ Three things read this document:
 If you change a rule here, change it in all three places. Each section below names the
 kube-linter check that enforces it, which is the stable link between them.
 
-### What is and isn't enforced
+## What is and isn't enforced
 
 The check lints the **rendered** tree (`flate build all`), so an app-template
 HelmRelease, a hand-written Deployment and a third-party chart are all checked
@@ -220,7 +220,7 @@ resources:
   limit takes the node down instead of just itself.
 - **`limits.cpu` is optional and usually wrong.** CPU is compressible, so a limit buys
   nothing but throttling. Set it only to deliberately cap a workload
-  (`kubernetes/apps/ai/coding-agent/helmrelease.yaml` caps at 2 cores on purpose).
+  (`kubernetes/apps/civic/ames-council-digest/cronjob.yaml` caps at 1 core on purpose).
 
 Homelab-scale numbers are fine — `10m` / `32Mi` for a static file server is a real answer.
 The point is a declared number, not a large one.

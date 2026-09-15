@@ -326,7 +326,7 @@ paying once per incident for a good answer beats paying repeatedly for a cheap o
 **Model auth goes through the Claude subscription, not a metered API key.** A Meridian
 sidecar (`ghcr.io/rynfar/meridian`) exposes an Anthropic-compatible API on loopback and
 bridges it onto the subscription via the Agent SDK, authenticated with the same
-`claude-code-oauth-token` BWS secret the coding agent uses. Holmes reaches it because
+`claude-code-oauth-token` BWS secret (`BWS_CODING_AGENT_CLAUDE_OAUTH_TOKEN`). Holmes reaches it because
 litellm resolves its Anthropic base as `ANTHROPIC_API_BASE` → `ANTHROPIC_BASE_URL` →
 `api.anthropic.com`.
 
@@ -352,8 +352,7 @@ Two further guardrails:
 
 - **Opt-in scope** — only rules labelled `ai_triage: "true"` are ever considered; widening
   coverage is a label change on a PrometheusRule
-- **Read-only** — the ServiceAccount is `view` plus read on cluster-scoped CRDs, matching
-  the coding agent. Holmes diagnoses; it never mutates the cluster
+- **Read-only** — the ServiceAccount is `view` plus read on cluster-scoped CRDs. Holmes diagnoses; it never mutates the cluster
 
 **One thread per deploy.** Investigations are grouped by the git SHA in the `apps`
 Kustomization's `status.lastAppliedRevision`, so everything that breaks under one revision
@@ -393,15 +392,10 @@ resources:
 
 - **Ollama**: Model management, OpenAI-compatible API
 - **Open WebUI**: Chat interface pointing at Ollama
-- **Coding Agent**: CloudCLI (claudecodeui) web UI driving the `claude` and
-  `opencode` CLIs from a phone/browser (`code.mpdavis.com`, Authentik-protected).
-  Custom image (`docker/coding-agent/`, built by GitHub Actions to
-  `ghcr.io/mpdavis/coding-agent`) bundles kubectl/flux/gh/git; the pod runs with
-  a read-only cluster ServiceAccount and proposes fixes via branches + PRs
 - **HolmesGPT alert triage**: CronJob (`kubernetes/apps/ai/holmes/`) that pulls
   firing alerts from Alertmanager every 10m and asks Claude Opus to investigate
   the ones it has not already seen, then posts the findings to Discord.
-  Read-only ServiceAccount, same posture as the coding agent. Scope is opt-in:
+  Read-only ServiceAccount. Scope is opt-in:
   only rules labelled `ai_triage: "true"` are ever considered. Design detail
   under "AI alert triage (HolmesGPT)"
 
@@ -417,13 +411,12 @@ homelab/
 │   ├── tofu/                  # OpenTofu — LXC/VM provisioning
 │   └── ansible/               # Ansible — node config, k3s install, Flux bootstrap
 ├── docker/                    # Custom images built by GitHub Actions → ghcr.io
-│   ├── coding-agent/          # CloudCLI + claude/opencode CLIs + k8s tooling
 │   └── gridiron/              # college football betting research (DuckDB + FastAPI)
 ├── kubernetes/                # Flux-managed cluster state (sync root)
 │   ├── kustomization.yaml     # Entry point — includes only Flux plumbing
 │   ├── apps/                  # grouped by namespace, one dir per service
 │   │   ├── kustomization.yaml
-│   │   ├── ai/                # ollama, open-webui, coding-agent, holmes
+│   │   ├── ai/                # ollama, open-webui, holmes
 │   │   ├── automation/        # home-assistant (home automation)
 │   │   ├── docs/              # paperless-ngx (document management)
 │   │   ├── gaming/            # minecraft (game server)

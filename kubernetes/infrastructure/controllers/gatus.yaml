@@ -52,7 +52,6 @@ spec:
                       - ntfy.mpdavis.com
                       - iam.mpdavis.com
                       - ai.mpdavis.com
-                      - code.mpdavis.com
                       - dispatcharr.mpdavis.com
                       - listenarr.mpdavis.com
                       - prowlarr.mpdavis.com
@@ -190,12 +189,6 @@ spec:
           conditions: &auth-conditions
             - "[STATUS] == 302"
             - "[CERTIFICATE_EXPIRATION] > 48h"
-        - name: coding-agent
-          group: external-auth
-          url: https://code.mpdavis.com/
-          client: *auth-client
-          headers: *auth-headers
-          conditions: *auth-conditions
         - name: dispatcharr
           group: external-auth
           url: https://dispatcharr.mpdavis.com/

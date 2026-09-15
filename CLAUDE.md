@@ -16,11 +16,11 @@ GitOps repository for a homelab k3s cluster managed by FluxCD (via FluxOperator)
 
 ## Repository Layout
 
-```
+```text
 bootstrap/          # Pre-Flux provisioning and configuration
   ansible/          # Ansible — node configuration, k3s install, Flux bootstrap
   tofu/             # OpenTofu — LXC container + VM provisioning on Proxmox
-docker/             # Custom images built by GitHub Actions to ghcr.io (e.g. coding-agent)
+docker/             # Custom images built by GitHub Actions to ghcr.io (e.g. gridiron)
 kubernetes/         # Flux-managed cluster state (sync root)
   apps/             # Per-service manifests, grouped by namespace (ai/, civic/, media/, homepage/, hello-world/)
   infrastructure/   # Cluster infrastructure — HelmReleases, HelmRepositories, companion manifests
