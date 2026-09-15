@@ -423,8 +423,7 @@ homelab/
 │   │   ├── gridiron/          # gridiron (college football betting research)
 │   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
 │   │   ├── ntfy/              # ntfy (push notifications / Alertmanager sink)
-│   │   ├── homepage/
-│   │   └── hello-world/
+│   │   └── homepage/
 │   ├── infrastructure/
 │   │   ├── kustomization.yaml
 │   │   ├── sources/           # HelmRepository definitions
