@@ -25,6 +25,9 @@ spec:
   # Traefik's VIP directly — resolving the public Cloudflare records from
   # inside the LAN would depend on NAT hairpin through the router. This still
   # exercises Traefik routing, the wildcard cert, and Authentik forward-auth.
+  # Each hostname goes under the VIP matching its IngressRoute's exposure:
+  # public routes only listen on the public VIP and tailnet-labelled routes only
+  # on the tailnet VIP, so a hostname under the wrong IP fails its probe (404).
   postRenderers:
     - kustomize:
         patches:
@@ -35,22 +38,26 @@ spec:
               - op: add
                 path: /spec/template/spec/hostAliases
                 value:
-                  - ip: 10.0.1.200
+                  - ip: ${TRAEFIK_PUBLIC_IP}
+                    hostnames:
+                      - audiobookshelf.mpdavis.com
+                      - emby.mpdavis.com
+                      - seerr.mpdavis.com
+                      - thumbs.mpdavis.com
+                      - ntfy.mpdavis.com
+                      - iam.mpdavis.com
+                      - council.mpdavis.com
+                      - homeassistant.mpdavis.com
+                  - ip: ${TRAEFIK_TAILNET_IP}
                     hostnames:
                       - hello.mpdavis.com
                       - home.mpdavis.com
                       - paperless.mpdavis.com
-                      - audiobookshelf.mpdavis.com
-                      - emby.mpdavis.com
-                      - seerr.mpdavis.com
                       - podfetch.mpdavis.com
                       - ecm.mpdavis.com
-                      - thumbs.mpdavis.com
                       - qbit.mpdavis.com
                       - mousehole.mpdavis.com
                       - grafana.mpdavis.com
-                      - ntfy.mpdavis.com
-                      - iam.mpdavis.com
                       - ai.mpdavis.com
                       - code.mpdavis.com
                       - dispatcharr.mpdavis.com
@@ -62,9 +69,7 @@ spec:
                       - flux.mpdavis.com
                       - birdnet.mpdavis.com
                       - proxmox.mpdavis.com
-                      - council.mpdavis.com
                       - gridiron.mpdavis.com
-                      - homeassistant.mpdavis.com
   values:
     resources:
       requests:

@@ -75,11 +75,12 @@ queries it from GitHub Actions). Check conventions:
   redirect path to `iam.mpdavis.com`
 - Internal services (no ingress): cluster-DNS health endpoint, `[STATUS] == 200`
 - `*.mpdavis.com` probes resolve via a `hostAliases` postRenderers patch to the Traefik VIP
-  (no NAT-hairpin dependency)
+  matching the route's exposure — public VIP or tailnet VIP (no NAT-hairpin dependency)
 
-**When a service gains or loses an IngressRoute, update BOTH lists in `gatus.yaml`:** the
-`config.endpoints` entry (correct group/conditions) *and* the hostname in the `hostAliases`
-postRenderers patch. The `add-service` skill covers this for new services.
+**When a service gains or loses an IngressRoute, or changes exposure, update BOTH lists in
+`gatus.yaml`:** the `config.endpoints` entry (correct group/conditions) *and* the hostname under
+the correct IP in the `hostAliases` postRenderers patch. The `add-service` skill covers this for
+new services.
 
 Deploy pipeline: `deploy-canary.yml` verifies each merge after the fact — it waits for Flux's
 `kustomization/apps/<digest>` commit status, baselines what's already failing before the
@@ -91,9 +92,15 @@ gate. Details in `.github/workflows/README.md`.
 ## Networking
 
 - Ingress: Traefik as single entry point for all HTTP/HTTPS (k8s and external services)
-- MetalLB VIP: `10.0.1.200`
+- MetalLB VIPs: `10.0.1.200` public Traefik (router port-forwards 443 here), `10.0.1.210` tailnet-only Traefik (never forwarded)
+- Exposure: IngressRoutes are **public** by default. Admin/personal tools get the label
+  `homelab.mpdavis.com/exposure: tailnet` (+ `entryPoints: [tailnet]`); the root kustomization
+  patches then force the `tailnet` entrypoint and a DNS target of the tailnet VIP. Remote access
+  is via the Tailscale subnet router advertising `10.0.1.0/24`. Default new services to tailnet
+  unless people off the tailnet need them. Never use an IP allowlist for this — Traefik's
+  `externalTrafficPolicy: Cluster` SNATs internet traffic to LAN node IPs
 - Wildcard cert: `*.mpdavis.com` via cert-manager (DNS-01, Cloudflare)
-- DNS records: ExternalDNS provisions a per-service Cloudflare A record from each IngressRoute's `Host()` rule
+- DNS records: ExternalDNS provisions a per-service Cloudflare A record from each IngressRoute's `Host()` rule (public IP, or the tailnet VIP for tailnet routes)
 - Auth: Authentik forward-auth Traefik middleware (`authentik-forward-auth`, domain-level provider on the embedded outpost) protects selected services; native OIDC for apps that support it (e.g. Paperless)
 - Service discovery: Kubernetes-native DNS (`<service>.<namespace>.svc.cluster.local`)
 

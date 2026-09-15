@@ -15,3 +15,7 @@ data:
   # Networking
   METALLB_POOL: "10.0.1.200-10.0.1.250"
   PUBLIC_IP: "46.110.78.19"
+  # Traefik VIPs. PUBLIC is the router's 443 port-forward target; TAILNET is
+  # never forwarded (LAN + Tailscale subnet route only). Both inside METALLB_POOL.
+  TRAEFIK_PUBLIC_IP: "10.0.1.200"
+  TRAEFIK_TAILNET_IP: "10.0.1.210"

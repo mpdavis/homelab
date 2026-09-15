@@ -286,7 +286,9 @@ A new `IngressRoute` means three more edits, none of which live next to the Ingr
 1. **Gatus endpoint** — `kubernetes/infrastructure/controllers/gatus.yaml`,
    `spec.values.config.endpoints`.
 2. **Gatus `hostAliases`** — same file, in the `postRenderers` kustomize patch. In-cluster
-   probes resolve `*.mpdavis.com` via the Traefik VIP, not public DNS.
+   probes resolve `*.mpdavis.com` via the Traefik VIP, not public DNS. List the hostname
+   under `${TRAEFIK_PUBLIC_IP}` for a public route or `${TRAEFIK_TAILNET_IP}` for a route
+   labelled `homelab.mpdavis.com/exposure: tailnet` — under the wrong VIP the probe 404s.
 3. **Homepage tile** — `kubernetes/apps/homepage/homepage/config/services.yaml` (a
    `configMapGenerator` file, *not* an inline ConfigMap).
 
