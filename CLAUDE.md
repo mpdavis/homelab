@@ -16,7 +16,7 @@ GitOps repository for a homelab k3s cluster managed by FluxCD (via FluxOperator)
 
 ## Repository Layout
 
-```
+```text
 bootstrap/          # Pre-Flux provisioning and configuration
   ansible/          # Ansible — node configuration, k3s install, Flux bootstrap
   tofu/             # OpenTofu — LXC container + VM provisioning on Proxmox
