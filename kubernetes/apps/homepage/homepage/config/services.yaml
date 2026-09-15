@@ -74,10 +74,6 @@
         icon: mdi-gavel
         href: https://council.${DOMAIN}
         description: Ames city council meeting digests
-    - Trek:
-        icon: mdi-airplane
-        href: https://trek.${DOMAIN}
-        description: Travel planning
     - Gridiron:
         icon: mdi-football
         href: https://gridiron.${DOMAIN}

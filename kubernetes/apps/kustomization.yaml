@@ -10,7 +10,6 @@ resources:
   - gridiron
   - media
   - ntfy
-  - travel
   - homepage
 
 # ExternalDNS (traefik-proxy source) only provisions a record for an

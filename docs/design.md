@@ -430,7 +430,6 @@ homelab/
 │   │   ├── gridiron/          # gridiron (college football betting research)
 │   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
 │   │   ├── ntfy/              # ntfy (push notifications / Alertmanager sink)
-│   │   ├── travel/            # trek (travel planning)
 │   │   └── homepage/
 │   ├── infrastructure/
 │   │   ├── kustomization.yaml
