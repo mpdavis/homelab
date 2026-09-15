@@ -60,7 +60,6 @@ spec:
                       - sonarr.mpdavis.com
                       - teamarr.mpdavis.com
                       - flux.mpdavis.com
-                      - trek.mpdavis.com
                       - birdnet.mpdavis.com
                       - proxmox.mpdavis.com
                       - council.mpdavis.com
@@ -159,10 +158,6 @@ spec:
           # /v1/health is unauthenticated even with auth-default-access:
           # deny-all, so it's a clean 200 liveness signal.
           url: https://ntfy.mpdavis.com/v1/health
-          conditions: *open-conditions
-        - name: trek
-          group: external-open
-          url: https://trek.mpdavis.com/
           conditions: *open-conditions
         - name: homeassistant
           group: external-open
