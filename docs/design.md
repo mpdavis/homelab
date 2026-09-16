@@ -165,10 +165,13 @@ For workloads where you want data to survive a node failure without manual resto
 ### Ingress
 
 ```text
-Internet → Cloudflare DNS (per-service A records, e.g. grafana.mpdavis.com)
-         → Router port-forward 443 → MetalLB VIP (10.0.1.200)
-         → Traefik (k8s IngressRoute)
-         → k8s Services  OR  ExternalName/Endpoints → non-k8s services
+Public:   Internet → Cloudflare DNS (A record → public IP, e.g. emby.mpdavis.com)
+                   → Router port-forward 443 → MetalLB VIP 10.0.1.200 (Service traefik)
+                   → Traefik `websecure` entrypoint
+Tailnet:  LAN / Tailscale client → Cloudflare DNS (A record → 10.0.1.210, e.g. sonarr.mpdavis.com)
+                   → Tailscale subnet router (10.0.1.0/24) → MetalLB VIP 10.0.1.210 (Service traefik-tailnet)
+                   → Traefik `tailnet` entrypoint
+Both      → IngressRoute → k8s Services  OR  ExternalName/Endpoints → non-k8s services
 ```
 
 Traefik inside k8s handles ALL HTTP/HTTPS routing, including services running
@@ -205,15 +208,41 @@ K8s native: services find each other via DNS (`<service>.<namespace>.svc.cluster
 
 ### External Access
 
-MetalLB assigns a VIP (10.0.1.200) to the Traefik LoadBalancer service. All
-HTTP(S) traffic routes through this single ingress point.
+One Traefik deployment is fronted by two pinned MetalLB VIPs:
+
+| VIP | Service | Entrypoints | Reachable from |
+|---|---|---|---|
+| `10.0.1.200` | `traefik` | `web`, `websecure` | Internet (router port-forwards 443) + LAN |
+| `10.0.1.210` | `traefik-tailnet` | `tailnet-web`, `tailnet` | LAN + tailnet only (never port-forwarded) |
+
+Every IngressRoute is **public** by default. Labelling it
+`homelab.mpdavis.com/exposure: tailnet` makes it **tailnet-only**: the root
+`kustomization.yaml` patches in `kubernetes/apps/` and `kubernetes/infrastructure/`
+force such routes onto the `tailnet` entrypoint and point their DNS record at the
+tailnet VIP. Remote access is via the Tailscale subnet router (LXC `tailscale-router`,
+`10.0.1.53`), which advertises `10.0.1.0/24`.
+
+Isolation is by entrypoint, not source IP. The Traefik Service uses
+`externalTrafficPolicy: Cluster`, so internet traffic is SNATed to a node IP by
+kube-proxy — an `ipAllowList` on `10.0.1.0/24` would therefore admit it.
+
+Current split:
+
+- **Public:** Emby, Seerr, Audiobookshelf, game-thumbs (media clients fetch artwork),
+  Authentik (`iam`, needed by any public forward-auth/OIDC login), Gatus status page,
+  ntfy, Home Assistant, council digest.
+- **Tailnet:** the *arr stack, qBittorrent, mousehole, Dispatcharr, Teamarr, ECM,
+  Podfetch, Open WebUI, Flux UI, Grafana, Homepage, Paperless, Proxmox, BirdNET,
+  gridiron.
 
 ### DNS
 
 Cloudflare as authoritative DNS for `mpdavis.com`. ExternalDNS (Cloudflare
 provider, Traefik IngressRoute source) auto-provisions an individual A record
-per service from the `Host()` rule on each IngressRoute, all pointing at the
-public ingress IP. A previous wildcard `*.mpdavis.com` record was removed: the
+per service from the `Host()` rule on each IngressRoute, pointing at the public
+ingress IP for public routes or at the private tailnet VIP (`10.0.1.210`) for
+tailnet routes — the record is public, but its address is only routable on the
+LAN or tailnet. A previous wildcard `*.mpdavis.com` record was removed: the
 search-domain interaction (`ndots`) meant any pod's lookup of an external host
 could match the wildcard and resolve to our own ingress, causing TLS
 mismatches. Per-service records resolve only explicitly-defined subdomains.
@@ -230,7 +259,9 @@ still used for all routes.
 | 10.0.1.50 | k3s-server | LXC on pve1 | k3s control plane + workloads |
 | 10.0.1.51 | k3s-agent-1 | LXC on pve1 | k3s general workloads |
 | 10.0.1.52 | k3s-agent-gpu | VM on pve2 | k3s GPU workloads |
-| 10.0.1.200 | (MetalLB VIP) | Virtual | Traefik LoadBalancer ingress |
+| 10.0.1.53 | tailscale-router | LXC on pve1 | Tailscale subnet router (advertises 10.0.1.0/24) |
+| 10.0.1.200 | (MetalLB VIP) | Virtual | Traefik public ingress (port-forward target) |
+| 10.0.1.210 | (MetalLB VIP) | Virtual | Traefik tailnet-only ingress |
 
 ## Secrets Management
 

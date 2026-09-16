@@ -2,9 +2,11 @@ apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: teamarr
+  labels:
+    homelab.mpdavis.com/exposure: tailnet
 spec:
   entryPoints:
-    - websecure
+    - tailnet
   routes:
     - match: Host(`teamarr.${DOMAIN}`)
       kind: Rule

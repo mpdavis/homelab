@@ -3,9 +3,11 @@ kind: IngressRoute
 metadata:
   name: flux-web
   namespace: flux-system
+  labels:
+    homelab.mpdavis.com/exposure: tailnet
 spec:
   entryPoints:
-    - websecure
+    - tailnet
   routes:
     - match: Host(`flux.${DOMAIN}`)
       kind: Rule
