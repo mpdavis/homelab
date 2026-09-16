@@ -6,6 +6,7 @@ resources:
   - ingress-grafana.yaml
   - dashboard-dcgm.yaml
   - node-disk-alerts.yaml
+  - external-secret-alerts.yaml
 configMapGenerator:
   - name: grafana-dashboard-ecowitt
     namespace: monitoring
