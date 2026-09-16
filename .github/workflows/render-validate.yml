@@ -30,7 +30,7 @@ name: Render & Validate
 # Deliberately NOT filtered on `paths: kubernetes/**`. This is intended to be a
 # REQUIRED status check, and a required check that does not run leaves the PR blocked
 # forever waiting for a verdict that never arrives — the same lesson as
-# image-pin-check (#425) and ames-council-digest-tests. On a PR touching no manifests
+# image-pin-check (#425). On a PR touching no manifests
 # flate still renders the tree from cache in a couple of seconds.
 
 on:

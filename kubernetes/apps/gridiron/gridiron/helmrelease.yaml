@@ -40,7 +40,8 @@ spec:
           main:
             image:
               repository: ghcr.io/mpdavis/gridiron
-              # build-gridiron.yml publishes only from main, so every tag in the
+              # mpdavis/gridiron's build.yml (1.1.x; 1.0.x predates the split out of
+              # this repo) publishes only from main, so every tag in the
               # registry is merged code and Renovate's bump can be taken as read.
               tag: 1.0.21
             env:

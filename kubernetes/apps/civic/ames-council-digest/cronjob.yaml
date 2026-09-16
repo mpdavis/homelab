@@ -63,7 +63,8 @@ spec:
             fsGroup: 1000
           containers:
             - name: ames-council-digest
-              # Published by build-ames-council-digest.yml, tagged 1.0.<run_number>.
+              # Published by mpdavis/ames-council-digest's build.yml, tagged
+              # 1.1.<run_number> (1.0.x came from this repo's docker/ before the split).
               # Only main publishes, so every tag in the registry is reviewed,
               # merged code and a Renovate bump can be taken on its face.
               #

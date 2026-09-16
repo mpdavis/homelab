@@ -267,3 +267,41 @@ spec:
           group: internal
           url: http://ollama.ai.svc.cluster.local:11434/api/version
           conditions: *internal-conditions
+        # App health for forward-auth services. Their external-auth checks only
+        # prove the middleware answers with a 302 — Authentik redirects whether
+        # or not the app behind it is up — so these hit the unauthenticated
+        # health endpoint on the in-cluster Service directly. Keep both.
+        - name: open-webui
+          group: internal
+          url: http://open-webui.ai.svc.cluster.local:8080/health
+          conditions: *internal-conditions
+        - name: dispatcharr
+          group: internal
+          # No dedicated health route; the version API is unauthenticated and
+          # served by the Django app.
+          url: http://dispatcharr.media.svc.cluster.local:9191/api/core/version/
+          conditions: *internal-conditions
+        - name: prowlarr
+          group: internal
+          url: http://prowlarr.media.svc.cluster.local:9696/ping
+          conditions: *internal-conditions
+        - name: radarr
+          group: internal
+          url: http://radarr.media.svc.cluster.local:7878/ping
+          conditions: *internal-conditions
+        - name: sonarr
+          group: internal
+          url: http://sonarr.media.svc.cluster.local:8989/ping
+          conditions: *internal-conditions
+        - name: teamarr
+          group: internal
+          url: http://teamarr.media.svc.cluster.local:9195/health
+          conditions: *internal-conditions
+        - name: council-digest
+          group: internal
+          url: http://ames-council-digest-web.civic.svc.cluster.local/healthz
+          conditions: *internal-conditions
+        - name: gridiron
+          group: internal
+          url: http://gridiron.gridiron.svc.cluster.local:8080/healthz
+          conditions: *internal-conditions
