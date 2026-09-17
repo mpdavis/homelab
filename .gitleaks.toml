@@ -23,6 +23,7 @@ paths = [
   '''(^|/)uv\.lock$''',
   # Test fixtures and cassettes use fake credentials on purpose.
   '''(^|/)tests?/''',
+  '''^\.agents/''',
 ]
 
 regexes = [
