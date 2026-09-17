@@ -23,12 +23,6 @@ paths = [
   '''(^|/)uv\.lock$''',
   # Test fixtures and cassettes use fake credentials on purpose.
   '''(^|/)tests?/''',
-  # Vendored agent skills (.agents/, pinned in skills-lock.json) are upstream docs
-  # we do not author or edit. Their shell examples use placeholder credentials —
-  # `curl -u tskey-api-xxxxx:` and the like — which trip curl-auth-user by the
-  # dozen. Nothing here is deployed, and the tree is replaced wholesale on update,
-  # so per-finding allowlisting would churn on every bump. Trade-off: a real secret
-  # pasted under .agents/ would not be caught here.
   '''^\.agents/''',
 ]
 
