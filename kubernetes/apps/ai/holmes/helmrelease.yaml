@@ -135,7 +135,7 @@ spec:
           01-select:
             image:
               repository: robustadev/holmes
-              tag: "0.41.0"
+              tag: "0.42.0"
             command:
               - python
               # -P keeps the script's own directory off sys.path, so a file in
@@ -167,7 +167,7 @@ spec:
           02-investigate:
             image:
               repository: robustadev/holmes
-              tag: "0.41.0"
+              tag: "0.42.0"
             # The image's entrypoint is already `python holmes_cli.py`, so these
             # are appended to it rather than replacing it.
             args:
@@ -211,7 +211,7 @@ spec:
             # Python, so this avoids pinning a second image just to POST JSON.
             image:
               repository: robustadev/holmes
-              tag: "0.41.0"
+              tag: "0.42.0"
             command:
               - python
               - -P
