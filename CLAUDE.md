@@ -50,6 +50,18 @@ the pinned tag here like any third-party image.
 - Each infrastructure component is a self-contained directory with its own `kustomization.yaml`
 - Dependency chain: `infrastructure-sources` → `infrastructure-controllers` → `infrastructure` → `apps` (via Flux Kustomization `dependsOn`)
 
+## Comments
+
+Write a comment only when the code cannot explain itself: a non-obvious constraint, a
+workaround and the reason for it, an upstream bug, a surprising ordering dependency, a
+value that looks wrong but is deliberate. Never restate what a line does, never label a
+block with its own name, and never add a comment to a change merely because it is a
+change. If a comment would be obvious to someone reading the code, delete it.
+
+This applies to YAML as much as to code — a `# image tag` above `tag:` is noise. Explain
+*why* a Helm value, resource limit, or annotation is set the way it is, not *that* it is
+set.
+
 ## Storage Classes
 
 | StorageClass | Backing | Use Case |
