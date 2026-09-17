@@ -1,0 +1,16 @@
+---
+- name: Configure sshd
+  ansible.builtin.template:
+    src: sshd.conf.j2
+    dest: /etc/ssh/sshd_config.d/10-devbox.conf
+    mode: "0644"
+    # A bad drop-in that survives to a restart takes the box's only management
+    # path with it, so refuse to write one that sshd itself rejects.
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Restart sshd
+
+- name: Enable and start sshd
+  ansible.builtin.systemd:
+    name: ssh
+    enabled: true
+    state: started

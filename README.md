@@ -24,7 +24,7 @@ and [docs/design.md](docs/design.md#deploy-verification--synthetic-monitoring) f
 
 ## Repository Layout
 
-```
+```text
 bootstrap/            # Pre-Flux provisioning and configuration
   tofu/               # OpenTofu (IaC) — Proxmox LXC/VM provisioning
   ansible/            # Ansible — Proxmox/node setup, k3s install, Flux bootstrap
@@ -34,7 +34,7 @@ kubernetes/           # Flux-managed cluster state (sync root)
     sources/          # HelmRepository definitions
     controllers/      # HelmRelease definitions
   clusters/           # Flux Kustomization entrypoints (infra.yaml, apps.yaml, flux-system/)
-docs/                 # Design documents
+docs/                 # Design documents (incl. devbox.md — the dev host runbook)
 ```
 
 ## Getting Started
@@ -78,6 +78,16 @@ ansible-playbook playbooks/site.yml           # install k3s + apply common/lxc/v
 ```bash
 ansible-playbook playbooks/bootstrap-secrets.yml  # BWSM access token
 ansible-playbook playbooks/bootstrap-flux.yml     # install FluxOperator + FluxInstance
+```
+
+### Provision the Development Host
+
+`devbox` is an always-on LXC for writing code — coding agents run there and
+[herdr](https://herdr.dev) attaches over SSH from a laptop or phone. It sits
+outside the cluster on purpose; see [docs/devbox.md](docs/devbox.md).
+
+```bash
+ansible-playbook playbooks/devbox.yml             # user, sshd, tooling, repos, Tailscale
 ```
 
 ### Access the Cluster

@@ -1,0 +1,19 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install base development packages
+  ansible.builtin.apt:
+    name: "{{ devbox_packages }}"
+    state: present
+
+# Ubuntu ships fd as `fdfind` to avoid a name clash with an unrelated package.
+# Every tool that shells out to it (and every muscle-memory invocation) expects
+# `fd`, so give it the name it wants.
+- name: Link fd-find to fd
+  ansible.builtin.file:
+    src: /usr/bin/fdfind
+    dest: /usr/local/bin/fd
+    state: link

@@ -18,7 +18,7 @@ GitOps repository for a homelab k3s cluster managed by FluxCD (via FluxOperator)
 
 ```text
 bootstrap/          # Pre-Flux provisioning and configuration
-  ansible/          # Ansible — node configuration, k3s install, Flux bootstrap
+  ansible/          # Ansible — node configuration, k3s install, Flux bootstrap, devbox
   tofu/             # OpenTofu — LXC container + VM provisioning on Proxmox
 kubernetes/         # Flux-managed cluster state (sync root)
   apps/             # Per-service manifests, grouped by namespace (ai/, civic/, media/, homepage/)
@@ -36,7 +36,7 @@ kubernetes/         # Flux-managed cluster state (sync root)
     flux-operator/  # RBAC + IngressRoute for Flux web UI
     flux-notifications/ # Flux Alert/Provider (GitHub commit status)
   clusters/         # Flux Kustomization entrypoints (infra.yaml, apps.yaml, flux-system/)
-docs/               # Design documents
+docs/               # Design documents (devbox.md = dev-host runbook)
 ```
 
 Custom images (gridiron, ames-council-digest) live in their own repos —
