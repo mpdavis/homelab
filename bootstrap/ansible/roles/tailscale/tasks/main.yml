@@ -28,19 +28,16 @@
     name: tailscale
     state: present
 
-- name: Enable IPv4 forwarding
+- name: Enable IP forwarding for subnet routing
   ansible.builtin.sysctl:
-    name: net.ipv4.ip_forward
+    name: "{{ item }}"
     value: "1"
     sysctl_file: /etc/sysctl.d/99-tailscale.conf
     reload: true
-
-- name: Enable IPv6 forwarding
-  ansible.builtin.sysctl:
-    name: net.ipv6.conf.all.forwarding
-    value: "1"
-    sysctl_file: /etc/sysctl.d/99-tailscale.conf
-    reload: true
+  loop:
+    - net.ipv4.ip_forward
+    - net.ipv6.conf.all.forwarding
+  when: tailscale_advertise_routes | length > 0
 
 - name: Enable and start tailscaled
   ansible.builtin.systemd:
@@ -56,15 +53,22 @@
 
 # tailscale up is not safely re-runnable once authenticated (re-supplying
 # --auth-key on an already-running backend errors out), so this only fires on
-# first bring-up. Route/hostname changes after that are applied manually with
-# `tailscale set`.
-- name: Bring up tailscale and advertise the LAN route
-  ansible.builtin.command: >
-    tailscale up
-    --auth-key={{ tailscale_auth_key }}
-    --advertise-routes={{ tailscale_advertise_routes }}
-    --accept-dns=false
-    --hostname={{ tailscale_hostname }}
+# first bring-up. Route/hostname/SSH changes after that are applied manually
+# with `tailscale set`, which is idempotent.
+- name: Bring up tailscale
+  ansible.builtin.command:
+    argv: >-
+      {{
+        ['tailscale', 'up',
+         '--auth-key=' ~ tailscale_auth_key,
+         '--accept-dns=' ~ (tailscale_accept_dns | bool | lower),
+         '--hostname=' ~ tailscale_hostname]
+        + (['--advertise-routes=' ~ tailscale_advertise_routes]
+           if tailscale_advertise_routes | length > 0 else [])
+        + (['--advertise-tags=' ~ tailscale_advertise_tags]
+           if tailscale_advertise_tags | length > 0 else [])
+        + (['--ssh'] if tailscale_ssh | bool else [])
+      }}
   when: "'\"BackendState\":\"Running\"' not in tailscale_status_raw.stdout"
   changed_when: true
   no_log: true

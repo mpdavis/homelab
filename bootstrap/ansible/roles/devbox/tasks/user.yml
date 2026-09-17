@@ -1,0 +1,77 @@
+---
+- name: Create the development user
+  ansible.builtin.user:
+    name: "{{ devbox_user }}"
+    comment: "{{ devbox_user_full_name }}"
+    shell: "{{ devbox_user_shell }}"
+    groups: sudo
+    append: true
+    create_home: true
+    state: present
+
+- name: Grant passwordless sudo
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: "/etc/sudoers.d/90-{{ devbox_user }}"
+    mode: "0440"
+    validate: /usr/sbin/visudo -csf %s
+
+- name: Create .ssh directory
+  ansible.builtin.file:
+    path: "/home/{{ devbox_user }}/.ssh"
+    state: directory
+    owner: "{{ devbox_user }}"
+    group: "{{ devbox_user }}"
+    mode: "0700"
+
+# Default to the keys Tofu already injected for root via cloud-init, so a new
+# laptop key is added in one place rather than two.
+- name: Read the keys cloud-init injected for root
+  ansible.builtin.slurp:
+    src: /root/.ssh/authorized_keys
+  register: devbox_root_keys
+  when: devbox_authorized_keys | length == 0
+
+- name: Default the user's keys to the ones Tofu injected
+  ansible.builtin.set_fact:
+    devbox_authorized_keys: >-
+      {{ (devbox_root_keys.content | b64decode).splitlines()
+         | select('match', '^(ssh|ecdsa)-') | list }}
+  when: devbox_authorized_keys | length == 0
+
+- name: Install authorized keys
+  ansible.builtin.template:
+    src: authorized_keys.j2
+    dest: "/home/{{ devbox_user }}/.ssh/authorized_keys"
+    owner: "{{ devbox_user }}"
+    group: "{{ devbox_user }}"
+    mode: "0600"
+  when: devbox_authorized_keys | length > 0
+
+- name: Create user directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ devbox_user }}"
+    group: "{{ devbox_user }}"
+    mode: "0755"
+  loop:
+    - "/home/{{ devbox_user }}/.local/bin"
+    - "/home/{{ devbox_user }}/.config"
+    - "{{ devbox_repo_root }}"
+
+- name: Configure git identity
+  ansible.builtin.template:
+    src: gitconfig.j2
+    dest: "/home/{{ devbox_user }}/.gitconfig"
+    owner: "{{ devbox_user }}"
+    group: "{{ devbox_user }}"
+    mode: "0644"
+
+# /etc/profile.d reaches every login shell, including zsh and the ones agents
+# spawn — a ~/.zshrc block would not.
+- name: Install the shared shell profile
+  ansible.builtin.template:
+    src: profile.sh.j2
+    dest: /etc/profile.d/devbox.sh
+    mode: "0644"

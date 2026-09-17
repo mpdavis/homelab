@@ -1,0 +1,84 @@
+---
+devbox_user: michael
+devbox_user_full_name: "Michael Davis"
+devbox_user_email: michael@mpdavis.com
+devbox_user_shell: /usr/bin/zsh
+
+# Empty means "reuse the keys Tofu injected for root" (see tasks/user.yml).
+devbox_authorized_keys: []
+
+# root stays in the list because Ansible connects as root — dropping it locks
+# this role out of its own host.
+devbox_ssh_allow_users:
+  - "{{ devbox_user }}"
+  - root
+
+# Agent panes go quiet for hours; 30s * 120 tolerates an hour of silence before
+# sshd gives up on one.
+devbox_ssh_alive_interval: 30
+devbox_ssh_alive_count_max: 120
+
+devbox_packages:
+  - build-essential
+  - ca-certificates
+  - curl
+  - fd-find
+  - file
+  - fzf
+  - git
+  - gnupg
+  - htop
+  - jq
+  - less
+  - nfs-common
+  - openssh-server
+  - pkg-config
+  - python3
+  - python3-venv
+  - ripgrep
+  - rsync
+  - tmux
+  - tree
+  - unzip
+  - wget
+  - zsh
+
+# Node is system-wide rather than under mise because the agent CLIs below are
+# global npm packages that must resolve in the non-interactive shells agents
+# spawn. Major-only pin: it names a NodeSource apt channel, so Renovate's
+# node-version datasource would rewrite it into something that is not one.
+devbox_node_major: "24"
+
+# renovate: datasource=npm depName=@anthropic-ai/claude-code
+devbox_claude_code_version: "2.1.272"
+# renovate: datasource=npm depName=opencode-ai
+devbox_opencode_version: "1.18.31"
+
+# renovate: datasource=github-releases depName=kubernetes/kubernetes
+devbox_kubectl_version: "v1.37.0"
+# renovate: datasource=github-releases depName=fluxcd/flux2
+devbox_flux_version: "v2.9.5"
+# renovate: datasource=github-releases depName=cli/cli
+devbox_gh_version: "v2.100.0"
+
+# Unpinned: herdr self-updates from its own checksummed manifest.
+devbox_herdr_install_url: https://herdr.dev/install.sh
+devbox_mise_install_url: https://mise.run
+
+devbox_repo_root: "/home/{{ devbox_user }}/git"
+
+# HTTPS so the gh credential helper covers clones and pushes alike. Not a mirror
+# of ~/git — several of those have dead or absent remotes; see docs/devbox.md.
+devbox_repos:
+  - https://github.com/mpdavis/homelab.git
+  - https://github.com/mpdavis/homelab-claude.git
+  - https://github.com/mpdavis/homelab-compose.git
+  - https://github.com/mpdavis/homelab-playbook.git
+  - https://github.com/mpdavis/claude-homelab.git
+  - https://github.com/mpdavis/gridiron.git
+  - https://github.com/mpdavis/ames-council-digest.git
+  - https://github.com/mpdavis/scripts.git
+  - https://github.com/mpdavis/syncerr.git
+  - https://github.com/mpdavis/schwab.git
+  - https://github.com/mpdavis/DailyRoll.git
+  - https://github.com/mpdavis/python-jose.git

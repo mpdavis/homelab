@@ -1,0 +1,17 @@
+---
+# Order matters: the user must exist before sshd allows it, and tooling.yml
+# configures the credential helper that repos.yml clones with.
+- name: Install base development packages
+  ansible.builtin.import_tasks: packages.yml
+
+- name: Create the development user
+  ansible.builtin.import_tasks: user.yml
+
+- name: Configure sshd
+  ansible.builtin.import_tasks: sshd.yml
+
+- name: Install development tooling
+  ansible.builtin.import_tasks: tooling.yml
+
+- name: Clone repositories
+  ansible.builtin.import_tasks: repos.yml

@@ -1,5 +1,19 @@
 ---
-tailscale_hostname: tailscale-router
-tailscale_advertise_routes: 10.0.1.0/24
+tailscale_hostname: unnamed-tailscale-node
+
+# Opt-in: empty means an ordinary tailnet node, with no --advertise-routes and
+# no forwarding sysctls. Defaulting this to the LAN would make every host that
+# reuses this role silently advertise routes.
+tailscale_advertise_routes: ""
+
+# Requires a matching `ssh` section in the tailnet ACL or every connection is
+# denied.
+tailscale_ssh: false
+
+tailscale_advertise_tags: ""
+
+# Keeps tailscaled out of /etc/resolv.conf, which the `lxc` role owns.
+tailscale_accept_dns: false
+
 tailscale_apt_keyring_url: https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg
 tailscale_apt_list_url: https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list

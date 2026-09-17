@@ -1,0 +1,13 @@
+---
+# Membership is root-equivalent — a convenience on a single-tenant box, not a
+# privilege boundary.
+docker_users: []
+
+docker_data_root: /var/lib/docker
+
+# Unbounded json-file logs are the usual way a dev box eats its disk.
+docker_log_max_size: "10m"
+docker_log_max_file: "3"
+
+docker_apt_keyring_url: https://download.docker.com/linux/ubuntu/gpg
+docker_apt_repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable"

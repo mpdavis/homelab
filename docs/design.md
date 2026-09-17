@@ -58,11 +58,23 @@ Existing network-attached storage at `10.0.1.6`. Exports via NFS to all cluster 
           │  └────────────────┘  │    │  │ AI inference        │  │
           │                      │    │  └────────────────────┘  │
           │  ┌────────────────┐  │    │                          │
-          │  ┌────────────────┐  │    │                          │
           │  │ k3s-agent-1    │  │    │                          │
           │  │ LXC            │  │    │                          │
           │  │ General        │  │    │                          │
           │  │ workloads      │  │    │                          │
+          │  └────────────────┘  │    │                          │
+          │                      │    │                          │
+          │  ┌────────────────┐  │    │                          │
+          │  │ devbox         │  │    │                          │
+          │  │ LXC            │  │    │                          │
+          │  │ SSH + coding   │  │    │                          │
+          │  │ agents (herdr) │  │    │                          │
+          │  └────────────────┘  │    │                          │
+          │                      │    │                          │
+          │  ┌────────────────┐  │    │                          │
+          │  │ tailscale-     │  │    │                          │
+          │  │ router   LXC   │  │    │                          │
+          │  │ 10.0.1.0/24    │  │    │                          │
           │  └────────────────┘  │    │                          │
           └──────────┬───────────┘    └──────────┬───────────────┘
                      │                           │
@@ -260,6 +272,7 @@ still used for all routes.
 | 10.0.1.51 | k3s-agent-1 | LXC on pve1 | k3s general workloads |
 | 10.0.1.52 | k3s-agent-gpu | VM on pve2 | k3s GPU workloads |
 | 10.0.1.53 | tailscale-router | LXC on pve1 | Tailscale subnet router (advertises 10.0.1.0/24) |
+| 10.0.1.54 | devbox | LXC on pve1 | Always-on development host (SSH, coding agents) |
 | 10.0.1.200 | (MetalLB VIP) | Virtual | Traefik public ingress (port-forward target) |
 | 10.0.1.210 | (MetalLB VIP) | Virtual | Traefik tailnet-only ingress |
 
@@ -409,6 +422,51 @@ resources:
   under "AI alert triage (HolmesGPT)"
 
 Model storage on NAS (Tier 1). Inference scratch/KV cache uses local memory/GPU VRAM.
+
+## Development Host
+
+`devbox` (LXC 204, `10.0.1.54`, 4 cores / 8 GB / 40 GB) is an always-on machine
+for writing code, deliberately outside the cluster. Coding agents run on it and
+[herdr](https://herdr.dev) attaches to it over SSH, so a laptop, a phone or any
+other client drives the same long-lived sessions.
+
+### Why not a pod
+
+The obvious alternative was a container in k3s, which would have been
+Flux-managed like everything else. It was rejected on lifecycle grounds: herdr's
+value is that a background server keeps agent processes alive across
+disconnects, and a pod is restarted by every image bump, node drain and
+HelmRelease upgrade. An always-on host that is rescheduled weekly is not an
+always-on host. Nested Docker and a local working tree are both far easier
+outside Kubernetes too.
+
+The cost is honest: this box is provisioned by Tofu and configured by Ansible,
+not reconciled by Flux, so it can drift. The Ansible role is idempotent and
+re-running it is the correction.
+
+### Shape
+
+- **Provisioning:** `bootstrap/tofu/proxmox` (container `devbox`), then
+  `bootstrap/ansible/playbooks/devbox.yml`.
+- **Privileged LXC with nesting**, for two reasons: tailscaled needs
+  `/dev/net/tun` — passed through out-of-band by the playbook, exactly as for
+  `tailscale-router` — and Docker will not start in a container without nesting.
+- **Its own tailnet node**, not merely a host behind the subnet router, so it
+  stays reachable if the router LXC is down and gets a MagicDNS name. Tailscale
+  SSH is enabled alongside ordinary key-based sshd: the tailnet ACL authorises
+  phone clients that carry no key material, while sshd still serves herdr and
+  Ansible.
+- **Repos cloned over HTTPS** with `gh` as the credential helper, so one token
+  covers clones and pushes with no per-host deploy key.
+- **Agent CLIs pinned** (`claude`, `opencode`) in `roles/devbox/defaults`, with
+  Renovate tracking them the same way it tracks image tags.
+
+### Capacity note
+
+pve1's LVM thin pool is 141 GB and was ~69% consumed before this host existed.
+The 40 GB disk is thin-provisioned, so only written blocks are charged, but a
+pool that genuinely fills can wedge every guest on the node. `lvs pve/data` is
+the number to watch; `docs/devbox.md` lists what to move to NFS first.
 
 ## Repository Structure
 

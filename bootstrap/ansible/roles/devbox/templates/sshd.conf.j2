@@ -1,0 +1,18 @@
+# Managed by Ansible (roles/devbox) — edits here are overwritten.
+#
+# Tailscale SSH is also enabled on this host and never reaches this daemon; it
+# authorises against the tailnet ACL. These settings cover key-based logins over
+# the LAN and tailnet IPs, which is the path herdr and Ansible use.
+
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin prohibit-password
+
+AllowUsers {{ devbox_ssh_allow_users | join(' ') }}
+
+# Server-side keepalives: agent panes idle for hours behind NAT.
+ClientAliveInterval {{ devbox_ssh_alive_interval }}
+ClientAliveCountMax {{ devbox_ssh_alive_count_max }}
+TCPKeepAlive yes
+
+AcceptEnv LANG LC_* TERM COLORTERM

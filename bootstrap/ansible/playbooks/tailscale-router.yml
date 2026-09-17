@@ -42,6 +42,9 @@
 - name: Configure Tailscale subnet router
   hosts: tailscale_router
   become: true
+  vars:
+    tailscale_hostname: tailscale-router
+    tailscale_advertise_routes: 10.0.1.0/24
   vars_prompt:
     - name: tailscale_auth_key
       prompt: "Enter Tailscale auth key (tagged tag:subnet-router, reusable, from Trust credentials)"

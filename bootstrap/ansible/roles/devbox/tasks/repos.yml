@@ -1,0 +1,22 @@
+---
+# update: false clones what is missing and never touches an existing checkout —
+# this box has real work on it, and a replay must not move HEAD or discard it.
+- name: Clone repositories
+  ansible.builtin.git:
+    repo: "{{ item }}"
+    dest: "{{ devbox_repo_root }}/{{ item | basename | regex_replace('\\.git$', '') }}"
+    update: false
+    version: HEAD
+  become_user: "{{ devbox_user }}"
+  loop: "{{ devbox_repos }}"
+  # One renamed or deleted repo should not fail the whole run.
+  register: devbox_clone
+  failed_when: false
+
+- name: Report repositories that could not be cloned
+  ansible.builtin.debug:
+    msg: >-
+      Could not clone: {{ devbox_clone.results
+        | selectattr('failed', 'defined') | selectattr('failed')
+        | map(attribute='item') | list | join(', ') }}
+  when: devbox_clone.results | selectattr('failed', 'defined') | selectattr('failed') | list | length > 0

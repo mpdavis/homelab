@@ -118,6 +118,24 @@ variable "containers" {
       start_order = 3
       tags       = ["tailscale", "subnet-router"]
     }
+    devbox = {
+      vmid       = 204
+      node       = "pve1"
+      cores      = 4
+      memory     = 8192
+      # Thin-provisioned, but pve1's pool is 141G at ~69%. Watch `lvs pve/data`.
+      disk_size  = 40
+      ip         = "10.0.1.54"
+      # Privileged for the same TUN reason as tailscale-router above (the
+      # passthrough lines are written by playbooks/devbox.yml); nesting is also
+      # required for Docker. A privileged LXC running coding agents is a
+      # deliberate trade — treat a devbox compromise as a pve1 compromise.
+      privileged = true
+      nesting    = true
+      keyctl     = true
+      start_order = 4
+      tags       = ["devbox", "development"]
+    }
 
   }
 }
