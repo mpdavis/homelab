@@ -1,0 +1,40 @@
+---
+# --keep-zshrc stops the installer writing its own ~/.zshrc over the template
+# below; --unattended stops it changing the login shell and launching zsh.
+- name: Install oh-my-zsh
+  ansible.builtin.shell:
+    cmd: >-
+      sh -c "$(curl -fsSL {{ devbox_omz_install_url }})" "" --unattended --keep-zshrc
+    creates: "/home/{{ devbox_user }}/.oh-my-zsh"
+  become_user: "{{ devbox_user }}"
+
+# Upstream ships spaceship for oh-my-zsh as a repo to clone; the Homebrew path
+# the laptop uses does not exist here.
+- name: Install the spaceship prompt
+  ansible.builtin.git:
+    repo: "{{ devbox_spaceship_repo }}"
+    dest: "/home/{{ devbox_user }}/.oh-my-zsh/custom/themes/spaceship-prompt"
+    depth: 1
+    version: master
+    update: false
+  become_user: "{{ devbox_user }}"
+
+# oh-my-zsh only looks for themes directly in custom/themes, not one level down.
+- name: Link the spaceship theme where oh-my-zsh looks for it
+  ansible.builtin.file:
+    src: spaceship-prompt/spaceship.zsh-theme
+    dest: "/home/{{ devbox_user }}/.oh-my-zsh/custom/themes/spaceship.zsh-theme"
+    state: link
+    owner: "{{ devbox_user }}"
+    group: "{{ devbox_user }}"
+
+- name: Install the shell rc files
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/home/{{ devbox_user }}/{{ item.dest }}"
+    owner: "{{ devbox_user }}"
+    group: "{{ devbox_user }}"
+    mode: "0644"
+  loop:
+    - { src: zshrc.j2, dest: .zshrc }
+    - { src: aliases.j2, dest: .aliases }

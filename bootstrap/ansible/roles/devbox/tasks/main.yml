@@ -7,6 +7,9 @@
 - name: Create the development user
   ansible.builtin.import_tasks: user.yml
 
+- name: Configure the interactive shell
+  ansible.builtin.import_tasks: zsh.yml
+
 - name: Configure sshd
   ansible.builtin.import_tasks: sshd.yml
 

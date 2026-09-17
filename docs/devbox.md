@@ -95,6 +95,46 @@ herdr needs its own binary on the remote and installs it on first connect; the
 Ansible role also installs it to `~/.local/bin/herdr`, so the box is usable
 directly over plain SSH before herdr has ever seen it.
 
+## Shell
+
+zsh with oh-my-zsh and the spaceship prompt, installed by the role and
+configured from templates — `~/.zshrc` and `~/.aliases` are managed files and
+local edits are overwritten.
+
+This is a deliberate subset of the laptop's config rather than a copy of it.
+Most of that `.zshrc` is the stock oh-my-zsh comment block, and the parts that
+do something are macOS-specific: Homebrew paths (`/opt/homebrew/...`, including
+where spaceship lives), a `Library/Python` PATH entry, and `brew shellenv` in
+`.zprofile`. Sourcing the Homebrew spaceship path on Linux errors on every
+prompt, so spaceship is installed here the oh-my-zsh way instead — cloned into
+`custom/themes` and symlinked where oh-my-zsh looks for it.
+
+The laptop's `~/.zshenv` is deliberately **not** replicated: it exports a
+Bitwarden Secrets Manager access token, which would give anything running here
+read access to every secret backing the cluster.
+
+### Where environment belongs
+
+`~/.zshrc` is read only by *interactive* shells. PATH, the mise shims and the
+agent credentials therefore live in `/etc/profile.d/devbox.sh`, sourced from
+`/etc/zsh/zshenv` for every zsh invocation — including the non-interactive ones
+agents spawn. Putting any of that in `.zshrc` would make it invisible to exactly
+the shells that need it most.
+
+### The skip-permissions alias
+
+`devbox_claude_skip_permissions` (default `false`) controls whether `~/.aliases`
+defines:
+
+```bash
+alias claude="claude --dangerously-skip-permissions"
+```
+
+It is off on purpose. The flag bypasses the permission system, which is the
+thing moshi-hook forwards to the phone as approvals — with it on, those prompts
+never fire. On a host that also holds a cluster-admin kubeconfig, that is worth
+turning on deliberately rather than inheriting from a copied dotfile.
+
 ## Working from a phone
 
 Two independent paths, and they stack.

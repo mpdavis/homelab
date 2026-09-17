@@ -4,6 +4,15 @@ devbox_user_full_name: "Michael Davis"
 devbox_user_email: michael@mpdavis.com
 devbox_user_shell: /usr/bin/zsh
 
+devbox_omz_install_url: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
+devbox_spaceship_repo: https://github.com/spaceship-prompt/spaceship-prompt.git
+
+# Off by default, deliberately. The flag bypasses the permission system, which
+# is precisely what moshi-hook routes to the phone as approvals — turning it on
+# means those prompts never fire. On a box that also holds a cluster-admin
+# kubeconfig that is a decision worth making on purpose, not inheriting.
+devbox_claude_skip_permissions: false
+
 # Empty means "reuse the keys Tofu injected for root" (see tasks/user.yml).
 devbox_authorized_keys: []
 

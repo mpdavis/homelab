@@ -1,0 +1,16 @@
+# Managed by Ansible (roles/devbox) — edits here are overwritten.
+#
+# Interactive-shell config only. PATH, the mise shims and the agent credentials
+# come from /etc/profile.d/devbox.sh, which /etc/zsh/zshenv sources for every
+# zsh — including the non-interactive ones agents spawn. Do not repeat them
+# here: this file is not read by those shells, so anything only set here is
+# invisible to them.
+
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="spaceship"
+plugins=(git)
+source "$ZSH/oh-my-zsh.sh"
+
+if [ -r "$HOME/.aliases" ]; then
+    source "$HOME/.aliases"
+fi
