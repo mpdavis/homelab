@@ -59,6 +59,9 @@ Before writing any manifests, determine the following by asking the user (skip q
    at Traefik via a separate `IngressRoute` (not the chart's built-in ingress). Every service
    that gets an IngressRoute also gets a Homepage tile (Step 3) — note which Homepage section it
    belongs to (Media, IPTV, Infrastructure, AI, …) and a one-line description.
+   **Exposure** — public internet or tailnet-only? Default to **tailnet** (admin UIs, *arr-style
+   tools, anything only Michael uses). Choose **public** only when people or clients off the
+   tailnet need it (shared media servers, request portals, mobile apps, webhooks).
 7. **Storage** — what persistent storage does it need?
    - **Config/database** — `local-path`, `ReadWriteOnce`. For SQLite DBs and app config. Typical 2–5Gi.
    - **Media** — `nfs-data` storage class, or an inline NFS mount (`server: ${NAS_IP}`,
@@ -329,9 +332,11 @@ apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: <service-name>
+  labels:
+    homelab.mpdavis.com/exposure: tailnet   # omit label + use `websecure` for a public service
 spec:
   entryPoints:
-    - websecure
+    - tailnet                               # `websecure` for a public service
   routes:
     - match: Host(`<service-name>.mpdavis.com`)
       kind: Rule
@@ -341,8 +346,10 @@ spec:
   tls: {}
 ```
 The `*.mpdavis.com` wildcard cert is already provisioned — `tls: {}` uses it automatically. The
-`apps/kustomization.yaml` patch auto-adds the ExternalDNS target annotation, so a DNS record is
-provisioned automatically — no per-service annotation needed. (Note: app-template names its
+`apps/kustomization.yaml` patches auto-add the ExternalDNS target annotation (public IP, or the
+tailnet VIP for labelled routes) and force labelled routes onto the `tailnet` entrypoint, so no
+per-service annotation is needed. The label is what actually keeps a route off the internet —
+never rely on an IP allowlist middleware. (Note: app-template names its
 Service `<service-name>` via the chart's fullname; verify the rendered Service name and match it
 here.)
 
@@ -389,12 +396,19 @@ hostname must be probed by the synthetic-monitoring stack, in **two places** in
 ```
 2. The hostname added to the `hostAliases` list in the `postRenderers` patch (same file) — in-cluster
    probes resolve `*.mpdavis.com` via the Traefik VIP, not public DNS.
+3. **Auth-protected services only:** the 302 comes from the middleware whether or not the app is
+   up, so if the app has an unauthenticated health endpoint (`/health`, `/healthz`, `/ping` on
+   *arr apps), also add an app-health check against the in-cluster Service:
+```yaml
+        - name: <service-name>
+          group: internal
+          url: http://<service-name>.<namespace>.svc.cluster.local:<port>/health
+          conditions: *internal-conditions
+```
 
 Pick the group by whether the IngressRoute has the `authelia` middleware: protected services are
 healthy when they 302 to the auth portal; open services when they return 200. Skipping this means
-the new service is invisible to the deploy canary and to `GatusEndpointDown` alerting — but note
-the canary treats an endpoint with no baseline entry as must-pass, so once added, the service's
-first failing deploy WILL trigger a revert PR (that's the point).
+the new service is invisible to `GatusEndpointDown` alerting.
 
 **external-secret.yaml** (only if the service needs secrets from Bitwarden).
 
@@ -458,7 +472,6 @@ selector, `${TZ}`/`${NAS_IP}`/`${NAS_DATA_PATH}` for substituted values, port na
      - media
      - <namespace>   # ← add the new namespace dir
      - homepage
-     - hello-world
    ```
 3. **Sources kustomization** — for an official-chart service with a new HelmRepository, add it to
    `kubernetes/infrastructure/sources/kustomization.yaml`. (app-template needs nothing — `bjw-s`
@@ -519,9 +532,9 @@ Before considering the service complete, verify:
 - [ ] `./<service>` registered in `apps/<namespace>/kustomization.yaml`; new namespace group also registered in `apps/kustomization.yaml`
 - [ ] Environment uses `${TZ}` (not a hardcoded timezone); NFS uses `${NAS_IP}`/`${NAS_DATA_PATH}`
 - [ ] If the app reads `<NAME>_*` env vars for config, `enableServiceLinks: false` is set (avoids the service-link env collision)
-- [ ] IngressRoute uses `websecure` entryPoint and `tls: {}`; Service name matches the rendered chart name
+- [ ] IngressRoute has `tls: {}` and the right exposure: tailnet (label `homelab.mpdavis.com/exposure: tailnet` + `tailnet` entryPoint) unless off-tailnet users need it, else `websecure`; Service name matches the rendered chart name
 - [ ] **Service with an IngressRoute has a Homepage tile** in `apps/homepage/configmap.yaml` (correct section, `href` matches the route)
-- [ ] **Service with an IngressRoute has a Gatus check** — endpoint entry (correct group: `external-open` vs `external-auth`) **and** hostname in the `hostAliases` patch, both in `infrastructure/controllers/gatus.yaml`
+- [ ] **Service with an IngressRoute has a Gatus check** — endpoint entry (correct group: `external-open` vs `external-auth`) **and** hostname under the matching VIP in the `hostAliases` patch, both in `infrastructure/controllers/gatus.yaml`
 - [ ] PVC uses the right StorageClass (`local-path` RWO config/DB; `nfs-data`/`nfs-homelab` RWX bulk)
 - [ ] `controllers.main.strategy: Recreate` set whenever the service has a `local-path` RWO PVC (stateful)
 - [ ] Container `securityContext` set: `allowPrivilegeEscalation: false` + `capabilities.drop: [ALL]` (no `runAsNonRoot`)

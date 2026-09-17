@@ -57,10 +57,6 @@
         icon: open-webui.png
         href: https://ai.${DOMAIN}
         description: AI chat interface (Ollama)
-    - Coding Agent:
-        icon: claude-ai.png
-        href: https://code.${DOMAIN}
-        description: Claude Code / opencode web UI (CloudCLI)
 - Personal:
     - Home Assistant:
         icon: home-assistant.png
@@ -74,10 +70,6 @@
         icon: mdi-gavel
         href: https://council.${DOMAIN}
         description: Ames city council meeting digests
-    - Trek:
-        icon: mdi-airplane
-        href: https://trek.${DOMAIN}
-        description: Travel planning
     - Gridiron:
         icon: mdi-football
         href: https://gridiron.${DOMAIN}

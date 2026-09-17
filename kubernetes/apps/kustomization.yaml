@@ -10,20 +10,27 @@ resources:
   - gridiron
   - media
   - ntfy
-  - travel
   - homepage
-  - hello-world
 
-# ExternalDNS (traefik-proxy source) only provisions a record for an
-# IngressRoute that carries an explicit target annotation — IngressRoute CRDs
-# expose no LoadBalancer status to derive one from. Apply it to every
-# IngressRoute so new services get a DNS record automatically. 46.110.78.19 is
-# the public IP that forwards external traffic to Traefik's VIP (10.0.1.200).
+# Exposure. Every IngressRoute is public by default; label it
+# `homelab.mpdavis.com/exposure: tailnet` to make it LAN/tailnet-only. The label
+# is the single switch — these patches derive both halves from it so they can
+# never disagree:
+#   - entryPoints: tailnet routes are forced onto the `tailnet` entrypoint, which
+#     only listens behind Traefik's non-port-forwarded VIP (${TRAEFIK_TAILNET_IP}).
+#     A tailnet-labelled route left on `websecure` would still be reachable from the
+#     internet by Host header, so this is enforced here rather than trusted.
+#   - DNS: ExternalDNS (traefik-proxy source) only provisions a record for an
+#     IngressRoute carrying an explicit target annotation — IngressRoute CRDs expose
+#     no LoadBalancer status to derive one from. Public routes point at ${PUBLIC_IP}
+#     (the router forwards 443 to ${TRAEFIK_PUBLIC_IP}); tailnet routes get a public
+#     A record holding the private tailnet VIP, reachable via the Tailscale subnet route.
 patches:
   - target:
       group: traefik.io
       version: v1alpha1
       kind: IngressRoute
+      labelSelector: homelab.mpdavis.com/exposure!=tailnet
     patch: |-
       apiVersion: traefik.io/v1alpha1
       kind: IngressRoute
@@ -31,3 +38,18 @@ patches:
         name: ignored
         annotations:
           external-dns.alpha.kubernetes.io/target: ${PUBLIC_IP}
+  - target:
+      group: traefik.io
+      version: v1alpha1
+      kind: IngressRoute
+      labelSelector: homelab.mpdavis.com/exposure=tailnet
+    patch: |-
+      apiVersion: traefik.io/v1alpha1
+      kind: IngressRoute
+      metadata:
+        name: ignored
+        annotations:
+          external-dns.alpha.kubernetes.io/target: ${TRAEFIK_TAILNET_IP}
+      spec:
+        entryPoints:
+          - tailnet

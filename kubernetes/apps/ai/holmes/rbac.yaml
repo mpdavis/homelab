@@ -1,5 +1,4 @@
-# Read-only cluster access for the alert-triage job, mirroring the coding-agent
-# posture: Holmes may inspect anything, read no secret data, and change nothing.
+# Read-only cluster access for the alert-triage job: Holmes may inspect anything, read no secret data, and change nothing.
 # It also reads the apps Kustomization's lastAppliedRevision to decide which
 # deploy thread its findings belong in.
 #

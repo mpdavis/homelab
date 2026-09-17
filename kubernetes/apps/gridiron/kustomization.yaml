@@ -3,7 +3,7 @@ kind: Kustomization
 # Without this every resource below is namespace-less, and the `apps` Flux
 # Kustomization would create them in its own namespace (flux-system) rather
 # than in `gridiron` — the workload would come up, in the wrong place, with
-# the ExternalSecret unable to find anything. `travel` sets it here too.
+# the ExternalSecret unable to find anything. `media` sets it here too.
 namespace: gridiron
 resources:
   - namespace.yaml

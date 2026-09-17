@@ -1,7 +1,7 @@
 # shellcheck config for *.sh — see .github/workflows/lint-shell.yml
 #
 # Advisory check (not on main's ruleset). Covers the handful of tracked shell
-# scripts (docker/coding-agent/entrypoint.sh, .github/scripts/*.sh). Scripts
+# scripts (.github/scripts/*.sh). Scripts
 # embedded in workflow `run:` blocks are NOT covered here — that needs actionlint.
 
 # Follow `source`/`.` into sibling files when a path is statically known.

@@ -1,7 +1,6 @@
 name: Lint · Shell
 
-# shellcheck over tracked *.sh files (docker/coding-agent/entrypoint.sh,
-# .github/scripts/*.sh). Advisory: NOT on main's ruleset, paths-filtered, and on a
+# shellcheck over tracked *.sh files (.github/scripts/*.sh). Advisory: NOT on main's ruleset, paths-filtered, and on a
 # PR it lints only the scripts that PR changed.
 #
 # Scripts embedded in workflow `run:` blocks are out of scope — that is actionlint's

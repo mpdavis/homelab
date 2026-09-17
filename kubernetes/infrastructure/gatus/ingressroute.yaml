@@ -1,6 +1,6 @@
-# Public, read-only status page — deliberately NOT behind Authentik: the
-# deploy-canary GitHub workflow polls /api/v1/endpoints/statuses from the
-# internet after each merge to verify the deploy actually serves traffic.
+# Public, read-only status page — deliberately NOT behind Authentik so
+# /api/v1/endpoints/statuses can be queried without a session (e.g. by the
+# diagnose-service agent).
 #
 # hygiene-exempt: gatus-endpoint Gatus can't probe its own status page
 # hygiene-exempt: gatus-hostalias Gatus can't probe its own status page

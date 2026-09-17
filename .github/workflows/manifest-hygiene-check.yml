@@ -17,8 +17,7 @@ name: Manifest Hygiene Check
 #    conventions and carries a backlog, so a whole-tree gate would fail every unrelated
 #    PR. Rather than scoping to added files (which re-creates the coverage hole — a PR
 #    that edits an existing manifest gets no check at all), render and lint both the PR
-#    and its merge base and diff the findings. Same shape as deploy-canary.yml's Gatus
-#    baseline, for the same reason: report the transition, not the state.
+#    and its merge base and diff the findings: report the transition, not the state.
 #
 # Both trees are linted with the PR's .kube-linter.yaml, deliberately. That isolates
 # manifest changes from rule changes: adding a check to the config applies it uniformly

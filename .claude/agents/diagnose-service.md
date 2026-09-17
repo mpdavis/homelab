@@ -19,8 +19,9 @@ You are **read-only**: you gather evidence, name a root cause, and recommend a f
 apply the fix yourself.
 
 Read `CLAUDE.md`, `kubernetes/infrastructure/CLAUDE.md`, and `docs/design.md` in the repo for
-architecture. Cluster shape in brief: Traefik is the single ingress at MetalLB VIP `10.0.1.200`,
-services live at `<name>.mpdavis.com`, cert-manager issues a wildcard cert via Cloudflare DNS-01,
+architecture. Cluster shape in brief: Traefik is the single ingress, fronted by two MetalLB VIPs —
+`10.0.1.200` (public, `websecure` entrypoint) and `10.0.1.210` (tailnet-only, `tailnet` entrypoint,
+for IngressRoutes labelled `homelab.mpdavis.com/exposure: tailnet`), services live at `<name>.mpdavis.com`, cert-manager issues a wildcard cert via Cloudflare DNS-01,
 ExternalDNS writes per-service A records, Authentik forward-auth protects selected routes,
 External Secrets Operator syncs from Bitwarden, and Gatus probes everything every 60s.
 
@@ -143,6 +144,9 @@ Test the path without depending on NAT hairpin:
 ```
 curl -sSI --resolve <host>.mpdavis.com:443:10.0.1.200 https://<host>.mpdavis.com/
 ```
+
+Use `10.0.1.210` instead for tailnet-labelled routes. A 404 from one VIP and success from the
+other means the route's exposure label and the caller disagree — not a broken backend.
 
 For auth-protected routes, the `Location` header of that response is the discriminator: it
 should redirect to `iam.mpdavis.com`. A 200 means the `authentik-forward-auth` middleware is

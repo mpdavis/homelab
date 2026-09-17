@@ -8,7 +8,7 @@ spec:
   chart:
     spec:
       chart: traefik
-      version: "~41.5.0"
+      version: "~41.6.0"
       sourceRef:
         kind: HelmRepository
         name: traefik
@@ -35,8 +35,25 @@ spec:
         enabled: true
         publishedService:
           enabled: true
+    # Two LoadBalancer Services front the same Traefik pods:
+    #   traefik          ${TRAEFIK_PUBLIC_IP}   web/websecure — the router port-forwards 443 here
+    #   traefik-tailnet  ${TRAEFIK_TAILNET_IP}  tailnet-web/tailnet — NOT port-forwarded; reachable
+    #                                           only from the LAN and via the Tailscale subnet router
+    # A route is private because it is bound to the `tailnet` entrypoint, which only
+    # listens behind the second VIP. This does not rely on client source IPs:
+    # externalTrafficPolicy is Cluster, so kube-proxy SNATs internet traffic to a LAN
+    # node IP and an ipAllowList on 10.0.1.0/24 would let it straight through.
+    # Both IPs are pinned so the router port-forward and DNS targets never drift.
     service:
       type: LoadBalancer
+      annotations:
+        metallb.io/loadBalancerIPs: ${TRAEFIK_PUBLIC_IP}
+      additionalServices:
+        tailnet:
+          annotations:
+            metallb.io/loadBalancerIPs: ${TRAEFIK_TAILNET_IP}
+          spec:
+            type: LoadBalancer
     ports:
       web:
         http:
@@ -45,3 +62,24 @@ spec:
               to: websecure
               scheme: https
               permanent: true
+      tailnet-web:
+        port: 8001
+        exposedPort: 80
+        expose:
+          default: false
+          tailnet: true
+        http:
+          redirections:
+            entryPoint:
+              to: tailnet
+              scheme: https
+              permanent: true
+      tailnet:
+        port: 8444
+        exposedPort: 443
+        expose:
+          default: false
+          tailnet: true
+        http:
+          tls:
+            enabled: true
