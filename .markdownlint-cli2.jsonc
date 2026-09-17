@@ -21,6 +21,9 @@
   },
   "ignores": [
     ".claude/**",
+    // Vendored agent skills — upstream docs, pinned in skills-lock.json and
+    // replaced wholesale on update. Not ours to reformat.
+    ".agents/**",
     "**/node_modules/**",
     "**/.venv/**",
     "**/.pytest_cache/**",
