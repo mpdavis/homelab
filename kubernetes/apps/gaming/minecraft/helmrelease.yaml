@@ -24,10 +24,12 @@ spec:
     image:
       repository: itzg/minecraft-server
       # Pinned to a stable, immutable date tag (digest
-      # sha256:b76b9298a2a60d5cf9d223e009cd0b8ad620c2080abd83f9a1fa5084fa87f9ab).
-      # Controls the itzg tooling + Java runtime (Java 21); the Minecraft game
-      # version is set separately via minecraftServer.version below.
-      tag: "2026.9.1-java21"
+      # sha256:e8640538dac5d54c2838d57fa9641e735ad0cf2b71fb0e8a68da3b542a315749).
+      # Controls the itzg tooling + Java runtime (Java 25, required since
+      # Minecraft's LATEST release now ships class file version 69); the
+      # Minecraft game version is set separately via minecraftServer.version
+      # below.
+      tag: "2026.9.1-java25"
       pullPolicy: IfNotPresent
     minecraftServer:
       # Accepting the Minecraft EULA (https://www.minecraft.net/en-us/eula) is
