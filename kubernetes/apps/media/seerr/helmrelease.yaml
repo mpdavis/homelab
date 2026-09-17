@@ -24,7 +24,10 @@ spec:
     fullnameOverride: seerr
     persistence:
       storageClass: local-path
-      size: 2Gi
+      # Matches the live seerr-config claim. The chart cannot shrink an existing
+      # PVC, so a smaller value here would only ever apply to a fresh install or
+      # a restore -- silently provisioning less storage than the running instance.
+      size: 5Gi
     extraEnv:
       - name: TZ
         value: ${TZ}
