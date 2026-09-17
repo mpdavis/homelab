@@ -19,6 +19,7 @@ Use stable APIs only — no beta versions:
 - Keep values inline in `spec.values` for non-sensitive configuration
 - Use `spec.valuesFrom` referencing a Secret for sensitive values (passwords, tokens)
 - Always configure install and upgrade remediation with retries:
+
   ```yaml
   install:
     remediation:
@@ -28,6 +29,7 @@ Use stable APIs only — no beta versions:
       retries: 3
       strategy: rollback
   ```
+
 - Set `crds: CreateReplace` in upgrade spec so CRDs get updated on upgrade
 - Use `dependsOn` between HelmReleases sparingly — only for real ordering dependencies
 

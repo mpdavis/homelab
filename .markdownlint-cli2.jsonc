@@ -20,6 +20,10 @@
     "MD029": { "style": "one_or_ordered" }
   },
   "ignores": [
+    // Each CLAUDE.md is a symlink to the AGENTS.md beside it; linting both
+    // reports every error twice.
+    "CLAUDE.md",
+    "**/CLAUDE.md",
     ".claude/**",
     ".agents/**",
     "**/node_modules/**",
