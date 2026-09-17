@@ -36,8 +36,23 @@ Tofu ever destroys and recreates this container, re-run the playbook.
 
 ## Tailnet ACL
 
-Tailscale SSH is enabled, and it **denies every connection until the tailnet ACL
-allows it**. Add a rule like this in the Tailscale admin console:
+Two separate things are needed in the tailnet policy file, and the first one
+bites before the second ever matters.
+
+**1. `tag:devbox` must be owned.** A tagged auth key is rejected outright if
+nothing owns the tag, so the playbook fails at `tailscale up` — long before any
+SSH rule is consulted:
+
+```json
+{
+  "tagOwners": {
+    "tag:devbox": ["autogroup:admin"]
+  }
+}
+```
+
+**2. Tailscale SSH denies every connection until an `ssh` rule allows it.** This
+is its own top-level section — not a grant, and not covered by `grants`/`acls`:
 
 ```json
 {
@@ -51,6 +66,9 @@ allows it**. Add a rule like this in the Tailscale admin console:
   ]
 }
 ```
+
+Use `"action": "accept"`, not `"check"`. Check mode forces a browser
+re-authentication per connection, which is meaningful friction from a phone.
 
 This is what lets a phone connect with no key material at all — authorisation is
 the tailnet identity, not a private key the phone has to store. Ordinary
@@ -148,3 +166,9 @@ handles the latter on boot.
 
 **Agents cannot push.** `gh auth status` on the box, as the `michael` user. If
 the token expired, rotate it as above.
+
+**A shell is missing `$CLAUDE_CODE_OAUTH_TOKEN`, `herdr` or `mise`.** All three
+come from `/etc/profile.d/devbox.sh`. Ubuntu's `/etc/zsh/zprofile` does *not*
+source `/etc/profile`, so zsh picks it up only via the managed block in
+`/etc/zsh/zshenv`. Check that block still exists; `zsh -l -c 'echo $PATH'`
+should show `~/.local/share/mise/shims` first.

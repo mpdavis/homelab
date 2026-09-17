@@ -1,8 +1,15 @@
 # Managed by Ansible (roles/devbox) — edits here are overwritten.
+#
+# Sourced from /etc/profile.d for sh/bash, and from /etc/zsh/zshenv for zsh.
+# zshenv runs on every zsh invocation, including nested ones, so the PATH edit
+# below has to be idempotent or it compounds.
 
 # Shims rather than `mise activate`: they also work in the non-interactive
 # shells agents spawn.
-export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"
+case ":$PATH:" in
+    *":$HOME/.local/share/mise/shims:"*) ;;
+    *) export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH" ;;
+esac
 
 if [ -r "$HOME/.config/devbox/env" ]; then
     . "$HOME/.config/devbox/env"
