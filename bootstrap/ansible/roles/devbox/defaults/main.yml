@@ -59,7 +59,7 @@ devbox_kubectl_version: "v1.37.0"
 # renovate: datasource=github-releases depName=fluxcd/flux2
 devbox_flux_version: "v2.9.5"
 # renovate: datasource=github-releases depName=cli/cli
-devbox_gh_version: "v2.100.0"
+devbox_gh_version: "v2.101.0"
 
 # Unpinned: herdr self-updates from its own checksummed manifest.
 devbox_herdr_install_url: https://herdr.dev/install.sh
