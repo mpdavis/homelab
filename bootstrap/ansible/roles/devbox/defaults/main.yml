@@ -30,6 +30,7 @@ devbox_packages:
   - htop
   - jq
   - less
+  - mosh
   - nfs-common
   - openssh-server
   - pkg-config
@@ -64,6 +65,16 @@ devbox_gh_version: "v2.101.0"
 # Unpinned: herdr self-updates from its own checksummed manifest.
 devbox_herdr_install_url: https://herdr.dev/install.sh
 devbox_mise_install_url: https://mise.run
+
+# moshi-hook has no public source repo, so Renovate has no datasource to track
+# and the installer resolves "latest" itself. It verifies a SHA-256 and ships
+# `moshi-hook update`, so upgrades are a manual, deliberate step.
+devbox_moshi_install_url: https://getmoshi.app/install.sh
+devbox_moshi_bin: "/home/{{ devbox_user }}/.local/bin/moshi-hook"
+
+# Pairing token from the Moshi app (Settings -> Hooks). Empty leaves the host
+# installed but unpaired.
+devbox_moshi_token: ""
 
 devbox_repo_root: "/home/{{ devbox_user }}/git"
 

@@ -97,10 +97,46 @@ directly over plain SSH before herdr has ever seen it.
 
 ## Working from a phone
 
-herdr's release binaries do not support Android/Termux, so the phone is a client
-that SSHes in rather than a host that runs herdr locally. Connect over Tailscale
-with any SSH app and run `herdr` on the box. Sessions survive the connection
-dropping, which is the point — a phone on cellular will drop.
+Two independent paths, and they stack.
+
+**herdr over SSH.** herdr's release binaries do not support Android/Termux, so
+the phone is a client that SSHes in rather than a host that runs herdr locally.
+Connect over Tailscale with any SSH app and run `herdr` on the box.
+
+**Moshi.** The [Moshi](https://getmoshi.app) app connects over Mosh (with SSH
+fallback) and drives tmux or herdr sessions directly. `mosh` is installed for
+this: it survives the phone roaming between cellular and Wi-Fi, which plain SSH
+does not. Mosh's UDP ports need no firewall work here because the traffic rides
+the tailnet.
+
+`moshi-hook` is the companion daemon. It installs agent hook config, serves a
+local Unix socket, and holds a WebSocket back to Moshi so approvals and status
+reach the phone. The playbook installs it, enables lingering, installs the
+Claude hooks and starts the daemon; the only manual step is the pairing token
+from the app under **Settings → Hooks**, which the playbook prompts for.
+
+Useful commands on the box:
+
+```bash
+moshi-hook status          # pairing state, hook freshness, multiplexers seen
+moshi-hook probe           # is the daemon up and is the gateway connected
+moshi-hook logs -f         # tail the daemon log
+moshi-hook host setup      # Easy Pair, if you'd rather not configure by hand
+moshi .                    # open/attach a tmux session for this directory
+```
+
+Hook config is merged into `~/.claude/settings.json` rather than overwriting it,
+so unrelated settings there survive. `moshi-hook uninstall` removes just the
+hook entries.
+
+Two things about the daemon worth knowing, because both are silent when wrong:
+
+- It runs as a **systemd user service**, so it needs
+  `loginctl enable-linger michael` or it dies with your last SSH session and
+  never starts at boot. The playbook enables this; `moshi-hook service install`
+  on its own does not.
+- Upgrades are manual (`moshi-hook update`). There is no public source repo for
+  Renovate to track, so nothing bumps it for you.
 
 ## Adding a repo
 

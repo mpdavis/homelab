@@ -59,6 +59,10 @@
       prompt: "Claude OAuth token from `claude setup-token` (blank to skip)"
       private: true
       default: ""
+    - name: devbox_moshi_token
+      prompt: "Moshi pairing token from the app, Settings -> Hooks (blank to skip)"
+      private: true
+      default: ""
   roles:
     # lxc makes / rshared, which Docker needs to start inside a container.
     - lxc
