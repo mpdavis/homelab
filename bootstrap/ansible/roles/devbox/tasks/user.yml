@@ -68,10 +68,20 @@
     group: "{{ devbox_user }}"
     mode: "0644"
 
-# /etc/profile.d reaches every login shell, including zsh and the ones agents
-# spawn — a ~/.zshrc block would not.
 - name: Install the shared shell profile
   ansible.builtin.template:
     src: profile.sh.j2
     dest: /etc/profile.d/devbox.sh
     mode: "0644"
+
+# Ubuntu's /etc/zsh/zprofile does not source /etc/profile, so profile.d alone
+# never reaches this user's zsh — no token, no mise shims, no ~/.local/bin.
+# zshenv is both the documented place for PATH and the only file zsh reads on
+# every invocation, which is what the shells agents spawn need.
+- name: Source the shared profile from zsh
+  ansible.builtin.blockinfile:
+    path: /etc/zsh/zshenv
+    marker: "# {mark} ANSIBLE MANAGED BLOCK (devbox)"
+    block: |
+      emulate sh -c '. /etc/profile.d/devbox.sh'
+    create: false
