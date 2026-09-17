@@ -1,0 +1,64 @@
+---
+# moshi-hook lets the Moshi phone app drive the agents running here: it installs
+# agent hook config, serves a local socket, and holds a WebSocket back to Moshi
+# for approvals. https://getmoshi.app/docs/hooks
+
+# The uid is needed for XDG_RUNTIME_DIR below. Ansible's become does not set up
+# a login session, so `systemctl --user` cannot find the user's bus on its own.
+- name: Look up the devbox user
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ devbox_user }}"
+
+- name: Install moshi-hook
+  ansible.builtin.shell:
+    cmd: "curl -fsSL {{ devbox_moshi_install_url }} | sh"
+    creates: "{{ devbox_moshi_bin }}"
+  become_user: "{{ devbox_user }}"
+  environment:
+    # The installer otherwise opens /dev/tty for a first-run multi-select.
+    MOSHI_HOOK_SKIP_FIRST_RUN: "1"
+
+# The daemon is a systemd *user* service whose socket lives in /run/user/<uid>,
+# which logind tears down when the user's last session ends. Without lingering
+# it dies on logout and never comes back at boot — which is the whole point of
+# this host.
+- name: Enable lingering so the user daemon survives logout
+  ansible.builtin.command: "loginctl enable-linger {{ devbox_user }}"
+  args:
+    creates: "/var/lib/systemd/linger/{{ devbox_user }}"
+
+- name: Read moshi-hook status
+  ansible.builtin.command: "{{ devbox_moshi_bin }} status"
+  become_user: "{{ devbox_user }}"
+  register: devbox_moshi_status
+  changed_when: false
+  # Exits non-zero while unpaired, which is the normal first-run state.
+  failed_when: false
+
+# Pairing is what ties this host to the Moshi account; without a token the box
+# is still fully usable over plain SSH, so this is skipped rather than fatal.
+- name: Pair moshi-hook with the Moshi account
+  ansible.builtin.command: "{{ devbox_moshi_bin }} pair --token {{ devbox_moshi_token }}"
+  become_user: "{{ devbox_user }}"
+  when:
+    - devbox_moshi_token | default('') | length > 0
+    - devbox_moshi_status.stdout is not search('status:\s+paired')
+  changed_when: true
+  no_log: true
+
+# Merges hook entries into ~/.claude/settings.json, preserving whatever else is
+# in there. `status` reports the agent as "current" once they match.
+- name: Install agent hooks
+  ansible.builtin.command: "{{ devbox_moshi_bin }} install"
+  become_user: "{{ devbox_user }}"
+  when: devbox_moshi_status.stdout is not search('claude\s+current')
+  changed_when: true
+
+- name: Install and start the moshi-hook daemon service
+  ansible.builtin.command: "{{ devbox_moshi_bin }} service install"
+  args:
+    creates: "/home/{{ devbox_user }}/.config/systemd/user/moshi-hook.service"
+  become_user: "{{ devbox_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.getent_passwd[devbox_user][1] }}"

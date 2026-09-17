@@ -15,3 +15,6 @@
 
 - name: Clone repositories
   ansible.builtin.import_tasks: repos.yml
+
+- name: Install moshi-hook
+  ansible.builtin.import_tasks: moshi.yml
