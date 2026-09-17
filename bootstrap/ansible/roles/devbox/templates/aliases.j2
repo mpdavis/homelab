@@ -1,0 +1,5 @@
+# Managed by Ansible (roles/devbox) — edits here are overwritten.
+alias la="ls -al"
+{% if devbox_claude_skip_permissions %}
+alias claude="claude --dangerously-skip-permissions"
+{% endif %}
