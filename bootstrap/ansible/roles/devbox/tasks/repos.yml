@@ -1,20 +1,15 @@
 ---
-# update: no is deliberate. This clones a repo that is missing and then never
-# touches it again — the box is a working checkout with branches, worktrees and
-# uncommitted changes on it, and a playbook run must never move HEAD or discard
-# work. Pulling is the user's business, not Ansible's.
+# update: false clones what is missing and never touches an existing checkout —
+# this box has real work on it, and a replay must not move HEAD or discard it.
 - name: Clone repositories
   ansible.builtin.git:
     repo: "{{ item }}"
     dest: "{{ devbox_repo_root }}/{{ item | basename | regex_replace('\\.git$', '') }}"
     update: false
     version: HEAD
-  become: true
   become_user: "{{ devbox_user }}"
   loop: "{{ devbox_repos }}"
-  # A repo that has been renamed, made private, or deleted upstream should not
-  # take the whole run down with it — the rest of the box is still worth
-  # configuring. Failures are summarised below.
+  # One renamed or deleted repo should not fail the whole run.
   register: devbox_clone
   failed_when: false
 

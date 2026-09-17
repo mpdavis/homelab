@@ -123,26 +123,13 @@ variable "containers" {
       node       = "pve1"
       cores      = 4
       memory     = 8192
-      # pve1's LVM thin pool is 141G and already ~69% consumed by the three
-      # containers above, so this 40G is a meaningful share of what's left. It
-      # is thin-provisioned — only written blocks are charged — but a pool that
-      # actually fills can wedge every guest on the node. `lvs pve/data` is the
-      # number to watch; the devbox runbook lists what to relocate to NFS first
-      # (docker data-root, ~/.cache, model weights) if it gets tight.
+      # Thin-provisioned, but pve1's pool is 141G at ~69%. Watch `lvs pve/data`.
       disk_size  = 40
       ip         = "10.0.1.54"
-      # Privileged + TUN passthrough for the same reason as tailscale-router
-      # above: tailscaled needs /dev/net/tun, which this provider cannot grant.
-      # The passthrough lines are written by playbooks/devbox.yml.
-      #
-      # Nesting is load-bearing here beyond the systemd issue noted above —
-      # this box runs Docker for builds and integration tests, which cannot
-      # start in an LXC without it.
-      #
-      # Worth stating plainly: a privileged LXC shares the host kernel with
-      # weak isolation, and this box runs coding agents that execute arbitrary
-      # code. It is a deliberate trade for a single-tenant homelab; treat a
-      # devbox compromise as equivalent to a pve1 compromise.
+      # Privileged for the same TUN reason as tailscale-router above (the
+      # passthrough lines are written by playbooks/devbox.yml); nesting is also
+      # required for Docker. A privileged LXC running coding agents is a
+      # deliberate trade — treat a devbox compromise as a pve1 compromise.
       privileged = true
       nesting    = true
       keyctl     = true

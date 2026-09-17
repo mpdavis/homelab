@@ -9,19 +9,13 @@
     create_home: true
     state: present
 
-# Passwordless sudo: the account has no password at all (key-only login), so
-# prompting would make sudo unusable rather than safer.
 - name: Grant passwordless sudo
-  ansible.builtin.copy:
+  ansible.builtin.template:
+    src: sudoers.j2
     dest: "/etc/sudoers.d/90-{{ devbox_user }}"
-    content: "{{ devbox_user }} ALL=(ALL) NOPASSWD:ALL\n"
     mode: "0440"
     validate: /usr/sbin/visudo -csf %s
 
-# Written wholesale rather than with ansible.posix.authorized_key: this repo
-# depends on ansible-core's builtin modules only, and the key list is fully
-# declared here anyway, so managing the file as a unit is both simpler and
-# self-correcting if a key is ever added by hand.
 - name: Create .ssh directory
   ansible.builtin.file:
     path: "/home/{{ devbox_user }}/.ssh"
@@ -30,10 +24,8 @@
     group: "{{ devbox_user }}"
     mode: "0700"
 
-# Tofu already injects ssh_public_keys into the container for root via
-# cloud-init. Reusing those rather than naming key files again keeps one source
-# of truth, so a laptop key added to the Tofu variable reaches this account on
-# the next run without being listed twice.
+# Default to the keys Tofu already injected for root via cloud-init, so a new
+# laptop key is added in one place rather than two.
 - name: Read the keys cloud-init injected for root
   ansible.builtin.slurp:
     src: /root/.ssh/authorized_keys
@@ -48,9 +40,9 @@
   when: devbox_authorized_keys | length == 0
 
 - name: Install authorized keys
-  ansible.builtin.copy:
+  ansible.builtin.template:
+    src: authorized_keys.j2
     dest: "/home/{{ devbox_user }}/.ssh/authorized_keys"
-    content: "{{ devbox_authorized_keys | join('\n') }}\n"
     owner: "{{ devbox_user }}"
     group: "{{ devbox_user }}"
     mode: "0600"
@@ -76,9 +68,8 @@
     group: "{{ devbox_user }}"
     mode: "0644"
 
-# Login shells of every flavour read /etc/profile (zsh via /etc/zsh/zprofile on
-# Ubuntu), which makes this the one place that reaches interactive SSH sessions,
-# herdr panes and the non-interactive shells agents spawn alike.
+# /etc/profile.d reaches every login shell, including zsh and the ones agents
+# spawn — a ~/.zshrc block would not.
 - name: Install the shared shell profile
   ansible.builtin.template:
     src: profile.sh.j2

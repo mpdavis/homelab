@@ -1,9 +1,8 @@
 # Managed by Ansible (roles/devbox) — edits here are overwritten.
 #
-# Read alongside Tailscale SSH, which is also enabled on this host: tailscaled
-# terminates tailnet SSH itself and authorises against the tailnet ACL, never
-# reaching this daemon. These settings govern key-based logins over the LAN and
-# the tailnet IP, which is the path herdr and Ansible use.
+# Tailscale SSH is also enabled on this host and never reaches this daemon; it
+# authorises against the tailnet ACL. These settings cover key-based logins over
+# the LAN and tailnet IPs, which is the path herdr and Ansible use.
 
 PasswordAuthentication no
 KbdInteractiveAuthentication no
@@ -11,14 +10,9 @@ PermitRootLogin prohibit-password
 
 AllowUsers {{ devbox_ssh_allow_users | join(' ') }}
 
-# Long-lived agent panes go quiet for hours. Without server-side keepalives the
-# NAT state between here and a laptop or phone expires and the session dies
-# mid-task; herdr survives that (the server keeps running) but reattaching is
-# friction worth avoiding.
+# Server-side keepalives: agent panes idle for hours behind NAT.
 ClientAliveInterval {{ devbox_ssh_alive_interval }}
 ClientAliveCountMax {{ devbox_ssh_alive_count_max }}
 TCPKeepAlive yes
 
-# Terminal capability and colour hints, so a pane opened from a phone renders
-# the same as one from the laptop.
 AcceptEnv LANG LC_* TERM COLORTERM

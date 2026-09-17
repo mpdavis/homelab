@@ -9,9 +9,6 @@
     name: "{{ devbox_packages }}"
     state: present
 
-# Ubuntu ships fd as `fdfind` to avoid a name clash with an unrelated package.
-# Every tool that shells out to it (and every muscle-memory invocation) expects
-# `fd`, so give it the name it wants.
 - name: Link fd-find to fd
   ansible.builtin.file:
     src: /usr/bin/fdfind

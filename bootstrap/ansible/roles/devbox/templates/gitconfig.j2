@@ -8,8 +8,5 @@
 	rebase = true
 [push]
 	autoSetupRemote = true
-# Repos are cloned into a shared box the agents also run on; marking the tree
-# safe avoids git's dubious-ownership refusal when a tool runs under a
-# different uid than the one that cloned.
 [safe]
 	directory = {{ devbox_repo_root }}/*

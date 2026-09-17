@@ -1,22 +1,14 @@
 # Managed by Ansible (roles/devbox) — edits here are overwritten.
-#
-# /etc/profile.d is read by login shells of every flavour (zsh reaches it via
-# /etc/zsh/zprofile on Ubuntu), which makes it the one place that covers
-# interactive SSH sessions, herdr panes, and the shells agents spawn alike.
 
-# mise shims rather than `mise activate`: shims work in non-interactive shells,
-# which is exactly where an agent runs `python` or `node` and expects the
-# version the project's mise.toml pins.
+# Shims rather than `mise activate`: they also work in the non-interactive
+# shells agents spawn.
 export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"
 
-# Agent credentials (Claude OAuth token). Absent on a box that has not been
-# given one yet, so this must not be fatal.
 if [ -r "$HOME/.config/devbox/env" ]; then
     . "$HOME/.config/devbox/env"
 fi
 
-# The claude CLI ships its own updater, which would fight the pinned npm
-# install this box is provisioned with.
+# The claude CLI's self-updater would fight the pinned npm install.
 export DISABLE_AUTOUPDATER=1
 
 export EDITOR=vim

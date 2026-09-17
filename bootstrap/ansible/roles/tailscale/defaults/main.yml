@@ -1,27 +1,18 @@
 ---
-# Every consumer sets its own hostname; this default only exists so a missing
-# override fails visibly rather than producing an unnamed tailnet node.
 tailscale_hostname: unnamed-tailscale-node
 
-# Subnet routing is opt-in. Empty means "join the tailnet as an ordinary node":
-# no --advertise-routes flag and no IP forwarding sysctls. Only the subnet
-# router sets this (see playbooks/tailscale-router.yml) — defaulting it to the
-# LAN would make every new host silently advertise routes it should not.
+# Opt-in: empty means an ordinary tailnet node, with no --advertise-routes and
+# no forwarding sysctls. Defaulting this to the LAN would make every host that
+# reuses this role silently advertise routes.
 tailscale_advertise_routes: ""
 
-# Tailscale SSH terminates SSH inside tailscaled and authorises against the
-# tailnet ACL instead of authorized_keys. Off by default; the devbox turns it
-# on so phone clients need no key material. Requires a matching `ssh` section
-# in the tailnet ACL or every connection is denied.
+# Requires a matching `ssh` section in the tailnet ACL or every connection is
+# denied.
 tailscale_ssh: false
 
-# ACL tags to advertise. Usually redundant (a tagged auth key already applies
-# its tags) but required when reusing an untagged key.
 tailscale_advertise_tags: ""
 
-# Leaving DNS alone keeps tailscaled out of /etc/resolv.conf, which the `lxc`
-# role owns. Hosts here are reached by tailnet IP or from a client that already
-# resolves MagicDNS itself, so nothing needs this on.
+# Keeps tailscaled out of /etc/resolv.conf, which the `lxc` role owns.
 tailscale_accept_dns: false
 
 tailscale_apt_keyring_url: https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg

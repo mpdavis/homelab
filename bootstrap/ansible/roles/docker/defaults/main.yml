@@ -1,15 +1,11 @@
 ---
-# Users added to the `docker` group. Membership is root-equivalent — the daemon
-# socket will run a container that bind-mounts /, so this is a convenience for a
-# single-tenant box, not a privilege boundary.
+# Membership is root-equivalent — a convenience on a single-tenant box, not a
+# privilege boundary.
 docker_users: []
 
-# Where images and containers live. Worth overriding to an NFS-backed path only
-# if the node's LVM thin pool gets tight; overlay2 on NFS is slow and loses
-# hardlink semantics, so local is the right default.
 docker_data_root: /var/lib/docker
 
-# Unbounded json-file logs are the usual way a dev box silently eats its disk.
+# Unbounded json-file logs are the usual way a dev box eats its disk.
 docker_log_max_size: "10m"
 docker_log_max_file: "3"
 

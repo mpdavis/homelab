@@ -1,29 +1,22 @@
 ---
-# --- Identity ---------------------------------------------------------------
-
 devbox_user: michael
 devbox_user_full_name: "Michael Davis"
 devbox_user_email: michael@mpdavis.com
 devbox_user_shell: /usr/bin/zsh
 
-# Public keys allowed to SSH in as devbox_user. Supplied by the playbook from
-# the same list Tofu injects into the container, so laptop keys work on a
-# freshly recreated box without a second source of truth.
+# Empty means "reuse the keys Tofu injected for root" (see tasks/user.yml).
 devbox_authorized_keys: []
 
-# root stays in the list because Ansible connects as root (see the inventory's
-# all.vars) — dropping it here locks this role out of its own host.
+# root stays in the list because Ansible connects as root — dropping it locks
+# this role out of its own host.
 devbox_ssh_allow_users:
   - "{{ devbox_user }}"
   - root
 
-# Agents run for a long time with no keystrokes and the box sits behind NAT, so
-# the server has to be the one keeping the connection warm. 30s * 120 tolerates
-# an hour of silence before sshd gives up on a pane.
+# Agent panes go quiet for hours; 30s * 120 tolerates an hour of silence before
+# sshd gives up on one.
 devbox_ssh_alive_interval: 30
 devbox_ssh_alive_count_max: 120
-
-# --- Packages ---------------------------------------------------------------
 
 devbox_packages:
   - build-essential
@@ -50,16 +43,10 @@ devbox_packages:
   - wget
   - zsh
 
-# --- Tooling ----------------------------------------------------------------
-
-# Node is installed from NodeSource system-wide rather than through mise: the
-# agent CLIs below are global npm packages that must resolve for every shell,
-# including the non-interactive ones agents spawn. mise still owns per-project
-# runtimes via its shims.
-#
-# Deliberately not Renovate-annotated: this is a major-only pin naming a
-# NodeSource apt channel, and the node-version datasource returns full
-# versions, which would rewrite it into something that is not a channel.
+# Node is system-wide rather than under mise because the agent CLIs below are
+# global npm packages that must resolve in the non-interactive shells agents
+# spawn. Major-only pin: it names a NodeSource apt channel, so Renovate's
+# node-version datasource would rewrite it into something that is not one.
 devbox_node_major: "24"
 
 # renovate: datasource=npm depName=@anthropic-ai/claude-code
@@ -74,25 +61,14 @@ devbox_flux_version: "v2.9.5"
 # renovate: datasource=github-releases depName=cli/cli
 devbox_gh_version: "v2.100.0"
 
-# herdr self-updates from its own manifest (`herdr update`), so it is installed
-# from the upstream script rather than pinned here. HERDR_INSTALL_DIR keeps it
-# in the user's ~/.local/bin, which is where the installer defaults anyway.
+# Unpinned: herdr self-updates from its own checksummed manifest.
 devbox_herdr_install_url: https://herdr.dev/install.sh
 devbox_mise_install_url: https://mise.run
 
-# --- Repositories -----------------------------------------------------------
-
 devbox_repo_root: "/home/{{ devbox_user }}/git"
 
-# Cloned over HTTPS so the GitHub token configured in tooling.yml authenticates
-# both the clone and later pushes — no SSH deploy key to manage per host.
-#
-# Deliberately not a mirror of ~/git on the laptop. Five of those directories
-# point at a Gitea instance (git.mpdavis.com / git.home.mpdavis.com) that no
-# longer resolves, and several have no remote at all, so they cannot be cloned
-# from anywhere: ai-scripts, homelab-sentinel, homelab-starr, homelab-buildarr,
-# coloring-pages, hubspot, hubspot-interview. Push them to GitHub and add them
-# here, or rsync them up as one-off local directories.
+# HTTPS so the gh credential helper covers clones and pushes alike. Not a mirror
+# of ~/git — several of those have dead or absent remotes; see docs/devbox.md.
 devbox_repos:
   - https://github.com/mpdavis/homelab.git
   - https://github.com/mpdavis/homelab-claude.git

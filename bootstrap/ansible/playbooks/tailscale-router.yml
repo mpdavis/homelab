@@ -43,9 +43,6 @@
   hosts: tailscale_router
   become: true
   vars:
-    # Set here rather than in the role's defaults: subnet routing is the one
-    # thing that makes this host special, and a role default that advertises
-    # the LAN would leak onto every other host that reuses the role.
     tailscale_hostname: tailscale-router
     tailscale_advertise_routes: 10.0.1.0/24
   vars_prompt:

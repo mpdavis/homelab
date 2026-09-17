@@ -1,8 +1,4 @@
 ---
-# --- Node + the agent CLIs --------------------------------------------------
-
-# Present by default on 24.04, but this role must not depend on the docker role
-# having run first to create it — the playbook orders devbox ahead of docker.
 - name: Ensure apt keyring directory exists
   ansible.builtin.file:
     path: /etc/apt/keyrings
@@ -31,27 +27,21 @@
   ansible.builtin.command: npm list --global --depth=0 --json
   register: devbox_npm_global
   changed_when: false
-  # npm exits non-zero when a global package has an unmet peer dependency,
-  # which says nothing about the versions actually installed.
+  # npm exits non-zero on an unmet peer dependency, which says nothing about
+  # the versions installed.
   failed_when: false
 
-# Version-pinned so a rebuilt box gets the same agents as the one it replaced —
-# an unpinned `npm install -g` would silently drift to whatever is latest on the
-# day the playbook happens to run. Renovate bumps the pins in defaults/main.yml.
 - name: Install agent CLIs
   ansible.builtin.command: "npm install --global {{ item.name }}@{{ item.version }}"
   loop:
     - { name: "@anthropic-ai/claude-code", version: "{{ devbox_claude_code_version }}" }
     - { name: "opencode-ai", version: "{{ devbox_opencode_version }}" }
   vars:
-    # default('{}', true) covers an empty stdout as well as an undefined one —
-    # from_json on "" is a hard failure, and this task runs right after a
-    # command deliberately allowed to fail.
+    # default('{}', true) covers empty stdout as well as undefined — from_json
+    # on "" is a hard failure.
     installed: "{{ ((devbox_npm_global.stdout | default('{}', true) | from_json).dependencies | default({})) }}"
   when: (installed[item.name] | default({})).version | default('') != item.version
   changed_when: true
-
-# --- Cluster tooling --------------------------------------------------------
 
 - name: Install kubectl
   ansible.builtin.get_url:
@@ -69,8 +59,6 @@
     mode: "0755"
     creates: /usr/local/bin/flux
 
-# The gh tarball nests the binary under gh_<version>_linux_amd64/bin/, so strip
-# both levels and pull out just that one path.
 - name: Install gh
   ansible.builtin.unarchive:
     src: "https://github.com/cli/cli/releases/download/{{ devbox_gh_version }}/gh_{{ devbox_gh_version | regex_replace('^v', '') }}_linux_amd64.tar.gz"
@@ -83,37 +71,24 @@
       - "*/bin/gh"
     creates: /usr/local/bin/gh
 
-# --- Per-user tooling -------------------------------------------------------
-
-# mise is installed per-user rather than system-wide because its shim directory
-# and tool cache live under the user's home; the profile script puts the shims
-# on PATH ahead of everything else.
 - name: Install mise
   ansible.builtin.shell:
     cmd: "curl -fsSL {{ devbox_mise_install_url }} | sh"
     creates: "/home/{{ devbox_user }}/.local/bin/mise"
-  become: true
   become_user: "{{ devbox_user }}"
   environment:
     MISE_INSTALL_PATH: "/home/{{ devbox_user }}/.local/bin/mise"
 
-# The installer verifies a SHA-256 from herdr's release manifest before writing
-# the binary, and `herdr update` reads that same manifest — so this is not
-# pinned here; the box tracks whatever herdr itself considers current.
 - name: Install herdr
   ansible.builtin.shell:
     cmd: "curl -fsSL {{ devbox_herdr_install_url }} | sh"
     creates: "/home/{{ devbox_user }}/.local/bin/herdr"
-  become: true
   become_user: "{{ devbox_user }}"
   environment:
     HERDR_INSTALL_DIR: "/home/{{ devbox_user }}/.local/bin"
 
-# --- Credentials ------------------------------------------------------------
-
 - name: Check existing gh authentication
   ansible.builtin.command: gh auth status
-  become: true
   become_user: "{{ devbox_user }}"
   register: devbox_gh_auth
   changed_when: false
@@ -123,19 +98,15 @@
   ansible.builtin.command:
     cmd: gh auth login --hostname github.com --git-protocol https --with-token
     stdin: "{{ devbox_github_token }}"
-  become: true
   become_user: "{{ devbox_user }}"
   when: devbox_gh_auth.rc != 0
   changed_when: true
   no_log: true
 
-# Makes gh the git credential helper for github.com, which is what lets the
-# HTTPS clones in repos.yml — and every later push — authenticate without a
-# separate deploy key or a token sitting in ~/.git-credentials. Rewrites the
-# same git config keys every run, so it reports no change of its own.
+# Makes gh the credential helper, which is what authenticates the HTTPS clones
+# in repos.yml and every later push. Rewrites the same keys each run.
 - name: Configure git to authenticate through gh
   ansible.builtin.command: gh auth setup-git
-  become: true
   become_user: "{{ devbox_user }}"
   changed_when: false
 
@@ -147,9 +118,6 @@
     group: "{{ devbox_user }}"
     mode: "0700"
 
-# Sourced by /etc/profile.d/devbox.sh. 0600 in the user's home is the same
-# protection gh and claude give their own credential files; the box is single
-# tenant and every account on it is already root-equivalent via sudo.
 - name: Install the agent credential environment
   ansible.builtin.template:
     src: env.j2

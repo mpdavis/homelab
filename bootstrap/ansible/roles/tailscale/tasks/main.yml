@@ -28,8 +28,6 @@
     name: tailscale
     state: present
 
-# Forwarding is only meaningful for a subnet router — an ordinary tailnet node
-# routes nothing, so enabling it there would be cargo cult.
 - name: Enable IP forwarding for subnet routing
   ansible.builtin.sysctl:
     name: "{{ item }}"

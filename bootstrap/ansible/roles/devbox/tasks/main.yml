@@ -1,7 +1,6 @@
 ---
-# Ordering is load-bearing: the user has to exist before sshd can allow it,
-# and the GitHub credential helper set up in tooling.yml is what lets repos.yml
-# clone the private repositories.
+# Order matters: the user must exist before sshd allows it, and tooling.yml
+# configures the credential helper that repos.yml clones with.
 - name: Install base development packages
   ansible.builtin.import_tasks: packages.yml
 
