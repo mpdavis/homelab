@@ -1,0 +1,24 @@
+name: homepage
+
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:v2.4.0
+    restart: unless-stopped
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: home.mpdavis.com
+    # Files, not the directory: homepage writes logs and default skeletons for
+    # any config file it doesn't find into /app/config, so it must stay
+    # writable. doco-cd recreates the container when a mounted file changes.
+    volumes:
+      - ./config/bookmarks.yaml:/app/config/bookmarks.yaml:ro
+      - ./config/services.yaml:/app/config/services.yaml:ro
+      - ./config/settings.yaml:/app/config/settings.yaml:ro
+      - ./config/widgets.yaml:/app/config/widgets.yaml:ro
+      - ./config/custom.css:/app/config/custom.css:ro
+      - ./config/custom.js:/app/config/custom.js:ro
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
