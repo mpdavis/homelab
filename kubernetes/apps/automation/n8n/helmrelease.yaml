@@ -1,0 +1,106 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: n8n
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: "~5.0"
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    crds: CreateReplace
+  values:
+    defaultPodOptions:
+      # n8n reads its config from N8N_* env vars, and the Service named `n8n`
+      # makes Kubernetes inject N8N_PORT=tcp://… and friends into the pod.
+      enableServiceLinks: false
+      # The image already runs as `node` (uid 1000); pinning it keeps a future
+      # image from silently running as root.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+    controllers:
+      main:
+        strategy: Recreate
+        annotations:
+          ignore-check.kube-linter.io/no-read-only-root-fs: "installing community nodes runs npm, which writes to ~/.npm outside the data volume; upstream's own chart runs n8n writable too"
+        containers:
+          main:
+            image:
+              repository: n8nio/n8n
+              tag: "2.40.5"
+            env:
+              TZ: ${TZ}
+              # Schedule/Cron nodes use this, not TZ.
+              GENERIC_TIMEZONE: ${TZ}
+              N8N_PORT: "5678"
+              N8N_HOST: n8n.${DOMAIN}
+              N8N_PROTOCOL: https
+              N8N_EDITOR_BASE_URL: https://n8n.${DOMAIN}
+              # Otherwise webhook nodes advertise http://localhost:5678/.
+              WEBHOOK_URL: https://n8n.${DOMAIN}/
+              N8N_PROXY_HOPS: "1"
+              # N8N_ENCRYPTION_KEY is left unset on purpose: n8n generates one on
+              # first boot and keeps it in /home/node/.n8n/config on the PVC. Back
+              # that file up with the database — the stored credentials cannot be
+              # decrypted without it.
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /healthz
+                    port: 5678
+                  initialDelaySeconds: 30
+                  periodSeconds: 30
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  # Unlike /healthz, this waits for the database connection and
+                  # migrations, which can take a while after an upgrade.
+                  httpGet:
+                    path: /healthz/readiness
+                    port: 5678
+                  initialDelaySeconds: 10
+                  periodSeconds: 10
+                  failureThreshold: 6
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+            resources:
+              requests:
+                cpu: 50m
+                memory: 256Mi
+              limits:
+                # Workflows run in-process, so one that loads a large payload
+                # grows the main process; the limit keeps that off the node.
+                memory: 2Gi
+    service:
+      main:
+        controller: main
+        ports:
+          http:
+            port: 5678
+    persistence:
+      data:
+        existingClaim: n8n
+        globalMounts:
+          - path: /home/node/.n8n

@@ -68,6 +68,7 @@ spec:
                       - birdnet.mpdavis.com
                       - proxmox.mpdavis.com
                       - gridiron.mpdavis.com
+                      - n8n.mpdavis.com
   values:
     resources:
       requests:
@@ -164,6 +165,10 @@ spec:
           # Requires http.trusted_proxies configured in configuration.yaml for
           # requests through Traefik (else HA returns 400 to proxied requests).
           url: https://homeassistant.mpdavis.com/
+          conditions: *open-conditions
+        - name: n8n
+          group: external-open
+          url: https://n8n.mpdavis.com/
           conditions: *open-conditions
         # External (non-k8s) LAN hosts routed through Traefik via
         # Service+Endpoints — probed exactly like in-cluster open services.

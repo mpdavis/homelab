@@ -96,6 +96,11 @@
       "description": "WHY: Listenarr only ships canary-X.Y.Z prereleases, and Renovate's default docker versioning can't parse the 'canary-' prefix, so this regex versioning treats 'canary' as a prerelease marker to keep canary tracked now while auto-switching to a stable tag once one exists. WHEN TO REMOVE: once the image is migrated to a stable (non-canary) tag, as default docker versioning then handles plain X.Y.Z tags on its own.",
       "matchPackageNames": ["ghcr.io/listenarrs/listenarr"],
       "versioning": "regex:^(?:v)?(?:(?<prerelease>canary)-)?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
+    },
+    {
+      "description": "n8n ships each weekly minor as a beta (docker tag `next`) under a plain X.Y.Z tag, then promotes it to `latest` when the following minor goes to beta. Semver can't tell the two apart, so without this the minor automerge rule would deploy betas the day they're cut. A week's age is roughly when a release becomes stable.",
+      "matchPackageNames": ["n8nio/n8n"],
+      "minimumReleaseAge": "7 days"
     }
   ]
 }

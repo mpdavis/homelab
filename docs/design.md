@@ -245,7 +245,7 @@ Current split:
   ntfy, Home Assistant, council digest.
 - **Tailnet:** the *arr stack, qBittorrent, mousehole, Dispatcharr, Teamarr, ECM,
   Podfetch, Open WebUI, Flux UI, Grafana, Homepage, Paperless, Proxmox, BirdNET,
-  gridiron.
+  gridiron, n8n.
 
 ### DNS
 
@@ -482,7 +482,7 @@ homelab/
 │   ├── apps/                  # grouped by namespace, one dir per service
 │   │   ├── kustomization.yaml
 │   │   ├── ai/                # ollama, open-webui, holmes
-│   │   ├── automation/        # home-assistant (home automation)
+│   │   ├── automation/        # home-assistant, n8n (home + workflow automation)
 │   │   ├── docs/              # paperless-ngx (document management)
 │   │   ├── gaming/            # minecraft (game server)
 │   │   ├── gridiron/          # gridiron (college football betting research)
