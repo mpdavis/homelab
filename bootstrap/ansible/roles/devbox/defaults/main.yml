@@ -62,7 +62,7 @@ devbox_node_major: "24"
 # renovate: datasource=npm depName=@anthropic-ai/claude-code
 devbox_claude_code_version: "2.1.278"
 # renovate: datasource=npm depName=opencode-ai
-devbox_opencode_version: "1.18.31"
+devbox_opencode_version: "1.18.32"
 
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
 devbox_kubectl_version: "v1.37.0"
