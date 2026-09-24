@@ -1,0 +1,46 @@
+name: Publish · Images
+
+# Publishes images/<name>/ to ghcr.io/mpdavis/<name>. See images/CLAUDE.md.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'images/**'
+      - '.github/workflows/publish-images.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image: [caddy-cloudflare]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push
+        run: |
+          ref="ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}"
+          docker build --tag "$ref:latest" "images/${{ matrix.image }}"
+          docker push "$ref:latest"
+          digest=$(docker image inspect "$ref:latest" --format '{{index .RepoDigests 0}}')
+          {
+            echo "## \`${{ matrix.image }}\`"
+            echo
+            echo "Pin stacks to:"
+            echo
+            echo '```yaml'
+            echo "image: $digest"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

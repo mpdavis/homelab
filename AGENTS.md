@@ -38,6 +38,7 @@ kubernetes/         # Flux-managed cluster state (sync root)
     flux-operator/  # RBAC + IngressRoute for Flux web UI
     flux-notifications/ # Flux Alert/Provider (GitHub commit status)
   clusters/         # Flux Kustomization entrypoints (infra.yaml, apps.yaml, flux-system/)
+images/             # Container images built from this repo (see images/CLAUDE.md)
 stacks/             # Docker Compose stacks (stacks/<stack>/) — the migration target
 doco-cd/            # doco-cd deploy config + the doco-cd instance itself
 docs/               # Design documents (devbox.md = dev-host runbook, compose.md = compose hosts)
@@ -50,7 +51,8 @@ path (doco-cd), secrets, and public-vs-tailnet exposure via Caddyfiles.
 
 Custom images (gridiron, ames-council-digest) live in their own repos —
 `mpdavis/<name>` — which publish `ghcr.io/mpdavis/<name>` from main; Renovate bumps
-the pinned tag here like any third-party image.
+the pinned tag here like any third-party image. Images with no source of their own
+are built from `images/` instead — see `images/CLAUDE.md`.
 
 ## Manifest Strategy
 
