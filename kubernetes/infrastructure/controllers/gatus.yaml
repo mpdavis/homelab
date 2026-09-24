@@ -53,10 +53,10 @@ spec:
                   - ip: ${COMPOSE_TAILNET_IP}
                     hostnames:
                       - home.mpdavis.com
+                      - podfetch.mpdavis.com
                   - ip: ${TRAEFIK_TAILNET_IP}
                     hostnames:
                       - paperless.mpdavis.com
-                      - podfetch.mpdavis.com
                       - ecm.mpdavis.com
                       - qbit.mpdavis.com
                       - mousehole.mpdavis.com

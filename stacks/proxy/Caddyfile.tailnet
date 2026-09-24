@@ -8,3 +8,7 @@
 home.mpdavis.com {
 	reverse_proxy homepage:3000
 }
+
+podfetch.mpdavis.com {
+	reverse_proxy podfetch:8000
+}
