@@ -22,3 +22,6 @@ data:
   # Caddy on the compose host (docker, pve2). Services migrated off k3s answer
   # here instead of on a Traefik VIP; Gatus still probes them by hostname.
   COMPOSE_TAILNET_IP: "10.0.1.57"
+  # Caddy on the infra host (infra, pve1), which serves what never ran in the
+  # cluster — LAN hosts Traefik used to front via Service+Endpoints.
+  INFRA_TAILNET_IP: "10.0.1.58"
