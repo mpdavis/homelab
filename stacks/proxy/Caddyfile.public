@@ -55,5 +55,5 @@ status.mpdavis.com {
 }
 
 thumbs.mpdavis.com {
-	import traefik
+	reverse_proxy game-thumbs:3000
 }
