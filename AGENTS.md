@@ -38,8 +38,15 @@ kubernetes/         # Flux-managed cluster state (sync root)
     flux-operator/  # RBAC + IngressRoute for Flux web UI
     flux-notifications/ # Flux Alert/Provider (GitHub commit status)
   clusters/         # Flux Kustomization entrypoints (infra.yaml, apps.yaml, flux-system/)
-docs/               # Design documents (devbox.md = dev-host runbook)
+stacks/             # Docker Compose stacks (stacks/<stack>/) — the migration target
+doco-cd/            # doco-cd deploy config + the doco-cd instance itself
+docs/               # Design documents (devbox.md = dev-host runbook, compose.md = compose hosts)
 ```
+
+**Migration in progress:** services are moving from k3s to Docker Compose one at a
+time. A service lives in exactly one of `kubernetes/` or `stacks/`, never both. Read
+`docs/compose.md` before touching `stacks/` — it covers the deploy
+path (doco-cd), secrets, and public-vs-tailnet exposure via Caddyfiles.
 
 Custom images (gridiron, ames-council-digest) live in their own repos —
 `mpdavis/<name>` — which publish `ghcr.io/mpdavis/<name>` from main; Renovate bumps

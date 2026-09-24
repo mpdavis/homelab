@@ -1,0 +1,11 @@
+---
+- name: Add service IPs to the primary interface
+  ansible.builtin.template:
+    src: 60-service-ips.yaml.j2
+    dest: /etc/netplan/60-service-ips.yaml
+    # netplan warns on anything group- or world-readable.
+    mode: "0600"
+  notify: Apply netplan
+
+- name: Apply netplan before anything binds to the new addresses
+  ansible.builtin.meta: flush_handlers

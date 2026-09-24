@@ -33,6 +33,16 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\n[a-z0-9_]+: \"(?<currentValue>[^\"]+)\""
       ]
+    },
+    {
+      "description": "Bump build-time dependencies pinned as annotated ARGs in stack Dockerfiles — e.g. the caddy-dns/cloudflare module xcaddy compiles into the proxy image. The dockerfile manager only sees FROM lines.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^stacks/.+/Dockerfile$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\nARG [A-Z_]+=(?<currentValue>[^\\s]+)"
+      ]
     }
   ],
   "packageRules": [

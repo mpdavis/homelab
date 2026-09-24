@@ -1,0 +1,11 @@
+# Sites here are reachable only from the LAN and tailnet: this instance
+# listens on 10.0.1.57, which the router never forwards. A hostname that
+# should be public goes in Caddyfile.public instead — never in both.
+{
+	email michael@mpdavis.com
+	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+}
+
+home.mpdavis.com {
+	reverse_proxy homepage:3000
+}

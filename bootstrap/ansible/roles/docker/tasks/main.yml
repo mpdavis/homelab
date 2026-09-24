@@ -47,3 +47,15 @@
     groups: docker
     append: true
   loop: "{{ docker_users }}"
+
+- name: List Docker networks
+  ansible.builtin.command: docker network ls --format '{{ "{{" }} .Name {{ "}}" }}'
+  register: docker_network_list
+  changed_when: false
+  when: docker_networks | length > 0
+
+- name: Create shared Docker networks
+  ansible.builtin.command: "docker network create {{ item }}"
+  loop: "{{ docker_networks }}"
+  when: item not in docker_network_list.stdout_lines
+  changed_when: true

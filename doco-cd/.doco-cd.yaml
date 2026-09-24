@@ -1,0 +1,12 @@
+# Every directory under stacks/ is one compose project. A stack's own
+# .doco-cd.yml (e.g. its external_secrets) is merged over this.
+#
+# doco-cd does not deploy itself: compose.yaml here is applied by the doco_cd
+# Ansible role, so a version bump is a playbook run rather than a merge.
+working_dir: stacks
+auto_discovery:
+  enabled: true
+  depth: 1
+  # Deleting a stack's directory removes the project; its volumes are kept
+  # (remove_volumes defaults to false).
+  delete: true

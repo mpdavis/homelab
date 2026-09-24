@@ -1,0 +1,8 @@
+- resources:
+    cpu: true
+    memory: true
+    disk: /
+    label: docker
+- search:
+    provider: duckduckgo
+    target: _blank

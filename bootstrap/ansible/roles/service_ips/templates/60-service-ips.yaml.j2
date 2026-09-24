@@ -1,0 +1,9 @@
+# Managed by Ansible (service_ips role).
+network:
+  version: 2
+  ethernets:
+    {{ service_ips_interface }}:
+      addresses:
+{% for ip in service_ips %}
+        - "{{ ip }}"
+{% endfor %}

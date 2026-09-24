@@ -1,0 +1,30 @@
+name: Validate · Stacks
+
+# Offline checks for stacks/ and doco-cd/ — see .github/scripts/validate-stacks.sh.
+# Advisory while the migration is in flight: NOT on main's ruleset, so the
+# `paths` filter is safe (a required check must not be filtered; see
+# image-pin-check.yml).
+on:
+  pull_request:
+    paths:
+      - 'stacks/**'
+      - 'doco-cd/**'
+      - '.github/scripts/validate-stacks.sh'
+      - '.github/workflows/validate-stacks.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-stacks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate stacks
+        run: .github/scripts/validate-stacks.sh

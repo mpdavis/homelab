@@ -11,3 +11,8 @@ docker_log_max_file: "3"
 
 docker_apt_keyring_url: https://download.docker.com/linux/ubuntu/gpg
 docker_apt_repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable"
+
+# Bridge networks shared across compose projects. Created here, not by a
+# stack, because doco-cd deploys stacks in parallel — no stack can be relied
+# on to create one before the others attach to it.
+docker_networks: []
