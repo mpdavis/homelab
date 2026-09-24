@@ -39,15 +39,16 @@ kubernetes/         # Flux-managed cluster state (sync root)
     flux-notifications/ # Flux Alert/Provider (GitHub commit status)
   clusters/         # Flux Kustomization entrypoints (infra.yaml, apps.yaml, flux-system/)
 images/             # Container images built from this repo (see images/CLAUDE.md)
-stacks/             # Docker Compose stacks (stacks/<stack>/) — the migration target
-doco-cd/            # doco-cd deploy config + the doco-cd instance itself
+stacks/             # Docker Compose stacks for the compose host (stacks/<stack>/)
+infra/              # Docker Compose stacks for the infra host (ingress for non-compose services)
+doco-cd/            # doco-cd deploy configs (one per host) + the doco-cd instance itself
 docs/               # Design documents (devbox.md = dev-host runbook, compose.md = compose hosts)
 ```
 
 **Migration in progress:** services are moving from k3s to Docker Compose one at a
-time. A service lives in exactly one of `kubernetes/` or `stacks/`, never both. Read
-`docs/compose.md` before touching `stacks/` — it covers the deploy
-path (doco-cd), secrets, and public-vs-tailnet exposure via Caddyfiles.
+time. A service lives in exactly one of `kubernetes/`, `stacks/` or `infra/`, never
+more. `stacks/CLAUDE.md` has the rules for writing a stack; `docs/compose.md` has the
+deploy path and the host runbook.
 
 Custom images (gridiron, ames-council-digest) live in their own repos —
 `mpdavis/<name>` — which publish `ghcr.io/mpdavis/<name>` from main; Renovate bumps

@@ -1,11 +1,10 @@
 name: proxy
 
 # One Caddy per exposure, each publishing only on its own IP, so exposure is
-# decided by which Caddyfile a site is in — not by a per-route setting that
-# can be forgotten. The public instance joins with the first public service.
+# decided by which Caddyfile a site is in.
 services:
   caddy-tailnet:
-    build: .
+    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:97a22bc99237513cd5d653e0a533903bbc1c20ba47430253d49e9a5eef16f284
     restart: unless-stopped
     ports:
       - 10.0.1.57:80:80
@@ -16,7 +15,27 @@ services:
     volumes:
       - ./Caddyfile.tailnet:/etc/caddy/Caddyfile:ro
       - caddy-tailnet-data:/data
-      - caddy-tailnet-config:/config
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  caddy-public:
+    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:97a22bc99237513cd5d653e0a533903bbc1c20ba47430253d49e9a5eef16f284
+    restart: unless-stopped
+    ports:
+      - 10.0.1.56:80:80
+      - 10.0.1.56:443:443
+      - 10.0.1.56:443:443/udp
+    environment:
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:?resolved by doco-cd from external_secrets}
+    volumes:
+      - ./Caddyfile.public:/etc/caddy/Caddyfile:ro
+      - caddy-public-data:/data
     networks:
       - proxy
     healthcheck:
@@ -30,7 +49,7 @@ volumes:
   # Holds issued certificates and the ACME account. Losing it only costs a
   # re-issue, but repeated loss runs into Let's Encrypt rate limits.
   caddy-tailnet-data:
-  caddy-tailnet-config:
+  caddy-public-data:
 
 networks:
   proxy:

@@ -1,0 +1,7 @@
+# The infra host's tree (poll target `infra`); .doco-cd.yaml is the compose
+# host's.
+working_dir: infra
+auto_discovery:
+  enabled: true
+  depth: 1
+  delete: true

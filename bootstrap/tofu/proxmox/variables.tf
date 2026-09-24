@@ -176,5 +176,17 @@ variable "vms" {
       ip        = "10.0.1.55"
       tags      = ["docker"]
     }
+    # Ingress for what does not run on the compose host, so those routes
+    # survive pve2 maintenance. A VM, not an LXC: Docker in an LXC breaks on
+    # runc/AppArmor (see the devbox).
+    infra = {
+      vmid      = 206
+      node      = "pve1"
+      cores     = 1
+      memory    = 1024
+      disk_size = 8
+      ip        = "10.0.1.58"
+      tags      = ["docker", "infra"]
+    }
   }
 }

@@ -5,3 +5,7 @@ doco_cd_bws_access_token: ""
 doco_cd_bws_token_file: /etc/homelab/bws-access-token
 
 doco_cd_dir: /opt/doco-cd
+
+# Empty means the default deploy config (.doco-cd.yaml); a value selects
+# .doco-cd.<target>.yaml, which is how a second host gets its own stacks.
+doco_cd_target: ""

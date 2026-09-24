@@ -1,0 +1,6 @@
+# Internet-facing sites. Empty until the first public service moves off k3s,
+# which is also when the router's 443 forward moves here. See docs/compose.md.
+{
+	email michael@mpdavis.com
+	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+}

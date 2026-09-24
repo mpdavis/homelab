@@ -1,0 +1,18 @@
+# Tailnet-only ingress for what does not run in Docker. See docs/compose.md.
+{
+	email michael@mpdavis.com
+	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+}
+
+proxmox.mpdavis.com {
+	reverse_proxy https://10.0.1.1:8006 {
+		# Proxmox serves its own self-signed cert on 8006.
+		transport http {
+			tls_insecure_skip_verify
+		}
+	}
+}
+
+birdnet.mpdavis.com {
+	reverse_proxy 10.0.63.190:80
+}
