@@ -5,6 +5,16 @@
     dest: /etc/netplan/60-service-ips.yaml
     # netplan warns on anything group- or world-readable.
     mode: "0600"
+  when: service_ips | length > 0
+  notify: Apply netplan
+
+# An empty `addresses:` is not valid netplan, so a host with no service IPs
+# gets no drop-in at all rather than one with an empty list.
+- name: Remove the drop-in from hosts with no service IPs
+  ansible.builtin.file:
+    path: /etc/netplan/60-service-ips.yaml
+    state: absent
+  when: service_ips | length == 0
   notify: Apply netplan
 
 - name: Apply netplan before anything binds to the new addresses
