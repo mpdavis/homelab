@@ -1,0 +1,163 @@
+name: monitoring
+
+# Metrics and logs for the Docker hosts. The backends live here, on pve1, so
+# they keep recording — and alerting — while the compose host is down. Each
+# host runs the same agent (alloy + node-exporter + cadvisor) and pushes to
+# the backends; stacks/monitoring/ is the compose host's copy of it.
+services:
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      # The VM disk is 32G and Loki shares it; size wins over time if the
+      # host count grows.
+      - --storage.tsdb.retention.size=8GB
+      # The agents push; nothing scrapes across hosts.
+      - --web.enable-remote-write-receiver
+      - --web.external-url=http://10.0.1.58:9090
+    # LAN-only, unauthenticated: the compose host's Alloy writes here, and the
+    # UI is handy for ad-hoc queries.
+    ports:
+      - 10.0.1.58:9090:9090
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules.yml:/etc/prometheus/rules.yml:ro
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:9090/-/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.1
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    # ntfy still runs in k3s behind the public Caddy. Resolving its public
+    # record from the LAN would depend on NAT hairpin through the router.
+    extra_hosts:
+      - ntfy.mpdavis.com:10.0.1.56
+    secrets:
+      - ntfy_token
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:9093/-/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Distroless — no shell or wget for a healthcheck. Gatus probes /ready.
+  loki:
+    image: grafana/loki:3.7.8
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    ports:
+      - 10.0.1.58:3100:3100
+    volumes:
+      - ./loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki-data:/loki
+
+  grafana:
+    image: grafana/grafana:13.2.2
+    restart: unless-stopped
+    environment:
+      GF_SERVER_ROOT_URL: https://grafana-compose.mpdavis.com
+      # Only applied when Grafana creates its database; after that, change the
+      # password in the UI or with `grafana cli admin reset-admin-password`.
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?resolved by doco-cd from external_secrets}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?resolved by doco-cd from external_secrets}
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - default
+      - proxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  alloy:
+    image: grafana/alloy:v1.19.2
+    restart: unless-stopped
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    environment:
+      HOST_LABEL: infra
+      PROMETHEUS_URL: http://prometheus:9090/api/v1/write
+      LOKI_URL: http://loki:3100/loki/api/v1/push
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy/data
+    networks:
+      - default
+      - doco-cd
+
+  # Host network, or it reports the container's network interfaces instead of
+  # the host's.
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    restart: unless-stopped
+    command: ["--path.rootfs=/host"]
+    network_mode: host
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:v0.60.6
+    restart: unless-stopped
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=30s
+      - --store_container_labels=false
+      - --whitelisted_container_labels=com.docker.compose.project,com.docker.compose.service
+      - --disable_metrics=percpu,sched,tcp,udp,advtcp,hugetlb,referenced_memory,cpu_topology,resctrl,process,perf_event,memory_numa
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+
+secrets:
+  ntfy_token:
+    environment: NTFY_TOKEN
+
+volumes:
+  prometheus-data:
+  alertmanager-data:
+  loki-data:
+  grafana-data:
+  alloy-data:
+
+networks:
+  proxy:
+    external: true
+  # doco-cd's own project network, created by the doco_cd Ansible role, so
+  # Alloy can scrape its metrics on :9120.
+  doco-cd:
+    name: doco-cd_default
+    external: true

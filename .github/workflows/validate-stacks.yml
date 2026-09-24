@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - 'stacks/**'
+      - 'infra/**'
       - 'doco-cd/**'
       - '.github/scripts/validate-stacks.sh'
       - '.github/workflows/validate-stacks.yml'

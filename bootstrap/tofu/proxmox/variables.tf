@@ -176,15 +176,16 @@ variable "vms" {
       ip        = "10.0.1.55"
       tags      = ["docker"]
     }
-    # Ingress for what does not run on the compose host, so those routes
-    # survive pve2 maintenance. A VM, not an LXC: Docker in an LXC breaks on
-    # runc/AppArmor (see the devbox).
+    # Ingress and monitoring for what should survive pve2 maintenance. A VM,
+    # not an LXC: Docker in an LXC breaks on runc/AppArmor (see the devbox).
+    # pve1's 32G is already overcommitted by the k3s LXCs, so this stays small;
+    # the disk holds Prometheus (capped at 8GB) and 30 days of Loki.
     infra = {
       vmid      = 206
       node      = "pve1"
-      cores     = 1
-      memory    = 1024
-      disk_size = 8
+      cores     = 2
+      memory    = 3072
+      disk_size = 32
       ip        = "10.0.1.58"
       tags      = ["docker", "infra"]
     }

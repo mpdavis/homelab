@@ -16,3 +16,7 @@ proxmox.mpdavis.com {
 birdnet.mpdavis.com {
 	reverse_proxy 10.0.63.190:80
 }
+
+grafana-compose.mpdavis.com {
+	reverse_proxy grafana:3000
+}

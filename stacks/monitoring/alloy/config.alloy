@@ -1,0 +1,86 @@
+// The agent every Docker host runs. {infra,stacks}/monitoring/alloy/config.alloy
+// must stay identical (validate-stacks checks); the compose file supplies
+// HOST_LABEL, PROMETHEUS_URL and LOKI_URL, the only per-host differences.
+
+// ---- Logs: every container's stdout/stderr ----
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// Loki derives service_name from `service`, so Grafana's log views group by
+// compose service rather than by container.
+discovery.relabel "containers" {
+  targets = []
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "stack"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+}
+
+loki.source.docker "containers" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.docker.containers.targets
+  relabel_rules = discovery.relabel.containers.rules
+  forward_to    = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = sys.env("LOKI_URL")
+  }
+
+  external_labels = {
+    host = sys.env("HOST_LABEL"),
+  }
+}
+
+// ---- Metrics ----
+
+prometheus.scrape "node" {
+  job_name   = "node"
+  targets    = [{"__address__" = "host.docker.internal:9100"}]
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+prometheus.scrape "cadvisor" {
+  job_name   = "cadvisor"
+  targets    = [{"__address__" = "cadvisor:8080"}]
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+prometheus.scrape "doco_cd" {
+  job_name   = "doco-cd"
+  targets    = [{"__address__" = "doco-cd:9120"}]
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+prometheus.exporter.self "alloy" { }
+
+prometheus.scrape "alloy" {
+  job_name   = "alloy"
+  targets    = prometheus.exporter.self.alloy.targets
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+prometheus.remote_write "default" {
+  endpoint {
+    url = sys.env("PROMETHEUS_URL")
+  }
+
+  external_labels = {
+    host = sys.env("HOST_LABEL"),
+  }
+}

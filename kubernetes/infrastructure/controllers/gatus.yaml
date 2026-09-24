@@ -76,6 +76,7 @@ spec:
                     hostnames:
                       - birdnet.mpdavis.com
                       - proxmox.mpdavis.com
+                      - grafana-compose.mpdavis.com
   values:
     resources:
       requests:
@@ -155,6 +156,10 @@ spec:
         - name: grafana
           group: external-open
           url: https://grafana.mpdavis.com/login
+          conditions: *open-conditions
+        - name: grafana-compose
+          group: external-open
+          url: https://grafana-compose.mpdavis.com/api/health
           conditions: *open-conditions
         - name: authentik
           group: external-open
@@ -270,6 +275,16 @@ spec:
         - name: loki
           group: internal
           url: http://loki.loki.svc.cluster.local:3100/ready
+          conditions: *internal-conditions
+        # The Docker hosts' monitoring backends (infra/monitoring/). Probed from
+        # here because the infra host cannot alert on its own outage.
+        - name: prometheus-infra
+          group: internal
+          url: http://${INFRA_TAILNET_IP}:9090/-/healthy
+          conditions: *internal-conditions
+        - name: loki-infra
+          group: internal
+          url: http://${INFRA_TAILNET_IP}:3100/ready
           conditions: *internal-conditions
         - name: ollama
           group: internal

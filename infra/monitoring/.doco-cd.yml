@@ -1,0 +1,7 @@
+external_secrets:
+  # BWS_GRAFANA_ADMIN_USER / BWS_GRAFANA_ADMIN_PASSWORD — the same login as
+  # the k3s Grafana.
+  GRAFANA_ADMIN_USER: 5d21d6d4-5452-4a20-88fc-b4510146bcc9
+  GRAFANA_ADMIN_PASSWORD: 84b2fe83-0a83-4b84-8f5d-b3e001210112
+  # BWS_NTFY_ALERTMANAGER_TOKEN: write access to the homelab-alerts topic.
+  NTFY_TOKEN: 47079c89-adab-4d19-8173-b48d01492747

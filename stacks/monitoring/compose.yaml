@@ -1,0 +1,69 @@
+name: monitoring
+
+# This host's agent. Prometheus, Loki, Alertmanager and Grafana run on the
+# infra host (infra/monitoring/), so they outlive this one; everything here
+# pushes to them over the LAN.
+services:
+  alloy:
+    image: grafana/alloy:v1.19.2
+    restart: unless-stopped
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    environment:
+      HOST_LABEL: docker
+      PROMETHEUS_URL: http://10.0.1.58:9090/api/v1/write
+      LOKI_URL: http://10.0.1.58:3100/loki/api/v1/push
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Holds the remote-write WAL, so a few hours of infra-host downtime are
+      # backfilled rather than lost.
+      - alloy-data:/var/lib/alloy/data
+    networks:
+      - default
+      - doco-cd
+
+  # Host network, or it reports the container's network interfaces instead of
+  # the host's.
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    restart: unless-stopped
+    command: ["--path.rootfs=/host"]
+    network_mode: host
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:v0.60.6
+    restart: unless-stopped
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=30s
+      - --store_container_labels=false
+      - --whitelisted_container_labels=com.docker.compose.project,com.docker.compose.service
+      - --disable_metrics=percpu,sched,tcp,udp,advtcp,hugetlb,referenced_memory,cpu_topology,resctrl,process,perf_event,memory_numa
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+
+volumes:
+  alloy-data:
+
+networks:
+  # doco-cd's own project network, created by the doco_cd Ansible role, so
+  # Alloy can scrape its metrics on :9120.
+  doco-cd:
+    name: doco-cd_default
+    external: true

@@ -29,10 +29,10 @@ infra/                    # the infra host's projects, same shape
   <stack>/
 ```
 
-| Host     | Where                       | Runs                                     |
-| -------- | --------------------------- | ---------------------------------------- |
-| `docker` | VM 205 on pve2, `10.0.1.55` | the migrated services + their Caddies    |
-| `infra`  | VM 206 on pve1, `10.0.1.58` | Caddy for what is not on the docker host |
+| Host     | Where                       | Runs                                                     |
+| -------- | --------------------------- | -------------------------------------------------------- |
+| `docker` | VM 205 on pve2, `10.0.1.55` | the migrated services + their Caddies                    |
+| `infra`  | VM 206 on pve1, `10.0.1.58` | Caddy for what is not on the docker host, and monitoring |
 
 Each host runs one doco-cd, told which tree to deploy by its poll target: the
 compose host uses the default config, the infra host sets `DOCO_TARGET=infra`
@@ -59,11 +59,39 @@ Renovate bumps the pinned image there like any other. Handing that apply to a
 GitHub Action, or to a second doco-cd instance that only deploys the first, is
 open.
 
-Deploy failures are visible in `docker logs -f doco-cd-doco-cd-1` for now. There
-is no push alert: the obvious sources both want something that hasn't moved yet
-— an Apprise sidecar needs an ntfy token, which only a second instance could
-resolve, and doco-cd's Prometheus metrics (port 9120) want the monitoring stack
-on this host, after which the existing Alertmanager route to ntfy covers it.
+A failed deploy raises `DocoCdDeploymentFailed` in ntfy, from doco-cd's
+metrics (see Monitoring below); `docker logs -f doco-cd-doco-cd-1` on the host
+has the reason.
+
+## Monitoring
+
+Prometheus, Loki, Alertmanager and Grafana run on the infra host
+(`infra/monitoring/`), so they keep recording and alerting while the compose
+host is down. Grafana is `grafana-compose.mpdavis.com` (tailnet); the k3s
+Grafana stays at `grafana.mpdavis.com` and keeps watching the cluster until it
+is retired, at which point this one can take the name.
+
+Every Docker host runs the same agent — Alloy, node-exporter and cAdvisor
+(`infra/monitoring/` and `stacks/monitoring/`) — which pushes:
+
+- every container's logs to Loki, labelled `host`, `stack`, `service`,
+  `container`;
+- host metrics (`job="node"`), per-container metrics (`job="cadvisor"`) and
+  doco-cd's own (`job="doco-cd"`) to Prometheus by remote write, labelled
+  `host`.
+
+A new stack needs nothing to be monitored. Pushing means the backends need no
+route to the hosts, only `10.0.1.58:9090` and `:3100` reachable from them;
+both are LAN-only and unauthenticated.
+
+Alerts go to the same ntfy topic as the cluster's, with the same template. The
+rules are `infra/monitoring/prometheus/rules.yml`. The infra host cannot report
+its own outage, so Gatus in k3s probes its Prometheus, Loki and Grafana.
+
+Alloy's config is identical on every host — only env vars differ — and is
+copied per tree because a stack can only mount its own files;
+`validate-stacks` fails if the copies drift. A new host copies the agent stack
+and sets `HOST_LABEL`, then adds a `HostAgentAbsent` clause for it.
 
 ## Where Caddy runs
 
