@@ -1,0 +1,29 @@
+# The doco-cd instance that deploys the stacks. Applied by the doco_cd Ansible
+# role, not by doco-cd itself — an instance can't safely recreate its own
+# container mid-deploy. Renovate bumps the image here like any other; applying
+# that bump is a playbook run today.
+name: doco-cd
+
+services:
+  doco-cd:
+    image: ghcr.io/kimdre/doco-cd:0.119.0
+    restart: unless-stopped
+    environment:
+      TZ: America/Chicago
+      # Keeps the deploy configs in doco-cd/ instead of the repo root.
+      DEPLOY_CONFIG_BASE_DIR: doco-cd
+      POLL_CONFIG: |
+        - url: https://github.com/mpdavis/homelab.git
+          reference: main
+          interval: 60s
+      SECRET_PROVIDER: bitwarden_sm
+      SECRET_PROVIDER_ACCESS_TOKEN_FILE: /run/secrets/bws-access-token
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/homelab/bws-access-token:/run/secrets/bws-access-token:ro
+      - data:/data
+    cap_drop:
+      - ALL
+
+volumes:
+  data:

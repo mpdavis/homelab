@@ -1,0 +1,7 @@
+---
+# Empty keeps the token already on the host, so re-running the playbook
+# doesn't require re-entering it.
+doco_cd_bws_access_token: ""
+doco_cd_bws_token_file: /etc/homelab/bws-access-token
+
+doco_cd_dir: /opt/doco-cd

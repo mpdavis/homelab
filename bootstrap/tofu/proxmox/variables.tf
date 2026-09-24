@@ -163,5 +163,18 @@ variable "vms" {
       gpu_mapping = "gpu"
       tags        = ["k3s", "agent", "gpu"]
     }
+    # pve2 is becoming the Docker Compose host, pve1 the infrastructure host.
+    # See docs/compose.md. Sized for the migration's first stacks: pve2 has
+    # ~10G of RAM outside k3s-agent-gpu's dedicated 48G, so this grows as that
+    # VM shrinks and eventually inherits its GPU mapping.
+    docker = {
+      vmid      = 205
+      node      = "pve2"
+      cores     = 4
+      memory    = 8192
+      disk_size = 32
+      ip        = "10.0.1.55"
+      tags      = ["docker"]
+    }
   }
 }

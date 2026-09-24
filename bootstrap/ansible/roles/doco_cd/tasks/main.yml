@@ -1,0 +1,54 @@
+---
+- name: Create /etc/homelab
+  ansible.builtin.file:
+    path: /etc/homelab
+    state: directory
+    mode: "0700"
+
+- name: Store the Bitwarden access token
+  ansible.builtin.copy:
+    content: "{{ doco_cd_bws_access_token }}"
+    dest: "{{ doco_cd_bws_token_file }}"
+    mode: "0600"
+  when: doco_cd_bws_access_token | length > 0
+  no_log: true
+
+- name: Check for a Bitwarden access token
+  ansible.builtin.stat:
+    path: "{{ doco_cd_bws_token_file }}"
+  register: doco_cd_token_stat
+
+- name: Require a Bitwarden access token
+  ansible.builtin.assert:
+    that: doco_cd_token_stat.stat.exists
+    fail_msg: >-
+      No Bitwarden access token on the host yet. Re-run and enter one at the
+      prompt; doco-cd resolves every external_secret with it.
+
+# doco-cd deploys the stacks but not itself: recreating its own container
+# mid-deploy would kill the deploy. So this role owns the instance, and
+# re-running the playbook is how a version bump (or any compose change) is
+# applied.
+- name: Create the doco-cd directory
+  ansible.builtin.file:
+    path: "{{ doco_cd_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Copy the doco-cd compose file
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../../doco-cd/compose.yaml"
+    dest: "{{ doco_cd_dir }}/compose.yaml"
+    mode: "0644"
+
+- name: Apply the doco-cd instance
+  ansible.builtin.command: >-
+    docker compose --project-name doco-cd
+    --file {{ doco_cd_dir }}/compose.yaml
+    up --detach --wait
+  register: doco_cd_up
+  # compose reports what it did on stderr and is a no-op when nothing changed.
+  changed_when: >-
+    'Created' in doco_cd_up.stderr or
+    'Recreated' in doco_cd_up.stderr or
+    'Started' in doco_cd_up.stderr

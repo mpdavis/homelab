@@ -1,0 +1,24 @@
+---
+# Provisions the Docker Compose host and starts doco-cd, which then deploys
+# stacks/ from this repo. See docs/compose.md for the runbook.
+#
+#   tofu -chdir=bootstrap/tofu/proxmox apply
+#   ansible-playbook -i inventory/hosts.yml playbooks/docker-host.yml
+
+- name: Configure Docker hosts
+  hosts: docker_hosts
+  become: true
+  vars_prompt:
+    - name: bws_access_token
+      prompt: "Bitwarden Secrets Manager access token for this host's machine account (blank keeps the current one)"
+      private: true
+      default: ""
+  roles:
+    - common
+    - role: vm
+      when: node_type == 'vm'
+    - docker
+    - service_ips
+    - role: doco_cd
+      vars:
+        doco_cd_bws_access_token: "{{ bws_access_token }}"

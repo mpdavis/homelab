@@ -1,0 +1,8 @@
+---
+# Must match the netplan ID cloud-init writes to 50-cloud-init.yaml. Netplan
+# concatenates `addresses` across files for the same ID, so this drop-in adds
+# to the primary address instead of replacing it.
+service_ips_interface: eth0
+
+# CIDR strings, e.g. ["10.0.1.56/16"].
+service_ips: []
