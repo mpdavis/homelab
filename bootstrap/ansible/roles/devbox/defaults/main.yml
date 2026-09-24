@@ -65,7 +65,7 @@ devbox_claude_code_version: "2.1.281"
 devbox_opencode_version: "1.18.32"
 
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
-devbox_kubectl_version: "v1.37.0"
+devbox_kubectl_version: "v1.37.1"
 # renovate: datasource=github-releases depName=fluxcd/flux2
 devbox_flux_version: "v2.9.5"
 # renovate: datasource=github-releases depName=cli/cli
