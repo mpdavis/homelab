@@ -123,7 +123,7 @@ The Kubernetes copy keeps serving until DNS moves.
 3. Remove it from `kubernetes/`, and move its Gatus `hostAliases` entry to the
    Caddy IP. With `policy: sync`, ExternalDNS deletes the old A record once the
    IngressRoute is gone.
-4. Recreate the record pointing at the Caddy IP. Wait until ExternalDNS has
-   removed it first: until then ExternalDNS owns the record through its TXT
-   registry and would reset it. Moving these records into OpenTofu is an open
-   decision.
+4. Once ExternalDNS has removed the record, add the hostname to `records` in
+   `bootstrap/tofu/cloudflare` and apply. Adding it earlier just gets it reset —
+   ExternalDNS still owns the record through its TXT registry until the
+   IngressRoute is gone.
