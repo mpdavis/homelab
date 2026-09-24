@@ -1,0 +1,4 @@
+external_secrets:
+  # Cloudflare API token (Zone:Read + DNS:Edit) for DNS-01; same secret as
+  # BWS_CLOUDFLARE_API_TOKEN in the bws-secret-ids ConfigMap.
+  CLOUDFLARE_API_TOKEN: 67c9d80b-ca8e-47b5-a2eb-b442005fab6a

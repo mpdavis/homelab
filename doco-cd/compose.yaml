@@ -16,6 +16,9 @@ services:
         - url: https://github.com/mpdavis/homelab.git
           reference: main
           interval: 60s
+          # Empty on the compose host (the default .doco-cd.yaml); the infra
+          # host sets it to select .doco-cd.infra.yaml.
+          target: ${DOCO_TARGET:-}
       SECRET_PROVIDER: bitwarden_sm
       SECRET_PROVIDER_ACCESS_TOKEN_FILE: /run/secrets/bws-access-token
     volumes:

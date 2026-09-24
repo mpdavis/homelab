@@ -1,6 +1,5 @@
-# Sites here are reachable only from the LAN and tailnet: this instance
-# listens on 10.0.1.57, which the router never forwards. A hostname that
-# should be public goes in Caddyfile.public instead — never in both.
+# Tailnet-only sites; the public ones live in Caddyfile.public. See
+# docs/compose.md.
 {
 	email michael@mpdavis.com
 	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}

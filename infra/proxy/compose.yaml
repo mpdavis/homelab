@@ -1,0 +1,32 @@
+name: proxy
+
+services:
+  caddy-tailnet:
+    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:97a22bc99237513cd5d653e0a533903bbc1c20ba47430253d49e9a5eef16f284
+    restart: unless-stopped
+    ports:
+      - 10.0.1.58:80:80
+      - 10.0.1.58:443:443
+      - 10.0.1.58:443:443/udp
+    environment:
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:?resolved by doco-cd from external_secrets}
+    volumes:
+      - ./Caddyfile.tailnet:/etc/caddy/Caddyfile:ro
+      - caddy-tailnet-data:/data
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  # Holds issued certificates and the ACME account. Losing it only costs a
+  # re-issue, but repeated loss runs into Let's Encrypt rate limits.
+  caddy-tailnet-data:
+
+networks:
+  proxy:
+    external: true

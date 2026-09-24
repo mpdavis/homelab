@@ -46,6 +46,8 @@
     docker compose --project-name doco-cd
     --file {{ doco_cd_dir }}/compose.yaml
     up --detach --wait
+  environment:
+    DOCO_TARGET: "{{ doco_cd_target }}"
   register: doco_cd_up
   # compose reports what it did on stderr and is a no-op when nothing changed.
   changed_when: >-

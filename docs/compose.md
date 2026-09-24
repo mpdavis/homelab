@@ -9,22 +9,35 @@ The target split is pve2 as the Compose host — it holds the GPU, and
 `k3s-agent-gpu` already carries most of the load — and pve1 as the
 infrastructure host for things that should not depend on it.
 
+This page is the runbook: how a change reaches a host, how to bring one up, and
+how to cut a service over. The rules for writing a stack — exposure, routing,
+secrets, pinning — live in `stacks/CLAUDE.md`.
+
 ## Layout
 
 ```text
 doco-cd/
-  .doco-cd.yaml           # what doco-cd deploys: everything in stacks/
+  .doco-cd.yaml           # what the compose host deploys: everything in stacks/
+  .doco-cd.infra.yaml     # what the infra host deploys: everything in infra/
   compose.yaml            # the doco-cd instance itself (applied by Ansible)
-stacks/
+stacks/                   # the compose host's projects
   <stack>/                # one compose project per stack, auto-discovered
     compose.yaml
     .doco-cd.yml          # optional: per-stack settings, e.g. external_secrets
     ...                   # config files the stack bind-mounts
+infra/                    # the infra host's projects, same shape
+  <stack>/
 ```
 
-Everything runs on one host: the `docker` VM (205) on pve2, `10.0.1.55`. A second
-host would reintroduce a per-host split — doco-cd selects a deploy config by poll
-target, so it would become `.doco-cd.<host>.yaml` with a `stacks/<host>/` tree.
+| Host     | Where                       | Runs                                     |
+| -------- | --------------------------- | ---------------------------------------- |
+| `docker` | VM 205 on pve2, `10.0.1.55` | the migrated services + their Caddies    |
+| `infra`  | VM 206 on pve1, `10.0.1.58` | Caddy for what is not on the docker host |
+
+Each host runs one doco-cd, told which tree to deploy by its poll target: the
+compose host uses the default config, the infra host sets `DOCO_TARGET=infra`
+(`doco_cd_target` in the inventory). A third host would add a tree and a
+`.doco-cd.<target>.yaml`.
 
 ## How a change deploys
 
@@ -54,63 +67,29 @@ on this host, after which the existing Alertmanager route to ntfy covers it.
 
 ## Where Caddy runs
 
-The proxy stack runs beside the apps on the compose host, so Caddy reaches them
-by container name and no stack publishes a LAN port.
+Three instances, one per (host, exposure). All build the same image; only the
+Caddyfile and the IP differ.
 
-A second Caddy is planned for the infra host (pve1), owning the routes that have
-nothing to do with compose: Proxmox (`10.0.1.1:8006`), BirdNET
-(`10.0.63.190:80`), and whatever else lands there later. Both are LAN endpoints
-it can reach directly, so neither Caddy ever proxies through the other — each
-hostname's DNS record points at whichever one owns it.
+| Instance              | Host   | IP           | Serves                                             |
+| --------------------- | ------ | ------------ | -------------------------------------------------- |
+| `proxy/caddy-tailnet` | docker | `10.0.1.57`  | migrated services, by container name               |
+| `proxy/caddy-public`  | docker | `10.0.1.56`  | the same, once any of them is public               |
+| `proxy/caddy-tailnet` | infra  | `10.0.1.58`  | Proxmox, BirdNET — LAN endpoints, reached directly |
 
-That instance stays tailnet-only, and **every public hostname terminates on the
-compose host's Caddy**: the router forwards 443 to exactly one IP, so public
-routes cannot be split across two instances.
+No instance proxies through another: each hostname's DNS record points at the IP
+that serves it. `validate-stacks` rejects a hostname that appears in two
+Caddyfiles, on one host or across both.
 
-## Conventions
-
-- **Exposure is set by which Caddyfile a site is in.**
-  - `Caddyfile.tailnet` is served on `10.0.1.57`, which is never port-forwarded,
-    so those sites are reachable only from the LAN and the tailnet.
-  - `Caddyfile.public` will be served on `10.0.1.56`, which becomes the router's
-    443 forward target at cutover.
-
-  A hostname in both files fails `validate-stacks`. Default new services to
-  tailnet.
-- **Routing goes over the shared `proxy` network.** A routed service joins the
-  external `proxy` network, and Caddy reaches it as `<service>:<port>`. The
-  `docker` Ansible role creates it (`docker_networks` in the inventory), because
-  doco-cd deploys stacks in parallel and no single stack can be relied on to
-  create it first.
-- **Secrets are never written into the repo.** A stack's `.doco-cd.yml` maps
-  environment variables to Bitwarden secret UUIDs under `external_secrets`. The
-  compose file refers to each one as `${VAR:?resolved by doco-cd from
-  external_secrets}`, so a missing secret fails loudly instead of starting with an
-  empty value.
-  - A UUID that is also in the `bws-secret-ids` ConfigMap gets a comment naming
-    its `BWS_*` key, so the two can be matched until `kubernetes/` is retired.
-  - The host's Bitwarden machine account must be able to read every secret its
-    stacks use.
-- **Pin image tags.** `image-pin-check` resolves every added `image:` under
-  `stacks/` and `doco-cd/`, and Renovate bumps them through its docker-compose
-  manager.
-- **Don't set `container_name`.** Compose's default names let doco-cd recreate
-  a container in place. A fixed name collides during a recreate.
-
-## CI
-
-- `validate-stacks.yml` (advisory):
-  - renders every compose file under `stacks/` and `doco-cd/`;
-  - checks every `external_secrets` UUID;
-  - checks the deploy config still discovers `stacks/`;
-  - builds the proxy image and runs `caddy validate` on each Caddyfile;
-  - rejects hostnames that appear in more than one Caddyfile.
-- `image-pin-check.yml` (required): now covers `stacks/**` and `doco-cd/**`.
+**Every public hostname terminates on the compose host's `caddy-public`.** The
+router forwards 443 to exactly one IP, so public routes cannot be split. That
+forward still points at Traefik's VIP and moves to `10.0.1.56` when the first
+public service is cut over — until then `Caddyfile.public` has no sites, which
+is valid and serves nothing.
 
 ## Bringing up a host
 
-1. Create the VM: `tofu -chdir=bootstrap/tofu/proxmox apply`. Only `docker`
-   should be new.
+1. Create the VM: `tofu -chdir=bootstrap/tofu/proxmox apply`. Note the state and
+   `terraform.tfvars` live only in the primary checkout, not in worktrees.
 2. Give the host a Bitwarden access token **(manual)**. Machine accounts are
    granted per project, and every secret lives in the single `homelab` project,
    so any token that can read the Cloudflare API token can read all of them —
@@ -121,12 +100,12 @@ routes cannot be split across two instances.
    one credential. Narrower access would mean splitting the project.
 3. Run the playbook:
    `ansible-playbook -i inventory/hosts.yml playbooks/docker-host.yml`. Paste the
-   Bitwarden token at the prompt.
+   Bitwarden token at the prompt. Add `--limit <host>` to do one host.
 4. Check the result:
    - `docker ps` on the host shows `doco-cd` and the stacks. The stacks appear
      within a minute or two of doco-cd starting.
-   - `curl --resolve home.mpdavis.com:443:10.0.1.57 https://home.mpdavis.com/`
-     returns the page.
+   - `curl --resolve <hostname>:443:<caddy ip> https://<hostname>/` returns the
+     page, before DNS points anywhere near it.
 
 doco-cd polls `main`, so provision after this branch merges. If you provision
 first, it logs "config not found" until the merge lands, then converges on its

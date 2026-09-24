@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Offline checks for the compose side of the repo — what doco-cd would
 # otherwise only discover on the host after merge:
-#   - every compose file under stacks/ and doco-cd/ renders
+#   - every compose file under the stack trees and doco-cd/ renders
 #   - every external_secrets entry is shaped like a Bitwarden UUID
-#   - doco-cd has the deploy config that discovers stacks/
+#   - every stack tree has a doco-cd deploy config that discovers it
 #   - every Caddyfile parses with the Caddy build the host will run
 #   - no hostname is served by more than one Caddyfile on a host, since a
 #     public/tailnet duplicate would silently expose a tailnet site
 set -euo pipefail
 
-stacks=stacks
+# One tree per host: stacks/ is the compose host, infra/ the infra host.
+trees=(stacks infra)
 doco="doco-cd"
 status=0
 # The Cloudflare module rejects anything not shaped like a real token (40
@@ -53,28 +54,48 @@ render() {
 
 while read -r problem; do
   fail "$problem"
-done < <(for f in "$doco"/.doco-cd.yaml "$doco"/.doco-cd.*.yaml "$stacks"/*/.doco-cd.yml; do
+done < <(for f in "$doco"/.doco-cd.yaml "$doco"/.doco-cd.*.yaml; do
   if [ -f "$f" ]; then check_secret_ids "$f"; fi
+done
+for tree in "${trees[@]}"; do
+  for f in "$tree"/*/.doco-cd.yml; do
+    if [ -f "$f" ]; then check_secret_ids "$f"; fi
+  done
 done)
 
 for compose in "$doco"/compose*.yaml; do
   render "$compose" "$doco"/.doco-cd.yaml "$doco"/.doco-cd.*.yaml
 done
 
-grep -q '^working_dir: stacks$' "$doco/.doco-cd.yaml" ||
-  fail "$doco/.doco-cd.yaml does not discover stacks/, so nothing would deploy it"
-
-for compose in "$stacks"/*/compose.yaml; do
-  render "$compose" "$(dirname "$compose")/.doco-cd.yml"
+for tree in "${trees[@]}"; do
+  # stacks/ is the default deploy config; every other tree needs a target.
+  cfg="$doco/.doco-cd.yaml"
+  [ "$tree" = stacks ] || cfg="$doco/.doco-cd.$tree.yaml"
+  grep -q "^working_dir: $tree\$" "$cfg" 2>/dev/null ||
+    fail "$cfg does not discover $tree/, so nothing would deploy it"
 done
 
-proxy="$stacks/proxy"
-if [ -f "$proxy/Dockerfile" ]; then
-  docker build --quiet --tag caddy-validate "$proxy" >/dev/null
+for tree in "${trees[@]}"; do
+  for compose in "$tree"/*/compose.yaml; do
+    [ -f "$compose" ] || continue
+    render "$compose" "$(dirname "$compose")/.doco-cd.yml"
+  done
+done
+
+for tree in "${trees[@]}"; do
+  proxy="$tree/proxy"
+  [ -d "$proxy" ] || continue
+  # Validate against the image the stack actually pins, not a stock Caddy:
+  # the Caddyfiles use the Cloudflare DNS module, which only that build has.
+  image=$(sed -n 's/^ *image: *\(ghcr.io\/mpdavis\/caddy-cloudflare[^ ]*\)/\1/p' "$proxy/compose.yaml" | head -1)
+  if [ -z "$image" ]; then
+    fail "$proxy/compose.yaml pins no caddy image"
+    continue
+  fi
 
   for caddyfile in "$proxy"/Caddyfile.*; do
     if out=$(docker run --rm -e CLOUDFLARE_API_TOKEN="$fake_cf_token" \
-      -v "$PWD/$caddyfile:/etc/caddy/Caddyfile:ro" caddy-validate \
+      -v "$PWD/$caddyfile:/etc/caddy/Caddyfile:ro" "$image" \
       caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile 2>&1); then
       echo "ok   $caddyfile"
     else
@@ -84,7 +105,17 @@ if [ -f "$proxy/Dockerfile" ]; then
   done
 
   dupes=$(grep -hoE '^[a-z0-9*][a-z0-9.*-]*\.[a-z]+' "$proxy"/Caddyfile.* | sort | uniq -d)
-  [ -z "$dupes" ] || fail "these hostnames are served from more than one Caddyfile: $dupes"
-fi
+  [ -z "$dupes" ] || fail "$proxy serves these hostnames from more than one Caddyfile: $dupes"
+done
+
+# A hostname may only be served by one host, whichever Caddyfile it is in.
+caddyfiles=()
+for tree in "${trees[@]}"; do
+  for f in "$tree"/proxy/Caddyfile.*; do
+    [ -f "$f" ] && caddyfiles+=("$f")
+  done
+done
+across=$(grep -hoE '^[a-z0-9*][a-z0-9.*-]*\.[a-z]+' "${caddyfiles[@]}" | sort | uniq -d)
+[ -z "$across" ] || fail "these hostnames are served by more than one host: $across"
 
 exit "$status"
