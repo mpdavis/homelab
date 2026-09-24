@@ -80,11 +80,14 @@ No instance proxies through another: each hostname's DNS record points at the IP
 that serves it. `validate-stacks` rejects a hostname that appears in two
 Caddyfiles, on one host or across both.
 
-**Every public hostname terminates on the compose host's `caddy-public`.** The
-router forwards 443 to exactly one IP, so public routes cannot be split. That
-forward still points at Traefik's VIP and moves to `10.0.1.56` when the first
-public service is cut over — until then `Caddyfile.public` has no sites, which
-is valid and serves nothing.
+**Every public hostname terminates on the compose host's `caddy-public`,** which
+the router forwards 443 to. Public routes cannot be split, because the router
+forwards to exactly one IP.
+
+Public services still in k3s are listed in `Caddyfile.public` with
+`import traefik`, which proxies them on to Traefik's VIP unchanged. Migrating
+one is then a one-line swap to `reverse_proxy <container>:<port>` — no router
+change, no DNS change, and nothing else moves with it.
 
 ## Bringing up a host
 

@@ -1,6 +1,59 @@
-# Internet-facing sites. Empty until the first public service moves off k3s,
-# which is also when the router's 443 forward moves here. See docs/compose.md.
+# Internet-facing sites: the router forwards 443 here.
+#
+# A hostname listed here is public. Services still in k3s are proxied on to
+# Traefik unchanged — migrating one means swapping `import traefik` for a
+# `reverse_proxy <container>:<port>`, with no router or DNS change. See
+# docs/compose.md.
 {
 	email michael@mpdavis.com
 	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+}
+
+# reverse_proxy rewrites Host to the upstream address by default, and Traefik
+# routes on Host — without this every proxied request is a 404. tls_server_name
+# matches the SNI to the hostname so the wildcard cert verifies against the VIP
+# we dial.
+(traefik) {
+	reverse_proxy https://10.0.1.200 {
+		header_up Host {host}
+		transport http {
+			tls_server_name {host}
+		}
+	}
+}
+
+audiobookshelf.mpdavis.com {
+	import traefik
+}
+
+council.mpdavis.com {
+	import traefik
+}
+
+emby.mpdavis.com {
+	import traefik
+}
+
+homeassistant.mpdavis.com {
+	import traefik
+}
+
+iam.mpdavis.com {
+	import traefik
+}
+
+ntfy.mpdavis.com {
+	import traefik
+}
+
+seerr.mpdavis.com {
+	import traefik
+}
+
+status.mpdavis.com {
+	import traefik
+}
+
+thumbs.mpdavis.com {
+	import traefik
 }

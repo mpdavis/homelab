@@ -29,7 +29,9 @@ spec:
   # only listen on the public VIP and tailnet-labelled routes only on the
   # tailnet VIP, so a hostname under the wrong IP fails its probe (404).
   # Services migrated off k3s answer on the compose host's Caddy instead, so
-  # they move to ${COMPOSE_TAILNET_IP} as they are cut over.
+  # they move to ${COMPOSE_TAILNET_IP} as they are cut over. Public hostnames
+  # all answer on ${COMPOSE_PUBLIC_IP}, which fronts Traefik for whatever has
+  # not moved yet — probing it is what proves the real path works.
   postRenderers:
     - kustomize:
         patches:
@@ -40,7 +42,7 @@ spec:
               - op: add
                 path: /spec/template/spec/hostAliases
                 value:
-                  - ip: ${TRAEFIK_PUBLIC_IP}
+                  - ip: ${COMPOSE_PUBLIC_IP}
                     hostnames:
                       - audiobookshelf.mpdavis.com
                       - emby.mpdavis.com

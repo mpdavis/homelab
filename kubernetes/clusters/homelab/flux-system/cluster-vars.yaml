@@ -25,3 +25,6 @@ data:
   # Caddy on the infra host (infra, pve1), which serves what never ran in the
   # cluster — LAN hosts Traefik used to front via Service+Endpoints.
   INFRA_TAILNET_IP: "10.0.1.58"
+  # Public Caddy on the compose host: the router's 443 forward target, and so
+  # the entry point every public hostname actually answers on.
+  COMPOSE_PUBLIC_IP: "10.0.1.56"
