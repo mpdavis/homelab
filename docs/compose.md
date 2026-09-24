@@ -113,17 +113,52 @@ own.
 
 ## Cutting a service over
 
-The Kubernetes copy keeps serving until DNS moves.
+### First, check what the service drags with it
 
-1. Add the stack under `stacks/`, and its hostname to the right Caddyfile.
-   Merge, then test through the new proxy with `curl --resolve`.
-2. Stop the Kubernetes workload. Copy its data from
-   `/var/lib/rancher/k3s/storage/pvc-*` on the node that holds it, or from the NFS
-   share. Stateless services such as homepage skip this step.
-3. Remove it from `kubernetes/`, and move its Gatus `hostAliases` entry to the
-   Caddy IP. With `policy: sync`, ExternalDNS deletes the old A record once the
-   IngressRoute is gone.
-4. Once ExternalDNS has removed the record, add the hostname to `records` in
-   `bootstrap/tofu/cloudflare` and apply. Adding it earlier just gets it reset —
-   ExternalDNS still owns the record through its TXT registry until the
-   IngressRoute is gone.
+- **Is it public?** The router forwards 443 to one IP, so a public service
+  cannot move alone — the front door moves with it.
+- **Does it mount NFS?** The host must be on the NAS export allowlist
+  (`showmount -e 10.0.1.6`), or the mount fails with `permission denied`.
+- **Does anything in the cluster talk to it?** A consumer using
+  `x.ns.svc.cluster.local` stops resolving the moment the Service is gone.
+- **Does it share files with another service?** Two copies writing the same
+  share is worse than downtime; stop one before starting the other.
+
+### Stateless
+
+1. Add the stack, and the hostname to the right Caddyfile. Merge, then test with
+   `curl --resolve <host>:443:<caddy ip> https://<host>/` before touching DNS.
+2. Remove it from `kubernetes/` and move its Gatus `hostAliases` entry to the
+   Caddy IP.
+3. Once ExternalDNS has deleted the record, add the hostname to `records` in
+   `bootstrap/tofu/cloudflare` and apply. Earlier just gets it reset —
+   ExternalDNS owns the record through its TXT registry until the IngressRoute
+   is gone.
+
+### Stateful
+
+The data has to be copied while nothing is writing it, and the stack must not
+start before the data is in place — doco-cd deploys within a minute of the
+merge, so the copy happens **before** it, not after:
+
+1. Open the PR (stack added, `kubernetes/` copy removed) but do not merge.
+2. Stop the cluster copy. Suspend first, or Flux scales it straight back up:
+
+   ```sh
+   flux suspend helmrelease <name> -n <ns>
+   kubectl -n <ns> scale deploy <name> --replicas=0
+   ```
+
+3. Copy the data into the target volume, and check it landed:
+
+   ```sh
+   docker volume create <project>_<volume>
+   ssh <k3s node> 'cd /var/lib/rancher/k3s/storage/pvc-*_<ns>_<name> && tar cf - .' \
+     | ssh <compose host> 'tar xf - -C /var/lib/docker/volumes/<project>_<volume>/_data'
+   ```
+
+   Then `chown` to the uid the container runs as, and compare checksums. An
+   embedded database keeps a WAL — copy it and its sidecar files, not just the
+   `.db`.
+4. Merge. Flux prunes the cluster copy; doco-cd starts the stack on the data.
+5. DNS as above.
