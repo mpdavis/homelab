@@ -19,3 +19,6 @@ data:
   # never forwarded (LAN + Tailscale subnet route only). Both inside METALLB_POOL.
   TRAEFIK_PUBLIC_IP: "10.0.1.200"
   TRAEFIK_TAILNET_IP: "10.0.1.210"
+  # Caddy on the compose host (docker, pve2). Services migrated off k3s answer
+  # here instead of on a Traefik VIP; Gatus still probes them by hostname.
+  COMPOSE_TAILNET_IP: "10.0.1.57"

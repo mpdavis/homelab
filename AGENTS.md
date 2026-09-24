@@ -100,8 +100,9 @@ via the `GatusEndpointDown` PrometheusRule. Check conventions:
   app is up, so if the app has an unauthenticated health endpoint also add an `internal` check
   against its cluster-DNS Service
 - Internal services (no ingress): cluster-DNS health endpoint, `[STATUS] == 200`
-- `*.mpdavis.com` probes resolve via a `hostAliases` postRenderers patch to the Traefik VIP
-  matching the route's exposure — public VIP or tailnet VIP (no NAT-hairpin dependency)
+- `*.mpdavis.com` probes resolve via a `hostAliases` postRenderers patch to the IP that
+  serves the hostname — public Traefik VIP, tailnet Traefik VIP, or the compose host's
+  Caddy (`COMPOSE_TAILNET_IP`) for services already migrated (no NAT-hairpin dependency)
 
 **When a service gains or loses an IngressRoute, or changes exposure, update BOTH lists in
 `gatus.yaml`:** the `config.endpoints` entry (correct group/conditions) *and* the hostname under
