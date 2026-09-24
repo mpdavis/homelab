@@ -56,6 +56,24 @@ its stacks reference.
 - **Healthchecks decide deployment success.** doco-cd waits for them, and
   restarts a container that later goes unhealthy.
 
+## Translating a k3s workload
+
+| In the cluster | In a stack |
+|---|---|
+| `securityContext.runAsUser/runAsGroup` | `user: "1000:1000"` — keep the same ids or the service loses access to files it owns on NFS |
+| `local-path` PVC | a named volume; its data is copied in before first start |
+| NFS PVC or inline `nfs:` volume | a volume with `driver_opts` (`type: nfs`, `nfsvers=3`) |
+| `${VAR}` from `cluster-vars` | the literal value — there is no postBuild substitution here |
+| Service DNS (`x.ns.svc.cluster.local`) | the container name on the `proxy` network, or a LAN address |
+| liveness/readiness probe | `healthcheck:` — doco-cd waits on it and restarts on unhealthy |
+| `IngressRoute` | a site block in the right Caddyfile |
+| Authentik forward-auth middleware | `forward_auth` in the site block |
+
+**The NAS exports are restricted by client IP.** A host that is not on the
+allowlist gets `permission denied` at mount time, which surfaces as a failed
+deployment rather than anything about permissions in the app. Check with
+`showmount -e 10.0.1.6` from the host before moving anything that touches NFS.
+
 ## What CI checks
 
 `validate-stacks` renders every compose file, verifies every `external_secrets`
