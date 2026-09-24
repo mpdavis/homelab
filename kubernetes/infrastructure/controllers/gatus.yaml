@@ -22,12 +22,14 @@ spec:
       retries: 3
       strategy: rollback
   # The chart exposes no hostAliases value. Probes for *.mpdavis.com must hit
-  # Traefik's VIP directly — resolving the public Cloudflare records from
+  # the serving IP directly — resolving the public Cloudflare records from
   # inside the LAN would depend on NAT hairpin through the router. This still
-  # exercises Traefik routing, the wildcard cert, and Authentik forward-auth.
-  # Each hostname goes under the VIP matching its IngressRoute's exposure:
-  # public routes only listen on the public VIP and tailnet-labelled routes only
-  # on the tailnet VIP, so a hostname under the wrong IP fails its probe (404).
+  # exercises routing, the wildcard cert, and Authentik forward-auth.
+  # Each hostname goes under the IP that actually answers for it: public routes
+  # only listen on the public VIP and tailnet-labelled routes only on the
+  # tailnet VIP, so a hostname under the wrong IP fails its probe (404).
+  # Services migrated off k3s answer on the compose host's Caddy instead, so
+  # they move to ${COMPOSE_TAILNET_IP} as they are cut over.
   postRenderers:
     - kustomize:
         patches:
@@ -48,9 +50,11 @@ spec:
                       - iam.mpdavis.com
                       - council.mpdavis.com
                       - homeassistant.mpdavis.com
-                  - ip: ${TRAEFIK_TAILNET_IP}
+                  - ip: ${COMPOSE_TAILNET_IP}
                     hostnames:
                       - home.mpdavis.com
+                  - ip: ${TRAEFIK_TAILNET_IP}
+                    hostnames:
                       - paperless.mpdavis.com
                       - podfetch.mpdavis.com
                       - ecm.mpdavis.com
