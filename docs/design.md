@@ -183,13 +183,13 @@ Public:   Internet → Cloudflare DNS (A record → public IP, e.g. emby.mpdavis
 Tailnet:  LAN / Tailscale client → Cloudflare DNS (A record → 10.0.1.210, e.g. sonarr.mpdavis.com)
                    → Tailscale subnet router (10.0.1.0/24) → MetalLB VIP 10.0.1.210 (Service traefik-tailnet)
                    → Traefik `tailnet` entrypoint
-Both      → IngressRoute → k8s Services  OR  ExternalName/Endpoints → non-k8s services
+Both      → IngressRoute → k8s Services
 ```
 
-Traefik inside k8s handles ALL HTTP/HTTPS routing, including services running
-outside the cluster. For non-k8s services, a Service+Endpoints pair routes
-through Traefik with the same wildcard cert and TLS termination as everything
-else.
+Traefik handles HTTP/HTTPS routing for what still runs in the cluster. Services
+migrated to the compose hosts, and LAN hosts that never ran here at all, are
+served by Caddy instead — see `docs/compose.md`. Each hostname's DNS record
+points at whichever proxy serves it.
 
 ### Authentication
 

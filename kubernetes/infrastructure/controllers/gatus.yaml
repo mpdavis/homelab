@@ -69,9 +69,11 @@ spec:
                       - sonarr.mpdavis.com
                       - teamarr.mpdavis.com
                       - flux.mpdavis.com
+                      - gridiron.mpdavis.com
+                  - ip: ${INFRA_TAILNET_IP}
+                    hostnames:
                       - birdnet.mpdavis.com
                       - proxmox.mpdavis.com
-                      - gridiron.mpdavis.com
   values:
     resources:
       requests:
@@ -169,8 +171,8 @@ spec:
           # requests through Traefik (else HA returns 400 to proxied requests).
           url: https://homeassistant.mpdavis.com/
           conditions: *open-conditions
-        # External (non-k8s) LAN hosts routed through Traefik via
-        # Service+Endpoints — probed exactly like in-cluster open services.
+        # LAN hosts that never ran in the cluster, now served by Caddy on the
+        # infra host — probed exactly like in-cluster open services.
         - name: birdnet
           group: external-open
           url: https://birdnet.mpdavis.com/
