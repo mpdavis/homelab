@@ -1,1 +1,4 @@
-../../../../network.yaml
+---
+# Read from the git-ignored file instead of symlinked to it: doco-cd walks
+# every symlink in its clone, where this one dangles, and fails every deploy.
+network: "{{ (lookup('ansible.builtin.file', inventory_dir ~ '/../../network.yaml') | from_yaml).network }}"

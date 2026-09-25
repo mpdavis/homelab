@@ -13,7 +13,9 @@ Tofu (`bootstrap/tofu/proxmox`) makes the LXCs and VMs; Ansible does the rest.
 
 Hosts are defined in `inventory/hosts.yml` without addresses. Every IP comes
 from `bootstrap/network.yaml` (git-ignored; copy `bootstrap/network.example.yaml`),
-which `inventory/group_vars/all/network.yml` symlinks in as the `network` var.
+which `inventory/group_vars/all/network.yml` reads in as the `network` var. It
+reads rather than symlinks: doco-cd's clone has no `network.yaml`, and a
+dangling symlink fails its every deploy.
 `inventory/network.yml`, a `constructed` inventory source, turns it into each
 host's `ansible_host`, so `ansible.cfg` points at the whole `inventory/`
 directory — don't pass `-i inventory/hosts.yml`. Tofu reads the same file. From
