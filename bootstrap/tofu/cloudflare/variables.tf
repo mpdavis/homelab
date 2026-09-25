@@ -8,11 +8,14 @@ variable "records" {
   description = "Hostname (without domain) to target name. Only services served by the compose hosts belong here — ExternalDNS still owns the records for whatever is left in k3s, and a hostname moves here as it is cut over."
   type        = map(string)
   default = {
-    thumbs   = "public"
-    home     = "compose_tailnet"
-    podfetch = "compose_tailnet"
-    gridiron = "compose_tailnet"
-    proxmox  = "infra_tailnet"
-    birdnet  = "infra_tailnet"
+    thumbs      = "public"
+    home        = "compose_tailnet"
+    podfetch    = "compose_tailnet"
+    gridiron    = "compose_tailnet"
+    dispatcharr = "compose_tailnet"
+    teamarr     = "compose_tailnet"
+    ecm         = "compose_tailnet"
+    proxmox     = "infra_tailnet"
+    birdnet     = "infra_tailnet"
   }
 }
