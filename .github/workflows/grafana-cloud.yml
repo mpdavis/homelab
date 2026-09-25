@@ -33,7 +33,7 @@ env:
   # the Alertmanager share the metrics instance id.
   MIMIR_ADDRESS: https://prometheus-prod-56-prod-us-east-2.grafana.net
   MIMIR_ALERTMANAGER_ADDRESS: https://alertmanager-prod-XX.grafana.net
-  MIMIR_API_USER: "000000"
+  MIMIR_API_USER: "3611114"
 
 jobs:
   validate:
