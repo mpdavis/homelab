@@ -17,6 +17,7 @@ scripts with no LLM and no secrets.
 | `lint-markdown.yml` | PRs touching `**/*.md` (advisory) | markdownlint-cli2 over the changed Markdown files. Config `.markdownlint-cli2.jsonc`. |
 | `lint-secrets.yml` | All PRs + push to `main` (advisory, no `paths` filter) | gitleaks over the commit range the PR/push adds. Config `.gitleaks.toml`. Backstop for a credential that bypasses the External Secrets pattern. |
 | `lint-helm.yml` | PRs touching `charts/**` (advisory) | `helm lint --strict` over first-party charts under `charts/*/`. Dormant until the first local chart lands. |
+| `grafana-cloud.yml` | PRs + push to `main` touching `grafana-cloud/**` (advisory) | Validates the Grafana Cloud alert rules with `mimirtool` on PRs; on `main`, syncs them into the stack's Grafana as Grafana-managed rules. Their notification routing is `bootstrap/tofu/grafana`, not this workflow. |
 
 ## Lint checks
 
@@ -176,6 +177,15 @@ a **fine-grained PAT** (or a GitHub App installation token) scoped to this repo 
 > A PAT approval comes from *your* account, so it won't satisfy a branch-protection
 > rule that requires review from someone other than the author. It's a signal /
 > convenience, not a way to self-approve past required reviews.
+
+### `GRAFANA_CLOUD_ALERTING_TOKEN` (required by `grafana-cloud.yml`)
+
+A token for a service account in the stack's Grafana
+(**Administration → Users and access → Service accounts**) with the **Admin**
+role. Grafana's conversion API needs rule write, folder create and
+"set provisioning status", and the last is not clearly part of Editor. The
+same token is `GRAFANA_AUTH` for `bootstrap/tofu/grafana`. The hosts push with
+a separate write-only access policy token held in Bitwarden.
 
 ## The `new service` label
 

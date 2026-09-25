@@ -1,0 +1,105 @@
+// The agent every Docker host runs, shipping to Grafana Cloud.
+// {infra,stacks}/monitoring/alloy/config.alloy must stay identical
+// (validate-stacks checks). The compose file supplies the Grafana Cloud
+// endpoints and HOST_LABEL, the only per-host difference.
+//
+// The free tier caps active series at 10k across all hosts, so metrics are
+// kept on purpose rather than by default. Check the budget under Cost
+// management > Usage in Grafana Cloud before adding a scrape.
+
+// ---- Logs: every container's stdout/stderr ----
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// Loki derives service_name from `service`, so Grafana's log views group by
+// compose service rather than by container.
+discovery.relabel "containers" {
+  targets = []
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "stack"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+}
+
+loki.source.docker "containers" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.docker.containers.targets
+  relabel_rules = discovery.relabel.containers.rules
+  forward_to    = [loki.write.grafana_cloud.receiver]
+}
+
+loki.write "grafana_cloud" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_LOKI_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_LOKI_USER")
+      password = sys.env("GRAFANA_CLOUD_TOKEN")
+    }
+  }
+
+  external_labels = {
+    host = sys.env("HOST_LABEL"),
+  }
+}
+
+// ---- Metrics ----
+
+prometheus.scrape "node" {
+  job_name   = "node"
+  targets    = [{"__address__" = "host.docker.internal:9100"}]
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.scrape "cadvisor" {
+  job_name   = "cadvisor"
+  targets    = [{"__address__" = "cadvisor:8080"}]
+  forward_to = [prometheus.relabel.cadvisor.receiver]
+}
+
+// cAdvisor emits ~60 series per container; these are the ones a dashboard or
+// alert actually uses, at roughly a third of the cost.
+prometheus.relabel "cadvisor" {
+  rule {
+    source_labels = ["__name__"]
+    regex         = "up|container_(cpu_usage_seconds_total|memory_working_set_bytes|spec_memory_limit_bytes|oom_events_total|network_(receive|transmit)_bytes_total|fs_(reads|writes)_bytes_total)"
+    action        = "keep"
+  }
+
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.scrape "doco_cd" {
+  job_name   = "doco-cd"
+  targets    = [{"__address__" = "doco-cd:9120"}]
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_PROMETHEUS_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_PROMETHEUS_USER")
+      password = sys.env("GRAFANA_CLOUD_TOKEN")
+    }
+  }
+
+  external_labels = {
+    host = sys.env("HOST_LABEL"),
+  }
+}

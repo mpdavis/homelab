@@ -1,0 +1,93 @@
+# Synced into the Grafana Cloud stack as Grafana-managed rules by
+# .github/workflows/grafana-cloud.yml; the namespace becomes their folder.
+# Evaluated off-site, so a dead host or a dead homelab still alerts. They
+# notify through bootstrap/tofu/grafana, routed on `severity`.
+namespace: docker-hosts
+groups:
+  - name: docker-hosts
+    rules:
+      # Agents push, so a dead host leaves no `up == 0` behind — its series
+      # just stop. One absent() per host keeps the host label on the alert.
+      - alert: HostAgentAbsent
+        expr: |
+          absent_over_time(up{job="node", host="docker"}[5m])
+          or
+          absent_over_time(up{job="node", host="infra"}[5m])
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No metrics from {{ $labels.host }}"
+          description: >-
+            Nothing has arrived from the Alloy agent on {{ $labels.host }} for
+            10 minutes. The host is down, or its monitoring stack is.
+
+      - alert: ScrapeTargetDown
+        expr: up == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} on {{ $labels.host }} is not answering scrapes"
+          description: >-
+            {{ $labels.instance }} ({{ $labels.job }}) on {{ $labels.host }}
+            has failed every scrape for 10 minutes.
+
+      # Same threshold as NodeFilesystemEarlyWarning in k3s: the bundled
+      # rules only fire at 95% full, which leaves no time to act.
+      - alert: HostFilesystemEarlyWarning
+        expr: |
+          (
+            node_filesystem_avail_bytes{job="node",fstype!="",mountpoint!=""}
+              / node_filesystem_size_bytes{job="node",fstype!="",mountpoint!=""} * 100 < 20
+          and
+            node_filesystem_readonly{job="node",fstype!="",mountpoint!=""} == 0
+          and
+            node_filesystem_size_bytes{job="node",fstype!="",mountpoint!=""} > 5e9
+          )
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk over 80% full on {{ $labels.host }} ({{ $labels.mountpoint }})"
+          description: >-
+            {{ $labels.device }} at {{ $labels.mountpoint }} on {{ $labels.host }}
+            has only {{ printf "%.1f" $value }}% free.
+
+      - alert: HostMemoryLow
+        expr: node_memory_MemAvailable_bytes{job="node"} / node_memory_MemTotal_bytes{job="node"} * 100 < 10
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memory low on {{ $labels.host }}"
+          description: >-
+            {{ $labels.host }} has had under 10% memory available for 15
+            minutes ({{ printf "%.1f" $value }}% now).
+
+  - name: doco-cd
+    rules:
+      # The push alert docs/compose.md was waiting on: until now a failed
+      # deploy only showed up in doco-cd's container log.
+      - alert: DocoCdDeploymentFailed
+        expr: increase(doco_cd_deployment_errors_total[10m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "doco-cd failed to deploy {{ $labels.deployment }} on {{ $labels.host }}"
+          description: >-
+            A deploy of {{ $labels.deployment }} on {{ $labels.host }} errored.
+            `docker logs doco-cd-doco-cd-1` on the host has the reason.
+
+      # Polls every 60s; a few misses are a GitHub blip, 15 minutes of them
+      # means nothing merged is reaching the host.
+      - alert: DocoCdPollFailing
+        expr: rate(doco_cd_poll_errors_total[5m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "doco-cd on {{ $labels.host }} cannot poll the repo"
+          description: >-
+            doco-cd on {{ $labels.host }} has been failing to poll
+            {{ $labels.repository }} for 15 minutes, so merges are not deploying.

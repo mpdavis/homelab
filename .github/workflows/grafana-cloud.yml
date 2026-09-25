@@ -1,0 +1,68 @@
+name: Grafana Cloud · Alert rules
+
+# grafana-cloud/rules/ holds the Grafana Cloud stack's alert rules in
+# Prometheus format. PRs validate them; main syncs them into the stack's
+# Grafana, where they become Grafana-managed rules querying its Prometheus.
+# Where they notify is bootstrap/tofu/grafana, not here.
+# Advisory: NOT on main's ruleset, so the `paths` filter is safe (a required
+# check must not be filtered; see image-pin-check.yml).
+on:
+  pull_request:
+    paths:
+      - 'grafana-cloud/**'
+      - '.github/workflows/grafana-cloud.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'grafana-cloud/**'
+      - '.github/workflows/grafana-cloud.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# A sync cancelled halfway leaves some groups updated and others not, so only
+# PR runs cancel.
+concurrency:
+  group: grafana-cloud-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # renovate: datasource=docker depName=grafana/mimirtool
+  MIMIRTOOL_VERSION: "3.2.1"
+  # Grafana's Prometheus-rules conversion API. It ignores the tenant, but
+  # mimirtool insists on one and Grafana documents 1.
+  MIMIR_ADDRESS: https://luckyzeppelin876.grafana.net/api/convert/
+  MIMIR_TENANT_ID: "1"
+  # The stack's provisioned Prometheus data source, which every rule queries.
+  MIMIR_EXTRA_HEADERS: X-Grafana-Alerting-Datasource-UID=grafanacloud-prom
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check rules
+        working-directory: grafana-cloud
+        run: |
+          docker run --rm -v "$PWD:/g:ro" -w /g "grafana/mimirtool:$MIMIRTOOL_VERSION" \
+            rules check rules/*.yml
+
+  sync:
+    needs: validate
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # sync, not load: a group deleted from the files is deleted from the
+      # stack too. Grafana's API fails under mimirtool's default concurrency.
+      - name: Sync rules
+        working-directory: grafana-cloud
+        env:
+          MIMIR_AUTH_TOKEN: ${{ secrets.GRAFANA_CLOUD_ALERTING_TOKEN }}
+        run: |
+          docker run --rm -v "$PWD:/g:ro" -w /g \
+            -e MIMIR_ADDRESS -e MIMIR_TENANT_ID -e MIMIR_EXTRA_HEADERS -e MIMIR_AUTH_TOKEN \
+            "grafana/mimirtool:$MIMIRTOOL_VERSION" rules sync --concurrency=1 rules/*.yml

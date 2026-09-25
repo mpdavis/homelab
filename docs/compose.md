@@ -59,11 +59,45 @@ Renovate bumps the pinned image there like any other. Handing that apply to a
 GitHub Action, or to a second doco-cd instance that only deploys the first, is
 open.
 
-Deploy failures are visible in `docker logs -f doco-cd-doco-cd-1` for now. There
-is no push alert: the obvious sources both want something that hasn't moved yet
-— an Apprise sidecar needs an ntfy token, which only a second instance could
-resolve, and doco-cd's Prometheus metrics (port 9120) want the monitoring stack
-on this host, after which the existing Alertmanager route to ntfy covers it.
+A failed deploy raises `DocoCdDeploymentFailed` in ntfy, from doco-cd's
+metrics (see Monitoring below); `docker logs -f doco-cd-doco-cd-1` on the host
+has the reason.
+
+## Monitoring
+
+Metrics, logs and alerting for the Docker hosts live in a free Grafana Cloud
+stack — nothing monitoring-related runs here except an agent. Off-site means a
+dead host, a dead pve1 or a dead homelab still alerts, which nothing on the
+LAN can do about itself. The k3s Grafana keeps watching the cluster until it
+is retired.
+
+Every Docker host runs the same agent — Alloy, node-exporter and cAdvisor, in
+`infra/monitoring/` and `stacks/monitoring/` — which pushes:
+
+- every container's logs, labelled `host`, `stack`, `service`, `container`;
+- host metrics (`job="node"`), per-container metrics (`job="cadvisor"`) and
+  doco-cd's own (`job="doco-cd"`), labelled `host`.
+
+A new stack needs nothing to be monitored. Alloy's config is identical on
+every host — only `HOST_LABEL` differs — and is copied per tree because a
+stack can only mount its own files; `validate-stacks` fails if the copies
+drift. A new host copies the agent stack, sets `HOST_LABEL`, and adds a
+`HostAgentAbsent` clause for itself.
+
+**The free tier caps active series at 10k** and keeps 14 days. The agent keeps
+metrics deliberately: container veths are excluded from node-exporter, and
+cAdvisor is cut to the metrics a dashboard uses. Check usage in the stack's
+cost-management page before adding a scrape.
+
+Alert rules are Prometheus-format files in `grafana-cloud/rules/`.
+`grafana-cloud.yml` validates them on PRs and, on merge, syncs them into the
+stack as Grafana-managed rules, so change them here rather than in the UI.
+Where they notify — the same ntfy topic and template as the cluster's, routed
+on `severity` — is `bootstrap/tofu/grafana`, applied by hand like the
+Cloudflare records.
+
+Going back to self-hosting is a change of the agent's endpoints plus an
+Alertmanager config: the agent and rules are standard Prometheus/Loki formats.
 
 ## Where Caddy runs
 

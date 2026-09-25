@@ -7,6 +7,7 @@
 #   - every Caddyfile parses with the Caddy build the host will run
 #   - no hostname is served by more than one Caddyfile on a host, since a
 #     public/tailnet duplicate would silently expose a tailnet site
+#   - every host runs the same monitoring agent config
 set -euo pipefail
 
 # One tree per host: stacks/ is the compose host, infra/ the infra host.
@@ -117,5 +118,16 @@ for tree in "${trees[@]}"; do
 done
 across=$(grep -hoE '^[a-z0-9*][a-z0-9.*-]*\.[a-z]+' "${caddyfiles[@]}" | sort | uniq -d)
 [ -z "$across" ] || fail "these hostnames are served by more than one host: $across"
+
+# The agent config is copied per tree because a stack can only mount files
+# from its own directory; the copies must not drift.
+agents=()
+for tree in "${trees[@]}"; do
+  f="$tree/monitoring/alloy/config.alloy"
+  [ -f "$f" ] && agents+=("$f")
+done
+for f in "${agents[@]:1}"; do
+  cmp -s "${agents[0]}" "$f" || fail "$f differs from ${agents[0]}; the agent config must be identical on every host"
+done
 
 exit "$status"
