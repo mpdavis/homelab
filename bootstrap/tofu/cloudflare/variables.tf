@@ -11,6 +11,7 @@ variable "records" {
     thumbs   = "public"
     home     = "compose_tailnet"
     podfetch = "compose_tailnet"
+    gridiron = "compose_tailnet"
     proxmox  = "infra_tailnet"
     birdnet  = "infra_tailnet"
   }
