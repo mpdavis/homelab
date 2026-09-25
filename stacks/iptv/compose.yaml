@@ -69,6 +69,16 @@ services:
       - ecm-mcp-secrets:/run/secrets/ecm-mcp
     extra_hosts:
       - emby:10.0.1.212
+    # The image's own check, with a longer grace period: every boot VACUUMs
+    # journal.db before listening, rewriting all of it (~6m for 12G here).
+    # Under the image's 2m, doco-cd killed it mid-VACUUM as unhealthy and it
+    # never finished starting.
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/venv/bin/python -c \"import urllib.request; urllib.request.urlopen('http://localhost:6100/api/health')\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15m
+      retries: 3
     networks:
       - proxy
 

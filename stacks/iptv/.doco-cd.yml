@@ -1,0 +1,3 @@
+# Outlasts ecm's 15m healthcheck start_period; at the 180s default doco-cd
+# fails the deploy and restarts ecm before it finishes starting.
+timeout: 1200
