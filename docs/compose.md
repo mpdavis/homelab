@@ -197,7 +197,8 @@ merge, so the copy happens **before** it, not after:
    ```
 
    A suspended HelmRelease is pruned on merge but never uninstalled, so its
-   Deployment and Service outlive it. Clean up afterwards with
+   Deployment and Service outlive it — unless the whole namespace goes too,
+   which takes the release with it. When the namespace stays, clean up with
    `helm -n <ns> uninstall <name>`; `helm list` is how you spot the leftovers.
 
 3. Copy the data into the target volume, and check it landed:
