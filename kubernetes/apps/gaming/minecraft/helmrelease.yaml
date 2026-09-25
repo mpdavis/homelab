@@ -29,7 +29,7 @@ spec:
       # Minecraft's LATEST release now ships class file version 69); the
       # Minecraft game version is set separately via minecraftServer.version
       # below.
-      tag: "2026.9.1-java25"
+      tag: "2026.9.2-java25"
       pullPolicy: IfNotPresent
     minecraftServer:
       # Accepting the Minecraft EULA (https://www.minecraft.net/en-us/eula) is
