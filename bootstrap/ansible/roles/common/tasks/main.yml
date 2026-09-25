@@ -5,6 +5,12 @@
   failed_when: cloud_init_result.rc not in [0, 2]
   register: cloud_init_result
 
+- name: Write resolv.conf without search domain
+  ansible.builtin.copy:
+    dest: /etc/resolv.conf
+    content: "{% for server in network.dns %}nameserver {{ server }}\n{% endfor %}"
+    mode: "0644"
+
 - name: Update apt cache
   ansible.builtin.apt:
     update_cache: true
@@ -15,7 +21,6 @@
     name:
       - curl
       - gnupg
-      - open-iscsi
       - nfs-common
     state: present
 
