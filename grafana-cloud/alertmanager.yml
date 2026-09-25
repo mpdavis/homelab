@@ -1,6 +1,8 @@
-# Same ntfy topic and message template as the k3s Alertmanager, so alerts
-# from both look alike during the migration. The token is the compose
-# secret ntfy_token (NTFY_TOKEN in .doco-cd.yml).
+# The Grafana Cloud stack's Alertmanager, loaded by
+# .github/workflows/grafana-cloud.yml. Same ntfy topic and message template as
+# the k3s Alertmanager, so alerts from both look alike during the migration.
+# Hosted Alertmanager has no file to read a token from; CI substitutes
+# ${NTFY_TOKEN} from the NTFY_ALERTMANAGER_TOKEN repo secret.
 route:
   group_by: ["alertname", "host"]
   group_wait: 30s
@@ -19,11 +21,11 @@ receivers:
         send_resolved: true
         http_config:
           authorization:
-            credentials_file: /run/secrets/ntfy_token
+            credentials: ${NTFY_TOKEN}
   - name: ntfy-critical
     webhook_configs:
       - url: "https://ntfy.mpdavis.com/homelab-alerts?tpl=1&title=%7B%7Bif%20eq%20.status%20%22resolved%22%7D%7D%E2%9C%85%20%7B%7Belse%7D%7D%F0%9F%94%A5%20%7B%7Bend%7D%7D%7B%7B.commonLabels.alertname%7D%7D&message=%7B%7Brange%20.alerts%7D%7D%7B%7B.annotations.description%7D%7D%0A%7B%7Bend%7D%7D&priority=5&tags=rotating_light"
         send_resolved: true
         http_config:
           authorization:
-            credentials_file: /run/secrets/ntfy_token
+            credentials: ${NTFY_TOKEN}

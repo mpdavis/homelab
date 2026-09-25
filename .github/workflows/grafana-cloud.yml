@@ -1,0 +1,84 @@
+name: Grafana Cloud · Alerting
+
+# grafana-cloud/ is the Grafana Cloud stack's alerting: rule files for its
+# Mimir ruler and alertmanager.yml for its Alertmanager. PRs validate it; main
+# syncs it, so the stack is changed by merging here, not in the UI.
+# Advisory: NOT on main's ruleset, so the `paths` filter is safe (a required
+# check must not be filtered; see image-pin-check.yml).
+on:
+  pull_request:
+    paths:
+      - 'grafana-cloud/**'
+      - '.github/workflows/grafana-cloud.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'grafana-cloud/**'
+      - '.github/workflows/grafana-cloud.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# A sync cancelled between the rules and the Alertmanager load leaves the two
+# out of step, so only PR runs cancel.
+concurrency:
+  group: grafana-cloud-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # renovate: datasource=docker depName=grafana/mimirtool
+  MIMIRTOOL_VERSION: "3.2.1"
+  # Not secret: from the stack's details page on grafana.com. The ruler and
+  # the Alertmanager share the metrics instance id.
+  MIMIR_ADDRESS: https://prometheus-prod-XX.grafana.net
+  MIMIR_ALERTMANAGER_ADDRESS: https://alertmanager-prod-XX.grafana.net
+  MIMIR_API_USER: "000000"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check rules
+        working-directory: grafana-cloud
+        run: |
+          docker run --rm -v "$PWD:/g:ro" -w /g "grafana/mimirtool:$MIMIRTOOL_VERSION" \
+            rules check rules/*.yml
+
+      - name: Check Alertmanager config
+        env:
+          NTFY_TOKEN: placeholder
+        run: |
+          envsubst '$NTFY_TOKEN' < grafana-cloud/alertmanager.yml > "$RUNNER_TEMP/alertmanager.yml"
+          docker run --rm -v "$RUNNER_TEMP:/t:ro" "grafana/mimirtool:$MIMIRTOOL_VERSION" \
+            alertmanager verify /t/alertmanager.yml
+
+  sync:
+    needs: validate
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # sync, not load: a group deleted from the files is deleted from the
+      # stack too.
+      - name: Sync rules
+        working-directory: grafana-cloud
+        env:
+          MIMIR_API_KEY: ${{ secrets.GRAFANA_CLOUD_ALERTING_TOKEN }}
+        run: |
+          docker run --rm -v "$PWD:/g:ro" -w /g \
+            -e MIMIR_ADDRESS -e MIMIR_API_USER -e MIMIR_API_KEY \
+            "grafana/mimirtool:$MIMIRTOOL_VERSION" rules sync rules/*.yml
+
+      - name: Load Alertmanager config
+        env:
+          MIMIR_API_KEY: ${{ secrets.GRAFANA_CLOUD_ALERTING_TOKEN }}
+          NTFY_TOKEN: ${{ secrets.NTFY_ALERTMANAGER_TOKEN }}
+        run: |
+          envsubst '$NTFY_TOKEN' < grafana-cloud/alertmanager.yml > "$RUNNER_TEMP/alertmanager.yml"
+          docker run --rm -v "$RUNNER_TEMP:/t:ro" \
+            -e MIMIR_ADDRESS="$MIMIR_ALERTMANAGER_ADDRESS" -e MIMIR_API_USER -e MIMIR_API_KEY \
+            "grafana/mimirtool:$MIMIRTOOL_VERSION" alertmanager load /t/alertmanager.yml

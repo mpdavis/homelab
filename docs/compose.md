@@ -29,10 +29,10 @@ infra/                    # the infra host's projects, same shape
   <stack>/
 ```
 
-| Host     | Where                       | Runs                                                     |
-| -------- | --------------------------- | -------------------------------------------------------- |
-| `docker` | VM 205 on pve2, `10.0.1.55` | the migrated services + their Caddies                    |
-| `infra`  | VM 206 on pve1, `10.0.1.58` | Caddy for what is not on the docker host, and monitoring |
+| Host     | Where                       | Runs                                     |
+| -------- | --------------------------- | ---------------------------------------- |
+| `docker` | VM 205 on pve2, `10.0.1.55` | the migrated services + their Caddies    |
+| `infra`  | VM 206 on pve1, `10.0.1.58` | Caddy for what is not on the docker host |
 
 Each host runs one doco-cd, told which tree to deploy by its poll target: the
 compose host uses the default config, the infra host sets `DOCO_TARGET=infra`
@@ -65,33 +65,37 @@ has the reason.
 
 ## Monitoring
 
-Prometheus, Loki, Alertmanager and Grafana run on the infra host
-(`infra/monitoring/`), so they keep recording and alerting while the compose
-host is down. Grafana is `grafana-compose.mpdavis.com` (tailnet); the k3s
-Grafana stays at `grafana.mpdavis.com` and keeps watching the cluster until it
-is retired, at which point this one can take the name.
+Metrics, logs and alerting for the Docker hosts live in a free Grafana Cloud
+stack — nothing monitoring-related runs here except an agent. Off-site means a
+dead host, a dead pve1 or a dead homelab still alerts, which nothing on the
+LAN can do about itself. The k3s Grafana keeps watching the cluster until it
+is retired.
 
-Every Docker host runs the same agent — Alloy, node-exporter and cAdvisor
-(`infra/monitoring/` and `stacks/monitoring/`) — which pushes:
+Every Docker host runs the same agent — Alloy, node-exporter and cAdvisor, in
+`infra/monitoring/` and `stacks/monitoring/` — which pushes:
 
-- every container's logs to Loki, labelled `host`, `stack`, `service`,
-  `container`;
+- every container's logs, labelled `host`, `stack`, `service`, `container`;
 - host metrics (`job="node"`), per-container metrics (`job="cadvisor"`) and
-  doco-cd's own (`job="doco-cd"`) to Prometheus by remote write, labelled
-  `host`.
+  doco-cd's own (`job="doco-cd"`), labelled `host`.
 
-A new stack needs nothing to be monitored. Pushing means the backends need no
-route to the hosts, only `10.0.1.58:9090` and `:3100` reachable from them;
-both are LAN-only and unauthenticated.
+A new stack needs nothing to be monitored. Alloy's config is identical on
+every host — only `HOST_LABEL` differs — and is copied per tree because a
+stack can only mount its own files; `validate-stacks` fails if the copies
+drift. A new host copies the agent stack, sets `HOST_LABEL`, and adds a
+`HostAgentAbsent` clause for itself.
 
-Alerts go to the same ntfy topic as the cluster's, with the same template. The
-rules are `infra/monitoring/prometheus/rules.yml`. The infra host cannot report
-its own outage, so Gatus in k3s probes its Prometheus, Loki and Grafana.
+**The free tier caps active series at 10k** and keeps 14 days. The agent keeps
+metrics deliberately: container veths are excluded from node-exporter, and
+cAdvisor is cut to the metrics a dashboard uses. Check usage in the stack's
+cost-management page before adding a scrape.
 
-Alloy's config is identical on every host — only env vars differ — and is
-copied per tree because a stack can only mount its own files;
-`validate-stacks` fails if the copies drift. A new host copies the agent stack
-and sets `HOST_LABEL`, then adds a `HostAgentAbsent` clause for it.
+Alerting is in `grafana-cloud/`: Prometheus-format rules for the stack's
+ruler, and an Alertmanager config routing to the same ntfy topic, with the
+same template, as the cluster's. `grafana-cloud.yml` validates both on PRs and
+syncs them on merge, so change alerts here rather than in the UI.
+
+Going back to self-hosting is a change of the agent's endpoints: the agent,
+rules and Alertmanager config are all standard Prometheus/Loki formats.
 
 ## Where Caddy runs
 

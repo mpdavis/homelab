@@ -1,10 +1,12 @@
+# Synced to the Grafana Cloud stack's Mimir ruler by
+# .github/workflows/grafana-cloud.yml. Evaluated off-site, so a dead host or
+# a dead homelab still alerts.
+namespace: docker-hosts
 groups:
   - name: docker-hosts
     rules:
       # Agents push, so a dead host leaves no `up == 0` behind — its series
       # just stop. One absent() per host keeps the host label on the alert.
-      # The infra host can't report its own death; Gatus in k3s probes this
-      # stack's endpoints and covers that case.
       - alert: HostAgentAbsent
         expr: |
           absent_over_time(up{job="node", host="docker"}[5m])
