@@ -49,6 +49,14 @@ resource "proxmox_virtual_environment_container" "container" {
   unprivileged  = !each.value.privileged
   start_on_boot = true
 
+  # For tailscaled. Needs root@pam: the API only lets root set dev[n].
+  dynamic "device_passthrough" {
+    for_each = each.value.tun ? ["/dev/net/tun"] : []
+    content {
+      path = device_passthrough.value
+    }
+  }
+
   features {
     nesting = each.value.nesting
     keyctl  = each.value.keyctl

@@ -40,7 +40,7 @@ Run from `bootstrap/ansible/`: `ansible-playbook playbooks/<playbook>.yml`.
 | `bootstrap-secrets.yml` | `k3s_server` | Creates the Bitwarden access token secret for External Secrets (prompts) |
 | `bootstrap-flux.yml` | `k3s_server` | Installs the Flux Operator and applies the FluxInstance |
 | `docker-host.yml` | `docker_hosts` | Docker, service IPs, and the doco-cd instance; see `docs/compose.md` |
-| `tailscale-router.yml` | `tailscale_router` | TUN passthrough and the subnet router (prompts for an auth key) |
+| `tailscale-router.yml` | `tailscale_router` | The subnet router (prompts for an auth key) |
 | `devbox.yml` | `development` | The development host; see `docs/devbox.md` |
 
 A fresh cluster, in order:
@@ -63,7 +63,6 @@ Every guest play starts with `common`; the rest are applied by group.
 | `pve` | Proxmox hosts | Repos, subscription nag, HA off, NIC offloading, k3s sysctls, update |
 | `common` | every guest | Cloud-init wait, `resolv.conf`, apt cache, base packages, k3s sysctls on VMs |
 | `lxc` | LXC guests | AppArmor removal, `/dev/kmsg` symlink, shared mount for k3s and Docker |
-| `lxc_tun` | tailscale-router, devbox | `/dev/net/tun` passthrough, edited on the hosting PVE node |
 | `vm` | VM guests | qemu-guest-agent |
 | `gpu` | k3s-agent-gpu | NVIDIA driver, container toolkit, containerd runtime |
 | `k3s_server` | k3s-server | k3s server install, kubeconfig fetch |

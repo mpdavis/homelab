@@ -27,6 +27,7 @@ variable "containers" {
     privileged  = bool
     nesting     = bool
     keyctl      = bool
+    tun         = optional(bool, false)
     start_order = optional(number, 0)
     tags        = optional(list(string), [])
   }))
@@ -61,12 +62,9 @@ variable "containers" {
       cores     = 1
       memory    = 512
       disk_size = 8
-      # Privileged: the bpg/proxmox provider has no way to grant TUN device
-      # passthrough (needed for tailscaled) via Terraform — CustomLXCConfig.Raw
-      # is read-only from the API, and the `features` block only exposes
-      # nesting/fuse/keyctl/mount/mknod, none of which cover this. The actual
-      # /dev/net/tun passthrough is applied out-of-band by the lxc_tun Ansible
-      # role, which edits /etc/pve/lxc/203.conf directly on pve1.
+      # Privileged dates from when TUN had to be passed through with raw LXC
+      # config lines. device_passthrough (`tun`) works unprivileged too, but
+      # flipping it recreates the container.
       #
       # Nesting: required even though nothing here runs nested containers.
       # This template's systemd (255) fails most units — including
@@ -77,6 +75,7 @@ variable "containers" {
       privileged  = true
       nesting     = true
       keyctl      = false
+      tun         = true
       start_order = 3
       tags        = ["tailscale", "subnet-router"]
     }
@@ -87,13 +86,13 @@ variable "containers" {
       memory = 8192
       # Thin-provisioned, but pve1's pool is 141G at ~69%. Watch `lvs pve/data`.
       disk_size = 40
-      # Privileged for the same TUN reason as tailscale-router above (the
-      # passthrough lines are written by the lxc_tun role); nesting is also
-      # required for Docker. A privileged LXC running coding agents is a
+      # Privileged for the same historical TUN reason as tailscale-router
+      # above; nesting is also required for Docker. A privileged LXC running coding agents is a
       # deliberate trade — treat a devbox compromise as a pve1 compromise.
       privileged  = true
       nesting     = true
       keyctl      = true
+      tun         = true
       start_order = 4
       tags        = ["devbox", "development"]
     }
