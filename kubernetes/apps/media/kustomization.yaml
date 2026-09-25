@@ -4,8 +4,6 @@ namespace: media
 resources:
   - namespace.yaml
   - audiobookshelf
-  - dispatcharr
-  - ecm
   - emby
   - listenarr
   - prowlarr
@@ -14,5 +12,4 @@ resources:
   - recyclarr
   - seerr
   - sonarr
-  - teamarr
   - unpackerr

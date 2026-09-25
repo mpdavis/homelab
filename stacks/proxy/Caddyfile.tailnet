@@ -33,3 +33,28 @@ gridiron.mpdavis.com {
 		reverse_proxy gridiron:8080
 	}
 }
+
+dispatcharr.mpdavis.com {
+	route {
+		import authentik
+		reverse_proxy dispatcharr:9191
+	}
+}
+
+teamarr.mpdavis.com {
+	route {
+		import authentik
+		reverse_proxy teamarr:9195
+	}
+}
+
+# No forward auth: ECM has its own login, and MCP clients authenticate with a
+# bearer key they could not get past Authentik with.
+ecm.mpdavis.com {
+	handle /mcp* {
+		reverse_proxy ecm-mcp:6101
+	}
+	handle {
+		reverse_proxy ecm:6100
+	}
+}

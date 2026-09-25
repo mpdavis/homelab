@@ -57,20 +57,20 @@ spec:
                       - home.mpdavis.com
                       - podfetch.mpdavis.com
                       - gridiron.mpdavis.com
+                      - ecm.mpdavis.com
+                      - dispatcharr.mpdavis.com
+                      - teamarr.mpdavis.com
                   - ip: ${TRAEFIK_TAILNET_IP}
                     hostnames:
                       - paperless.mpdavis.com
-                      - ecm.mpdavis.com
                       - qbit.mpdavis.com
                       - mousehole.mpdavis.com
                       - grafana.mpdavis.com
                       - ai.mpdavis.com
-                      - dispatcharr.mpdavis.com
                       - listenarr.mpdavis.com
                       - prowlarr.mpdavis.com
                       - radarr.mpdavis.com
                       - sonarr.mpdavis.com
-                      - teamarr.mpdavis.com
                       - flux.mpdavis.com
                   - ip: ${INFRA_TAILNET_IP}
                     hostnames:
@@ -286,7 +286,8 @@ spec:
         - name: dispatcharr
           group: internal
           # No dedicated health route; the version API is unauthenticated and
-          # served by the Django app.
+          # served by the Django app. Reaches the compose host through the
+          # bridge Service emby's tuner uses, so it checks that path too.
           url: http://dispatcharr.media.svc.cluster.local:9191/api/core/version/
           conditions: *internal-conditions
         - name: prowlarr
@@ -301,15 +302,7 @@ spec:
           group: internal
           url: http://sonarr.media.svc.cluster.local:8989/ping
           conditions: *internal-conditions
-        - name: teamarr
-          group: internal
-          url: http://teamarr.media.svc.cluster.local:9195/health
-          conditions: *internal-conditions
         - name: council-digest
           group: internal
           url: http://ames-council-digest-web.civic.svc.cluster.local/healthz
-          conditions: *internal-conditions
-        - name: gridiron
-          group: internal
-          url: http://gridiron.gridiron.svc.cluster.local:8080/healthz
           conditions: *internal-conditions

@@ -5,3 +5,5 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingressroute.yaml
+  - service-lan.yaml
+  - dispatcharr-bridge.yaml
