@@ -12,7 +12,7 @@ tailscale_ssh: false
 
 tailscale_advertise_tags: ""
 
-# Keeps tailscaled out of /etc/resolv.conf, which the `lxc` role owns.
+# Keeps tailscaled out of /etc/resolv.conf, which the `common` role owns.
 tailscale_accept_dns: false
 
 tailscale_apt_keyring_url: https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg

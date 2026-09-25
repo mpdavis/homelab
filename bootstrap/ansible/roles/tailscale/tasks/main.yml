@@ -1,10 +1,4 @@
 ---
-- name: Wait for cloud-init to finish
-  ansible.builtin.command: cloud-init status --wait
-  changed_when: false
-  failed_when: cloud_init_result.rc not in [0, 2]
-  register: cloud_init_result
-
 - name: Add Tailscale package signing key
   ansible.builtin.get_url:
     url: "{{ tailscale_apt_keyring_url }}"

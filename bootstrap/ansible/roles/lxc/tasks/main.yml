@@ -5,12 +5,6 @@
     state: absent
     purge: true
 
-- name: Write resolv.conf without search domain
-  ansible.builtin.copy:
-    dest: /etc/resolv.conf
-    content: "{% for server in network.dns %}nameserver {{ server }}\n{% endfor %}"
-    mode: "0644"
-
 - name: Create /dev/kmsg symlink
   ansible.builtin.file:
     src: /dev/console

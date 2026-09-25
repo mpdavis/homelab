@@ -1,10 +1,4 @@
 ---
-- name: Write resolv.conf without search domain
-  ansible.builtin.copy:
-    dest: /etc/resolv.conf
-    content: "{% for server in network.dns %}nameserver {{ server }}\n{% endfor %}"
-    mode: "0644"
-
 - name: Install qemu-guest-agent
   ansible.builtin.apt:
     name: qemu-guest-agent
