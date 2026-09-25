@@ -5,7 +5,7 @@ name: monitoring
 # routing in bootstrap/tofu/grafana. infra/monitoring/ runs the same agent.
 services:
   alloy:
-    image: grafana/alloy:v1.19.2
+    image: grafana/alloy:v1.20.0
     restart: unless-stopped
     command:
       - run
