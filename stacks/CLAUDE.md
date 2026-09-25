@@ -67,7 +67,13 @@ its stacks reference.
   a service when a file it mounts changes, so no hash label or manual restart is
   needed.
 - **Healthchecks decide deployment success.** doco-cd waits for them, and
-  restarts a container that later goes unhealthy.
+  restarts a container that later goes unhealthy — so a check that is subtly
+  wrong becomes a restart loop. Prefer the one the image ships
+  (`docker inspect <image> --format '{{.Config.Healthcheck}}'`) over writing
+  one, and if you do write one, use a binary the image actually has.
+- **Volumes are named `<project>_<key>`,** so the stack a service lives in
+  decides its volume names. Data copied during a migration has to go to the
+  name the final stack will use.
 
 ## Translating a k3s workload
 
@@ -79,7 +85,7 @@ its stacks reference.
 | `${VAR}` from `cluster-vars` | the literal value — there is no postBuild substitution here |
 | Service DNS (`x.ns.svc.cluster.local`) | the container name on the `proxy` network, or a LAN address |
 | liveness/readiness probe | `healthcheck:` — doco-cd waits on it and restarts on unhealthy |
-| `IngressRoute` | a site block in the right Caddyfile |
+| `IngressRoute` | a site block in the right Caddyfile; a service still in k3s uses `import traefik` |
 | Authentik forward-auth middleware | `forward_auth` in the site block |
 
 **The NAS exports are restricted by client IP.** A host that is not on the

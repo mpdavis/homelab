@@ -118,14 +118,23 @@ own.
 
 ### First, check what the service drags with it
 
-- **Is it public?** The router forwards 443 to one IP, so a public service
-  cannot move alone — the front door moves with it.
+- **Is it public?** No router work is needed — the forward already points at
+  the public Caddy — but the swap happens in `Caddyfile.public`, from
+  `import traefik` to a `reverse_proxy` at the container.
 - **Does it mount NFS?** The host must be on the NAS export allowlist
   (`showmount -e 10.0.1.6`), or the mount fails with `permission denied`.
 - **Does anything in the cluster talk to it?** A consumer using
   `x.ns.svc.cluster.local` stops resolving the moment the Service is gone.
 - **Does it share files with another service?** Two copies writing the same
   share is worse than downtime; stop one before starting the other.
+
+Test with `curl --resolve <host>:443:<caddy ip> https://<host>/`. Use port 443 —
+a different port puts `:port` in the `Host` header, which stops Traefik matching
+and looks like a routing bug that isn't.
+
+Never move the router's 443 forward before the Caddyfile that serves those
+hostnames is merged: the target answers nothing until doco-cd has deployed it,
+and every public service is down in the meantime.
 
 ### Stateless
 
@@ -167,5 +176,9 @@ merge, so the copy happens **before** it, not after:
    Then `chown` to the uid the container runs as, and compare checksums. An
    embedded database keeps a WAL — copy it and its sidecar files, not just the
    `.db`.
+
+   **Verify before merging, not after.** Flux prunes the PVC too, and
+   local-path deletes the directory with it, so once the merge lands the copy on
+   the compose host is the only copy.
 4. Merge. Flux prunes the cluster copy; doco-cd starts the stack on the data.
 5. DNS as above.
