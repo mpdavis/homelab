@@ -130,7 +130,7 @@ variable "vms" {
       node      = "pve2"
       cores     = 4
       memory    = 8192
-      disk_size = 32
+      disk_size = 128
       tags      = ["docker"]
     }
     # Ingress for what does not run on the compose host, so those routes
