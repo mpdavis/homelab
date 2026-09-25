@@ -1,0 +1,10 @@
+# Sets each host's ansible_host from bootstrap/network.yaml (loaded as the
+# `network` group var) once, at inventory load. A templated ansible_host in
+# group_vars would be re-evaluated per task, and under delegate_to Ansible
+# templates it with the delegating host's inventory_hostname, so a task
+# delegated to a Proxmox node would connect to the container instead.
+plugin: ansible.builtin.constructed
+strict: true
+use_vars_plugins: true
+compose:
+  ansible_host: network.hosts[inventory_hostname]

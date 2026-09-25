@@ -4,5 +4,5 @@
 # to the primary address instead of replacing it.
 service_ips_interface: eth0
 
-# CIDR strings, e.g. ["10.0.1.56/16"].
+# CIDR strings, e.g. ["192.0.2.10/24"].
 service_ips: []

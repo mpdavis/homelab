@@ -26,6 +26,12 @@ Only use `ansible.builtin.shell` or `ansible.builtin.command` when no built-in m
 
 Never commit secrets or default passwords to the repository. Use `vars_prompt` in playbooks for credentials needed at runtime. Sensitive values can also be passed via `-e` flags or environment variables.
 
+## Addresses
+
+Never write an IP into a playbook, role, or the inventory. Add it to
+`bootstrap/network.yaml` (and its shape to `network.example.yaml`) and reference
+it through the `network` var, e.g. `network.hosts[inventory_hostname]`.
+
 ## Playbook Conventions
 
 - Always use fully qualified collection names (`ansible.builtin.apt`, not `apt`)

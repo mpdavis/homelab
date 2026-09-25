@@ -3,7 +3,7 @@
 # stacks/ from this repo. See docs/compose.md for the runbook.
 #
 #   tofu -chdir=bootstrap/tofu/proxmox apply
-#   ansible-playbook -i inventory/hosts.yml playbooks/docker-host.yml
+#   ansible-playbook playbooks/docker-host.yml
 
 - name: Configure Docker hosts
   hosts: docker_hosts
