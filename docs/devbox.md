@@ -29,8 +29,8 @@ cd bootstrap/ansible
 ansible-playbook playbooks/devbox.yml
 ```
 
-The first play edits `/etc/pve/lxc/204.conf` on pve1 to pass `/dev/net/tun`
-through and reboots the container. This is the one piece Tofu cannot express —
+The `lxc_tun` role runs first: it edits `/etc/pve/lxc/204.conf` on pve1 to pass
+`/dev/net/tun` through and reboots the container. This is the one piece Tofu cannot express —
 the `bpg/proxmox` provider exposes no device passthrough for containers — so if
 Tofu ever destroys and recreates this container, re-run the playbook.
 

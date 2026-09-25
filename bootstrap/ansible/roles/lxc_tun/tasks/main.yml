@@ -1,0 +1,27 @@
+---
+# Passes /dev/net/tun through to a privileged LXC (for tailscaled). Tofu can't:
+# the bpg/proxmox provider has no device-passthrough option for containers, and
+# raw LXC config lines are read-only through the API. So this edits the config
+# on the node hosting the container — /etc/pve/lxc/ is only that node's
+# containers. If Tofu ever recreates the container, re-run the playbook.
+- name: Ensure the TUN device passthrough lines are present
+  ansible.builtin.lineinfile:
+    path: "/etc/pve/lxc/{{ vmid }}.conf"
+    line: "{{ item }}"
+  loop:
+    - "lxc.cgroup2.devices.allow: c 10:200 rwm"
+    - "lxc.mount.entry: /dev/net dev/net none bind,create=dir"
+  delegate_to: "{{ pve_node }}"
+  register: lxc_tun_config
+
+- name: Restart the container to apply device passthrough
+  ansible.builtin.command: "pct reboot {{ vmid }}"
+  delegate_to: "{{ pve_node }}"
+  when: lxc_tun_config.changed
+  changed_when: true
+
+- name: Wait for the container to come back up
+  ansible.builtin.wait_for_connection:
+    delay: 5
+    timeout: 120
+  when: lxc_tun_config.changed

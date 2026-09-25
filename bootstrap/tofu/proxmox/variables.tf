@@ -65,8 +65,8 @@ variable "containers" {
       # passthrough (needed for tailscaled) via Terraform — CustomLXCConfig.Raw
       # is read-only from the API, and the `features` block only exposes
       # nesting/fuse/keyctl/mount/mknod, none of which cover this. The actual
-      # /dev/net/tun passthrough is applied out-of-band by the tailscale-router
-      # Ansible playbook, which edits /etc/pve/lxc/203.conf directly on pve1.
+      # /dev/net/tun passthrough is applied out-of-band by the lxc_tun Ansible
+      # role, which edits /etc/pve/lxc/203.conf directly on pve1.
       #
       # Nesting: required even though nothing here runs nested containers.
       # This template's systemd (255) fails most units — including
@@ -88,7 +88,7 @@ variable "containers" {
       # Thin-provisioned, but pve1's pool is 141G at ~69%. Watch `lvs pve/data`.
       disk_size = 40
       # Privileged for the same TUN reason as tailscale-router above (the
-      # passthrough lines are written by playbooks/devbox.yml); nesting is also
+      # passthrough lines are written by the lxc_tun role); nesting is also
       # required for Docker. A privileged LXC running coding agents is a
       # deliberate trade — treat a devbox compromise as a pve1 compromise.
       privileged  = true
