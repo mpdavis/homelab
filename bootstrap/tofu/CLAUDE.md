@@ -26,7 +26,7 @@ All three read them from the environment, so nothing lands in a file:
 ```sh
 export PROXMOX_VE_PASSWORD=...                                   # proxmox/
 export CLOUDFLARE_API_TOKEN="$(bws secret get 67c9d80b-ca8e-47b5-a2eb-b442005fab6a -o json | jq -r .value)"  # cloudflare/
-export GRAFANA_AUTH=...                                          # grafana/: stack service account token
+export GRAFANA_AUTH="$(bws secret get 0e847022-1d64-467a-9bf5-b4d000090360 -o json | jq -r .value)"  # grafana/: stack service account token
 export TF_VAR_ntfy_token="$(bws secret get 47079c89-adab-4d19-8173-b48d01492747 -o json | jq -r .value)"  # grafana/
 ```
 
