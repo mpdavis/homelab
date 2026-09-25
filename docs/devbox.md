@@ -26,7 +26,7 @@ Then:
 ```bash
 tofu -chdir=bootstrap/tofu/proxmox apply
 cd bootstrap/ansible
-ansible-playbook -i inventory/hosts.yml playbooks/devbox.yml
+ansible-playbook playbooks/devbox.yml
 ```
 
 The first play edits `/etc/pve/lxc/204.conf` on pve1 to pass `/dev/net/tun`

@@ -1,9 +1,9 @@
 ---
-# Provisions the always-on development host (LXC 204, 10.0.1.54). See
+# Provisions the always-on development host (LXC 204). See
 # docs/devbox.md for the runbook.
 #
 #   tofu -chdir=bootstrap/tofu/proxmox apply
-#   ansible-playbook -i inventory/hosts.yml playbooks/devbox.yml
+#   ansible-playbook playbooks/devbox.yml
 
 # Same out-of-band TUN passthrough as playbooks/tailscale-router.yml: the
 # provider cannot grant it, and /etc/pve/lxc/*.conf is only writable from the

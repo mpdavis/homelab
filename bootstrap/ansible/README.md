@@ -11,7 +11,15 @@ Ansible playbooks and roles for provisioning the homelab infrastructure.
 
 ## Inventory
 
-Hosts are defined in `inventory/hosts.yml` and organized into groups:
+Hosts are defined in `inventory/hosts.yml` without addresses. Every IP comes
+from `bootstrap/network.yaml` (git-ignored; copy `bootstrap/network.example.yaml`),
+which `inventory/group_vars/all/network.yml` symlinks in as the `network` var.
+`inventory/network.yml`, a `constructed` inventory source, turns it into each
+host's `ansible_host`, so `ansible.cfg` points at the whole `inventory/`
+directory — don't pass `-i inventory/hosts.yml`. Tofu reads the same file. From
+a worktree, symlink the primary checkout's copy in first.
+
+Hosts are organized into groups:
 
 | Group | Hosts | Purpose |
 |-------|-------|---------|

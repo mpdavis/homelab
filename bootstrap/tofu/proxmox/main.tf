@@ -1,4 +1,6 @@
 locals {
+  net = yamldecode(file("${path.module}/../../network.yaml")).network
+
   container_nodes = toset([for c in var.containers : c.node])
   vm_nodes        = toset([for v in var.vms : v.node])
 }
@@ -74,14 +76,14 @@ resource "proxmox_virtual_environment_container" "container" {
 
     ip_config {
       ipv4 {
-        address = "${each.value.ip}${var.network_cidr}"
-        gateway = var.network_gateway
+        address = "${local.net.hosts[each.key]}/${local.net.prefix}"
+        gateway = local.net.gateway
       }
     }
 
     dns {
       domain  = ""
-      servers = var.dns_servers
+      servers = local.net.dns
     }
 
     user_account {
@@ -137,14 +139,14 @@ resource "proxmox_virtual_environment_vm" "vm" {
   initialization {
     ip_config {
       ipv4 {
-        address = "${each.value.ip}${var.network_cidr}"
-        gateway = var.network_gateway
+        address = "${local.net.hosts[each.key]}/${local.net.prefix}"
+        gateway = local.net.gateway
       }
     }
 
     dns {
       domain  = ""
-      servers = var.dns_servers
+      servers = local.net.dns
     }
 
     user_account {

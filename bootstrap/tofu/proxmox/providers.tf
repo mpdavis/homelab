@@ -10,7 +10,7 @@ terraform {
 }
 
 provider "proxmox" {
-  endpoint = var.proxmox_endpoint
+  endpoint = "https://${local.net.hosts.pve1}:8006"
   username = "root@pam"
   password = var.proxmox_password
   insecure = true
@@ -19,10 +19,10 @@ provider "proxmox" {
     agent = true
 
     dynamic "node" {
-      for_each = var.pve_nodes
+      for_each = setunion(local.container_nodes, local.vm_nodes)
       content {
         name    = node.key
-        address = node.value.address
+        address = local.net.hosts[node.key]
       }
     }
   }

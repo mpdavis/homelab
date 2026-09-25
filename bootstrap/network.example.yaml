@@ -1,0 +1,34 @@
+# Copy to network.yaml (git-ignored) and fill in. It is the only place the
+# bootstrap tier keeps addresses: Tofu reads it with yamldecode(), and Ansible
+# loads it as group_vars through inventory/group_vars/all/network.yml.
+#
+# Like Tofu's state, the real file lives only in the primary checkout. Running
+# from a worktree needs a copy or a symlink to it.
+network:
+  gateway: 192.168.0.1
+  # Prefix length every guest's address is configured with.
+  prefix: 16
+  dns:
+    - 1.1.1.1
+  # What the Tailscale subnet router advertises.
+  lan_route: 192.168.1.0/24
+  # The router's WAN address; public DNS records point here.
+  public_ip: 203.0.113.10
+
+  # One entry per inventory host and per Tofu guest, keyed by the same name.
+  hosts:
+    pve1: 192.168.1.1
+    pve2: 192.168.1.2
+    k3s-server: 192.168.1.50
+    k3s-agent-1: 192.168.1.51
+    k3s-agent-gpu: 192.168.1.52
+    tailscale-router: 192.168.1.53
+    devbox: 192.168.1.54
+    docker: 192.168.1.55
+    infra: 192.168.1.58
+
+  # Extra addresses on the docker host, one per Caddy instance. They must stay
+  # outside the MetalLB pool.
+  service_ips:
+    compose_public: 192.168.1.56
+    compose_tailnet: 192.168.1.57

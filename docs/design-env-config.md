@@ -4,6 +4,10 @@ Design for moving deployment-specific values (IP addresses, domain, timezone,
 node names, storage paths) out of the git repository into a central,
 out-of-git source of truth.
 
+**Status:** the bootstrap tier's addresses are done — `bootstrap/network.yaml`
+feeds both Tofu roots and the Ansible inventory. Names, VMIDs and sizing stay in
+git. The runtime tier is not started.
+
 ## Goals
 
 - No deployment-specific value hardcoded in tracked files

@@ -8,7 +8,7 @@
 - name: Write resolv.conf without search domain
   ansible.builtin.copy:
     dest: /etc/resolv.conf
-    content: "nameserver 1.1.1.1\n"
+    content: "{% for server in network.dns %}nameserver {{ server }}\n{% endfor %}"
     mode: "0644"
 
 - name: Create /dev/kmsg symlink

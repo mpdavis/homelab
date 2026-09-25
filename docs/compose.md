@@ -125,8 +125,9 @@ change, no DNS change, and nothing else moves with it.
 
 ## Bringing up a host
 
-1. Create the VM: `tofu -chdir=bootstrap/tofu/proxmox apply`. Note the state and
-   `terraform.tfvars` live only in the primary checkout, not in worktrees.
+1. Create the VM: add its address to `bootstrap/network.yaml`, then
+   `tofu -chdir=bootstrap/tofu/proxmox apply`. Note the state, `terraform.tfvars`
+   and `network.yaml` live only in the primary checkout, not in worktrees.
 2. Give the host a Bitwarden access token **(manual)**. Machine accounts are
    granted per project, and every secret lives in the single `homelab` project,
    so any token that can read the Cloudflare API token can read all of them —
@@ -136,7 +137,7 @@ change, no DNS change, and nothing else moves with it.
    (`secret/bitwarden-access-token` in `external-secrets`) works if you prefer
    one credential. Narrower access would mean splitting the project.
 3. Run the playbook:
-   `ansible-playbook -i inventory/hosts.yml playbooks/docker-host.yml`. Paste the
+   `ansible-playbook playbooks/docker-host.yml`. Paste the
    Bitwarden token at the prompt. Add `--limit <host>` to do one host.
 4. Check the result:
    - `docker ps` on the host shows `doco-cd` and the stacks. The stacks appear
