@@ -449,8 +449,8 @@ re-running it is the correction.
 - **Provisioning:** `bootstrap/tofu/proxmox` (container `devbox`), then
   `bootstrap/ansible/playbooks/devbox.yml`.
 - **Privileged LXC with nesting**, for two reasons: tailscaled needs
-  `/dev/net/tun` — passed through out-of-band by the playbook, exactly as for
-  `tailscale-router` — and Docker will not start in a container without nesting.
+  `/dev/net/tun` — passed through by Tofu's `device_passthrough`, exactly as
+  for `tailscale-router` — and Docker will not start in a container without nesting.
 - **Its own tailnet node**, not merely a host behind the subnet router, so it
   stays reachable if the router LXC is down and gets a MagicDNS name. Tailscale
   SSH is enabled alongside ordinary key-based sshd: the tailnet ACL authorises

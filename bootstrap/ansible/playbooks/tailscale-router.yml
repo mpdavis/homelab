@@ -10,6 +10,5 @@
       prompt: "Enter Tailscale auth key (tagged tag:subnet-router, reusable, from Trust credentials)"
       private: true
   roles:
-    - lxc_tun
     - common
     - tailscale

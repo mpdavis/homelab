@@ -28,8 +28,6 @@
       private: true
       default: ""
   roles:
-    # Before anything else: it reboots the container when it changes.
-    - lxc_tun
     - common
     # lxc makes / rshared, which Docker needs to start inside a container.
     - lxc

@@ -29,10 +29,8 @@ cd bootstrap/ansible
 ansible-playbook playbooks/devbox.yml
 ```
 
-The `lxc_tun` role runs first: it edits `/etc/pve/lxc/204.conf` on pve1 to pass
-`/dev/net/tun` through and reboots the container. This is the one piece Tofu cannot express —
-the `bpg/proxmox` provider exposes no device passthrough for containers — so if
-Tofu ever destroys and recreates this container, re-run the playbook.
+Tofu passes `/dev/net/tun` through (`tun = true` on the container, which sets
+`dev0` in `/etc/pve/lxc/204.conf`), so tailscaled has its device from first boot.
 
 ## Tailnet ACL
 
@@ -230,8 +228,9 @@ nodes. If `Data%` climbs past ~90%, reclaim space in this order:
 ## Troubleshooting
 
 **`tailscale up` fails or the box never appears on the tailnet.** Check TUN
-passthrough survived: `grep dev/net /etc/pve/lxc/204.conf` on pve1 should show
-both the cgroup allow rule and the mount entry. Re-run the playbook if not.
+passthrough: `ls -l /dev/net/tun` in the container, and `grep dev0
+/etc/pve/lxc/204.conf` on pve1. If `dev0` is missing, `tofu apply` and reboot
+the container.
 
 **Docker will not start.** Nesting must be on (`nesting = true` in the Tofu
 container definition) and `/` must be rshared — the `lxc` role's `rc.local`
