@@ -1,0 +1,38 @@
+name: gridiron
+
+services:
+  gridiron:
+    image: ghcr.io/mpdavis/gridiron:1.0.21
+    restart: unless-stopped
+    environment:
+      TZ: America/Chicago
+      GRIDIRON_DATA_DIR: /data
+      GRIDIRON_PORT: "8080"
+      # 2015 is a deliberate floor: CFBD's drive start position — the input to
+      # every field-position feature — is patchy before it.
+      GRIDIRON_FIRST_SEASON: "2015"
+      GRIDIRON_CFBD_API_KEY: ${GRIDIRON_CFBD_API_KEY:?resolved by doco-cd from external_secrets}
+      GRIDIRON_ODDS_API_KEY: ${GRIDIRON_ODDS_API_KEY:?resolved by doco-cd from external_secrets}
+    volumes:
+      - data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # DuckDB takes one writer and the ingest thread runs inside the web
+    # process, so this service must never run as two containers.
+    cpus: 3
+    mem_limit: 6g
+    networks:
+      - proxy
+
+volumes:
+  # DuckDB file plus the model artefacts derived from it.
+  data:
+
+networks:
+  proxy:
+    external: true

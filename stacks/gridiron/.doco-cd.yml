@@ -1,0 +1,4 @@
+external_secrets:
+  # Same secrets as BWS_GRIDIRON_* in the bws-secret-ids ConfigMap.
+  GRIDIRON_CFBD_API_KEY: 52ffcfb2-a0b1-44fc-88ad-b4ba01115975
+  GRIDIRON_ODDS_API_KEY: 161b739b-0df3-489a-9b50-b4b80188d47e
