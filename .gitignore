@@ -11,9 +11,3 @@ rendered.yaml
 
 # Bootstrap addresses; see bootstrap/network.example.yaml
 bootstrap/network.yaml
-# The tracked symlink that loads it as group_vars dangles in every clone, and
-# doco-cd follows symlinks while walking the repo for SOPS files — a missing
-# target aborts every deploy. doco-cd checks .gitignore before following, so
-# listing the link here makes it skip it. Git still tracks the link: ignore
-# rules never apply to tracked files.
-bootstrap/ansible/inventory/group_vars/all/network.yml
