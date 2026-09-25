@@ -257,6 +257,56 @@ spec:
           client: *auth-client
           headers: *auth-headers
           conditions: *auth-conditions
+        # --- public DNS for records OpenTofu owns (bootstrap/tofu/cloudflare).
+        # Every probe above resolves through hostAliases, so none of them can
+        # see a record that is missing or wrong — three services ran without
+        # DNS for hours on 2026-09-25 while everything stayed green. These ask
+        # a public resolver instead. Keep the list in step with `records`.
+        - name: dns-thumbs
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: thumbs.mpdavis.com}
+          conditions: ["[DNS_RCODE] == NOERROR", "[BODY] == ${PUBLIC_IP}"]
+        - name: dns-home
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: home.mpdavis.com}
+          conditions: &compose-tailnet-dns ["[DNS_RCODE] == NOERROR", "[BODY] == ${COMPOSE_TAILNET_IP}"]
+        - name: dns-podfetch
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: podfetch.mpdavis.com}
+          conditions: *compose-tailnet-dns
+        - name: dns-gridiron
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: gridiron.mpdavis.com}
+          conditions: *compose-tailnet-dns
+        - name: dns-dispatcharr
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: dispatcharr.mpdavis.com}
+          conditions: *compose-tailnet-dns
+        - name: dns-teamarr
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: teamarr.mpdavis.com}
+          conditions: *compose-tailnet-dns
+        - name: dns-ecm
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: ecm.mpdavis.com}
+          conditions: *compose-tailnet-dns
+        - name: dns-proxmox
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: proxmox.mpdavis.com}
+          conditions: &infra-tailnet-dns ["[DNS_RCODE] == NOERROR", "[BODY] == ${INFRA_TAILNET_IP}"]
+        - name: dns-birdnet
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: birdnet.mpdavis.com}
+          conditions: *infra-tailnet-dns
         # --- cluster-internal, no ingress ---
         - name: prometheus
           group: internal
