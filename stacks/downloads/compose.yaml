@@ -1,4 +1,4 @@
-name: podfetch
+name: downloads
 
 services:
   podfetch:
@@ -12,14 +12,14 @@ services:
       POLLING_INTERVAL: "60"
       DATABASE_URL: sqlite:///app/db/podcast.db
     volumes:
-      - db:/app/db
+      - podfetch-db:/app/db
       - podcasts:/app/podcasts
     networks:
       - proxy
 
 volumes:
   # SQLite database and app config.
-  db:
+  podfetch-db:
   # Downloaded episodes live on the media share so AudiobookShelf serves the
   # same library. The NAS offers NFSv3 only.
   podcasts:

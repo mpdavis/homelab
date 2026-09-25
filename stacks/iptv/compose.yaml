@@ -1,0 +1,21 @@
+name: iptv
+
+services:
+  game-thumbs:
+    image: ghcr.io/sethwv/game-thumbs:v2.3.0
+    restart: unless-stopped
+    user: "1000:1000"
+    environment:
+      TZ: America/Chicago
+    volumes:
+      - game-thumbs-cache:/app/.cache
+    networks:
+      - proxy
+
+volumes:
+  # Rebuildable thumbnail cache.
+  game-thumbs-cache:
+
+networks:
+  proxy:
+    external: true

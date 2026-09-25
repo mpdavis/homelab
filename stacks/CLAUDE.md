@@ -4,6 +4,19 @@ One directory per compose project, discovered automatically by doco-cd — the
 project takes the directory's name, and nothing lists it anywhere else. This
 tree belongs to the compose host; `infra/` is the same shape for the infra host.
 
+Services are grouped by what they do, not one stack each. The k3s `media`
+namespace becomes three:
+
+| Stack | Holds |
+|---|---|
+| `media` | what serves a library: emby, audiobookshelf |
+| `iptv` | dispatcharr, teamarr, ecm, game-thumbs |
+| `downloads` | what acquires: qbittorrent (with gluetun and mousehole), prowlarr, sonarr, radarr, unpackerr, recyclarr, podfetch, listenarr, seerr |
+
+Put a service in the right stack the first time. Moving it later renames the
+compose project, which renames its volumes — so the data has to be copied
+again, with the service stopped.
+
 `docs/compose.md` covers the deploy path and the host runbook.
 
 ## Exposure
