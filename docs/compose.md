@@ -152,6 +152,10 @@ merge, so the copy happens **before** it, not after:
    kubectl -n <ns> scale deploy <name> --replicas=0
    ```
 
+   A suspended HelmRelease is pruned on merge but never uninstalled, so its
+   Deployment and Service outlive it. Clean up afterwards with
+   `helm -n <ns> uninstall <name>`; `helm list` is how you spot the leftovers.
+
 3. Copy the data into the target volume, and check it landed:
 
    ```sh
