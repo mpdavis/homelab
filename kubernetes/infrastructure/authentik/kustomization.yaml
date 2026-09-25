@@ -9,3 +9,4 @@ resources:
   - helmrelease.yaml
   - ingressroute.yaml
   - middleware.yaml
+  - service-lan.yaml
