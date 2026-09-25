@@ -31,7 +31,7 @@ env:
   MIMIRTOOL_VERSION: "3.2.1"
   # Not secret: from the stack's details page on grafana.com. The ruler and
   # the Alertmanager share the metrics instance id.
-  MIMIR_ADDRESS: https://prometheus-prod-XX.grafana.net
+  MIMIR_ADDRESS: https://prometheus-prod-56-prod-us-east-2.grafana.net
   MIMIR_ALERTMANAGER_ADDRESS: https://alertmanager-prod-XX.grafana.net
   MIMIR_API_USER: "000000"
 

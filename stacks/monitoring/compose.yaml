@@ -16,7 +16,7 @@ services:
       HOST_LABEL: docker
       # Not secret: the stack's endpoints and instance ids, from the stack's
       # details page on grafana.com.
-      GRAFANA_CLOUD_PROMETHEUS_URL: https://prometheus-prod-XX.grafana.net/api/prom/push
+      GRAFANA_CLOUD_PROMETHEUS_URL: https://prometheus-prod-56-prod-us-east-2.grafana.net/api/prom/push
       GRAFANA_CLOUD_PROMETHEUS_USER: "000000"
       GRAFANA_CLOUD_LOKI_URL: https://logs-prod-XXX.grafana.net/loki/api/v1/push
       GRAFANA_CLOUD_LOKI_USER: "000000"
