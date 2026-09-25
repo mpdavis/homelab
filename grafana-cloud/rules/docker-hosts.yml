@@ -1,6 +1,7 @@
-# Synced to the Grafana Cloud stack's Mimir ruler by
-# .github/workflows/grafana-cloud.yml. Evaluated off-site, so a dead host or
-# a dead homelab still alerts.
+# Synced into the Grafana Cloud stack as Grafana-managed rules by
+# .github/workflows/grafana-cloud.yml; the namespace becomes their folder.
+# Evaluated off-site, so a dead host or a dead homelab still alerts. They
+# notify through bootstrap/tofu/grafana, routed on `severity`.
 namespace: docker-hosts
 groups:
   - name: docker-hosts

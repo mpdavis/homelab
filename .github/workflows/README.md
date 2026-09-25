@@ -17,7 +17,7 @@ scripts with no LLM and no secrets.
 | `lint-markdown.yml` | PRs touching `**/*.md` (advisory) | markdownlint-cli2 over the changed Markdown files. Config `.markdownlint-cli2.jsonc`. |
 | `lint-secrets.yml` | All PRs + push to `main` (advisory, no `paths` filter) | gitleaks over the commit range the PR/push adds. Config `.gitleaks.toml`. Backstop for a credential that bypasses the External Secrets pattern. |
 | `lint-helm.yml` | PRs touching `charts/**` (advisory) | `helm lint --strict` over first-party charts under `charts/*/`. Dormant until the first local chart lands. |
-| `grafana-cloud.yml` | PRs + push to `main` touching `grafana-cloud/**` (advisory) | Validates the Grafana Cloud alert rules and Alertmanager config with `mimirtool` on PRs; on `main`, syncs the rules to the stack's ruler and loads the Alertmanager config. The stack's alerting is changed by merging, not in the UI. |
+| `grafana-cloud.yml` | PRs + push to `main` touching `grafana-cloud/**` (advisory) | Validates the Grafana Cloud alert rules with `mimirtool` on PRs; on `main`, syncs them into the stack's Grafana as Grafana-managed rules. Their notification routing is `bootstrap/tofu/grafana`, not this workflow. |
 
 ## Lint checks
 
@@ -180,16 +180,12 @@ a **fine-grained PAT** (or a GitHub App installation token) scoped to this repo 
 
 ### `GRAFANA_CLOUD_ALERTING_TOKEN` (required by `grafana-cloud.yml`)
 
-A Grafana Cloud access policy token for the stack with **rules:read**,
-**rules:write**, **alerts:read** and **alerts:write** — nothing else. The hosts
-push with a separate write-only token held in Bitwarden.
-
-### `NTFY_ALERTMANAGER_TOKEN` (required by `grafana-cloud.yml`)
-
-An ntfy token with write access to the `homelab-alerts` topic. The hosted
-Alertmanager has no file to read it from, so the sync substitutes it into
-`grafana-cloud/alertmanager.yml` at load time. A token of its own, rather than
-the k3s Alertmanager's, can be revoked without silencing the cluster.
+A token for a service account in the stack's Grafana
+(**Administration → Users and access → Service accounts**) with the **Admin**
+role. Grafana's conversion API needs rule write, folder create and
+"set provisioning status", and the last is not clearly part of Editor. The
+same token is `GRAFANA_AUTH` for `bootstrap/tofu/grafana`. The hosts push with
+a separate write-only access policy token held in Bitwarden.
 
 ## The `new service` label
 

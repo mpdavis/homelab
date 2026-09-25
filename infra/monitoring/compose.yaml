@@ -1,8 +1,8 @@
 name: monitoring
 
 # This host's agent: container logs, host and container metrics, and
-# doco-cd's metrics, pushed to Grafana Cloud. Alert rules and routing live in
-# grafana-cloud/. stacks/monitoring/ runs the same agent.
+# doco-cd's metrics, pushed to Grafana Cloud. Alert rules live in grafana-cloud/,
+# routing in bootstrap/tofu/grafana. stacks/monitoring/ runs the same agent.
 services:
   alloy:
     image: grafana/alloy:v1.19.2

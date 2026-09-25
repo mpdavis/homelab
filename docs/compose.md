@@ -89,13 +89,15 @@ metrics deliberately: container veths are excluded from node-exporter, and
 cAdvisor is cut to the metrics a dashboard uses. Check usage in the stack's
 cost-management page before adding a scrape.
 
-Alerting is in `grafana-cloud/`: Prometheus-format rules for the stack's
-ruler, and an Alertmanager config routing to the same ntfy topic, with the
-same template, as the cluster's. `grafana-cloud.yml` validates both on PRs and
-syncs them on merge, so change alerts here rather than in the UI.
+Alert rules are Prometheus-format files in `grafana-cloud/rules/`.
+`grafana-cloud.yml` validates them on PRs and, on merge, syncs them into the
+stack as Grafana-managed rules, so change them here rather than in the UI.
+Where they notify — the same ntfy topic and template as the cluster's, routed
+on `severity` — is `bootstrap/tofu/grafana`, applied by hand like the
+Cloudflare records.
 
-Going back to self-hosting is a change of the agent's endpoints: the agent,
-rules and Alertmanager config are all standard Prometheus/Loki formats.
+Going back to self-hosting is a change of the agent's endpoints plus an
+Alertmanager config: the agent and rules are standard Prometheus/Loki formats.
 
 ## Where Caddy runs
 
