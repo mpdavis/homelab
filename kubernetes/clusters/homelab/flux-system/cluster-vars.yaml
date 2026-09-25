@@ -28,3 +28,6 @@ data:
   # Public Caddy on the compose host: the router's 443 forward target, and so
   # the entry point every public hostname actually answers on.
   COMPOSE_PUBLIC_IP: "10.0.1.56"
+  # Authentik's embedded outpost, reachable from the compose hosts so their
+  # Caddy can forward-auth against it. Retires when authentik itself moves.
+  AUTHENTIK_LAN_IP: "10.0.1.211"

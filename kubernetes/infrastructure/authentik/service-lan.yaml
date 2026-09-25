@@ -1,0 +1,24 @@
+# Caddy on the compose hosts authenticates against the embedded outpost, which
+# expects to be reached directly rather than through an ingress: the forward
+# auth endpoint and the /outpost.goauthentik.io/ callbacks must arrive carrying
+# the *application's* host, and Traefik routes iam.mpdavis.com only.
+#
+# A cluster-internal Service cannot serve that, so the outpost gets a LAN
+# address for as long as authentik itself runs in k3s. Tailnet-only: no router
+# forward points here, and authentik is already public on iam.mpdavis.com.
+apiVersion: v1
+kind: Service
+metadata:
+  name: authentik-lan
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: ${AUTHENTIK_LAN_IP}
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: authentik
+    app.kubernetes.io/instance: authentik
+    app.kubernetes.io/component: server
+  ports:
+    - name: http
+      port: 9000
+      targetPort: 9000
