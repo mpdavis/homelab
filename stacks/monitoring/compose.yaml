@@ -19,7 +19,7 @@ services:
       GRAFANA_CLOUD_PROMETHEUS_URL: https://prometheus-prod-56-prod-us-east-2.grafana.net/api/prom/push
       GRAFANA_CLOUD_PROMETHEUS_USER: "3611114"
       GRAFANA_CLOUD_LOKI_URL: https://logs-prod-036.grafana.net/loki/api/v1/push
-      GRAFANA_CLOUD_LOKI_USER: "000000"
+      GRAFANA_CLOUD_LOKI_USER: "1801225"
       GRAFANA_CLOUD_TOKEN: ${GRAFANA_CLOUD_TOKEN:?resolved by doco-cd from external_secrets}
     extra_hosts:
       - host.docker.internal:host-gateway
