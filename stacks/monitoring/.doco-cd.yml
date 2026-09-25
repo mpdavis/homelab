@@ -1,3 +1,3 @@
 external_secrets:
   # Grafana Cloud access policy token, scopes metrics:write + logs:write only.
-  GRAFANA_CLOUD_TOKEN: 00000000-0000-0000-0000-000000000000
+  GRAFANA_CLOUD_TOKEN: 2efc05d0-720f-4faf-bc83-b4d0000762b5
