@@ -27,6 +27,7 @@ Hosts are organized into groups:
 | `k3s_server` | k3s-server | k3s control plane |
 | `k3s_agent` | k3s-agent-1, k3s-agent-gpu | k3s worker nodes |
 | `k3s_cluster` | (all k3s nodes) | Parent group for k3s |
+| `lxc` / `vm` | every guest, by type | Sets `node_type`; target platform roles with e.g. `k3s_cluster:&vm` |
 
 ## Playbooks
 
@@ -87,6 +88,7 @@ ansible-playbook playbooks/bootstrap-flux.yml
 | `pve` | Proxmox hosts | Repo config, subscription nag, NIC offloading, system update |
 | `common` | All k3s nodes | Cloud-init wait, apt cache, base packages |
 | `lxc` | LXC nodes | `/dev/kmsg` symlink, shared mount for k3s |
+| `lxc_tun` | tailscale-router, devbox | `/dev/net/tun` passthrough, edited on the hosting PVE node |
 | `vm` | VM nodes | qemu-guest-agent |
 | `gpu` | k3s-agent-gpu | NVIDIA drivers, container toolkit, containerd config |
 | `k3s_server` | k3s-server | k3s server install |

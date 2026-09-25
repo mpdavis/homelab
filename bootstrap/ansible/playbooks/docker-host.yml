@@ -15,8 +15,7 @@
       default: ""
   roles:
     - common
-    - role: vm
-      when: node_type == 'vm'
+    - vm
     - docker
     - service_ips
     - role: doco_cd
