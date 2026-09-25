@@ -1,0 +1,28 @@
+# Emby's Live TV tuner streams from http://dispatcharr:9191, saved in its
+# settings. dispatcharr now runs on the compose host and publishes that port
+# there, so this selectorless Service keeps the name resolving. Retires when
+# emby moves to compose.
+apiVersion: v1
+kind: Service
+metadata:
+  name: dispatcharr
+spec:
+  ports:
+    - name: http
+      port: 9191
+      targetPort: 9191
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: dispatcharr-compose
+  labels:
+    kubernetes.io/service-name: dispatcharr
+addressType: IPv4
+endpoints:
+  - addresses:
+      - ${COMPOSE_HOST_IP}
+ports:
+  - name: http
+    port: 9191
+    protocol: TCP

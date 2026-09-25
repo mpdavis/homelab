@@ -12,9 +12,105 @@ services:
     networks:
       - proxy
 
+  # All-in-one image: postgres, redis, celery and the web app under one
+  # entrypoint that starts as root and drops each to uid 1000 itself.
+  dispatcharr:
+    image: ghcr.io/dispatcharr/dispatcharr:latest@sha256:f81924fa3dbfeb463b3908be7e086bf58aacbd2ba56062bfb555ee3a471acf8f
+    restart: unless-stopped
+    environment:
+      DISPATCHARR_ENV: aio
+      TZ: America/Chicago
+    volumes:
+      - dispatcharr-data:/data
+    # Emby, still in k3s, streams its tuner from here through a selectorless
+    # Service (kubernetes/apps/media/emby/dispatcharr-bridge.yaml). Goes when
+    # emby moves to compose.
+    ports:
+      - "10.0.1.55:9191:9191"
+    # The image ships no healthcheck; the version API is unauthenticated.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:9191/api/core/version/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 2m
+      retries: 3
+    networks:
+      - proxy
+
+  teamarr:
+    image: ghcr.io/pharaoh-labs/teamarr:2.18.0
+    restart: unless-stopped
+    user: "1000:1000"
+    environment:
+      TZ: America/Chicago
+    volumes:
+      - teamarr-data:/app/data
+    # Emby is still in k3s; its settings name it http://emby:8096. Goes when
+    # emby moves to compose.
+    extra_hosts:
+      - emby:10.0.1.212
+    networks:
+      - proxy
+
+  # The entrypoint starts as root, applies PUID/PGID, then drops to that user
+  # with gosu — so no `user:` here, or the drop fails.
+  ecm:
+    image: ghcr.io/motwakorb/enhancedchannelmanager:latest@sha256:2ef4645a618283264f2966b1db2ae387c9629ed254831fea4365bfec604fa0fb
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      CONFIG_DIR: /config
+      ECM_PORT: "6100"
+      TZ: America/Chicago
+      MCP_SECRETS_DIR: /run/secrets/ecm-mcp
+    volumes:
+      - ecm-config:/config
+      - ecm-mcp-secrets:/run/secrets/ecm-mcp
+    extra_hosts:
+      - emby:10.0.1.212
+    networks:
+      - proxy
+
+  # Hardened per upstream's docker-compose.mcp.yml: it sees only the credential
+  # projection ECM writes, never /config.
+  ecm-mcp:
+    image: ghcr.io/motwakorb/enhancedchannelmanager-mcp:latest@sha256:4312802781d7e82b6d860520d16f2af99a2bd6b78a07880bcc26cb4569ab7b07
+    restart: unless-stopped
+    # The sidecar rejects a projection it does not own.
+    user: "1000:1000"
+    environment:
+      MCP_SECRETS_DIR: /run/secrets/ecm-mcp
+      ECM_URL: http://ecm:6100
+      MCP_PORT: "6101"
+      MCP_BIND_ADDRESS: 0.0.0.0
+      MCP_ALLOWED_HOSTS: ecm.mpdavis.com
+    volumes:
+      - ecm-mcp-secrets:/run/secrets/ecm-mcp:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      ecm:
+        condition: service_healthy
+    networks:
+      - proxy
+
 volumes:
   # Rebuildable thumbnail cache.
   game-thumbs-cache:
+  # Embedded postgres, backups, and DVR recordings.
+  dispatcharr-data:
+  # SQLite database and generated XMLTV.
+  teamarr-data:
+  # settings.json and journal.db (SQLite, with WAL).
+  ecm-config:
+  # The credentials ECM writes for the MCP sidecar.
+  ecm-mcp-secrets:
 
 networks:
   proxy:

@@ -1,0 +1,18 @@
+# teamarr and ECM, on the compose host, call emby by the name http://emby:8096
+# saved in their settings; their compose entries map that name to this
+# address. Tailnet-only: no router forward points here. Retires when emby moves
+# to compose.
+apiVersion: v1
+kind: Service
+metadata:
+  name: emby-lan
+  annotations:
+    metallb.io/loadBalancerIPs: ${EMBY_LAN_IP}
+spec:
+  type: LoadBalancer
+  selector:
+    app: emby
+  ports:
+    - name: http
+      port: 8096
+      targetPort: http

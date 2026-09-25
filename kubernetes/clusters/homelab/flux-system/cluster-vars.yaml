@@ -31,3 +31,9 @@ data:
   # Authentik's embedded outpost, reachable from the compose hosts so their
   # Caddy can forward-auth against it. Retires when authentik itself moves.
   AUTHENTIK_LAN_IP: "10.0.1.211"
+  # Emby, reachable from the compose host for the iptv apps that call it.
+  # Retires when emby moves.
+  EMBY_LAN_IP: "10.0.1.212"
+  # The compose host's own address, where the few services k3s still calls
+  # publish their port.
+  COMPOSE_HOST_IP: "10.0.1.55"

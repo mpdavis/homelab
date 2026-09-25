@@ -160,6 +160,13 @@ own.
   (`showmount -e 10.0.1.6`), or the mount fails with `permission denied`.
 - **Does anything in the cluster talk to it?** A consumer using
   `x.ns.svc.cluster.local` stops resolving the moment the Service is gone.
+  Look inside the apps too: URLs saved in their settings (`http://emby:8096`)
+  are invisible to a grep of this repo. Bridge both ways instead of editing
+  them — a selectorless Service with an EndpointSlice at a port the stack
+  publishes on the host keeps the k3s name resolving, and a `<name>-lan`
+  LoadBalancer plus `extra_hosts` in the stack keeps a compose app's name for a
+  k3s service. Each bridge retires with whichever side moves last; see
+  `kubernetes/apps/media/emby/`.
 - **Does it share files with another service?** Two copies writing the same
   share is worse than downtime; stop one before starting the other.
 
