@@ -46,6 +46,10 @@ means: merge the removal from `kubernetes/`, wait for ExternalDNS to delete the
 record, then add the hostname to `records` here and apply. Adding it earlier
 just gets it reset — ExternalDNS still owns it through its TXT registry.
 
+Add a matching `dns-<host>` check to `gatus.yaml` alongside the record. Gatus's
+HTTP probes resolve through `hostAliases`, so without it a missing or wrong
+record goes unnoticed.
+
 `targets` names the destination rather than repeating an address: `public` is
 the router (which forwards 443 to the compose host's public Caddy), the others
 are Caddy IPs reachable over the LAN and the Tailscale subnet route.
