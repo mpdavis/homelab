@@ -89,13 +89,13 @@ variable "vms" {
   }))
   default = {
     # The Docker Compose host, and pve2's only guest. See docs/compose.md. A VM
-    # with a passthrough device locks all of its RAM up front, so memory beyond
-    # what the host (62G) needs for itself is never shared back.
+    # with a passthrough device locks all of its RAM up front and never gives it
+    # back, so this leaves pve2 (62G) ~6G for itself rather than taking it all.
     docker = {
       vmid        = 205
       node        = "pve2"
       cores       = 4
-      memory      = 40960
+      memory      = 53248
       disk_size   = 128
       gpu_mapping = "gpu"
       tags        = ["docker", "gpu"]
