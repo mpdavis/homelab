@@ -47,8 +47,10 @@ iam.mpdavis.com {
 	import traefik
 }
 
+# ntfy and the status page run on the infra host, so they keep working while
+# this host is down; only the public route passes through here.
 ntfy.mpdavis.com {
-	import traefik
+	reverse_proxy 10.0.1.58:8080
 }
 
 seerr.mpdavis.com {
@@ -56,7 +58,7 @@ seerr.mpdavis.com {
 }
 
 status.mpdavis.com {
-	import traefik
+	reverse_proxy 10.0.1.58:8081
 }
 
 thumbs.mpdavis.com {

@@ -1,0 +1,37 @@
+name: ntfy
+
+# Push notifications: Grafana Cloud's alerts and Alertmanager publish here, the
+# phone subscribes. On this host so an alert about the compose host can still
+# be stored and fetched.
+services:
+  ntfy:
+    image: binwiederhier/ntfy:v2.28.0
+    restart: unless-stopped
+    user: "1000:1000"
+    command: ["serve"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      TZ: America/Chicago
+    volumes:
+      - ./server.yml:/etc/ntfy/server.yml:ro
+      # Message cache, users and access tokens, attachments.
+      - data:/var/lib/ntfy
+    # The compose host's public Caddy serves ntfy.mpdavis.com from here; the
+    # router forwards 443 there, not to this host.
+    ports:
+      - 10.0.1.58:8080:8080
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8080/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  data:

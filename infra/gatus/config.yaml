@@ -1,0 +1,286 @@
+# Served on /metrics. The Alloy agent ships gatus_results_endpoint_success to
+# Grafana Cloud, where GatusEndpointDown alerts on it (grafana-cloud/rules/).
+metrics: true
+storage:
+  type: sqlite
+  path: /data/data.db
+# Endpoint checks run every 60s (Gatus default interval).
+endpoints:
+  # --- external, no forward-auth: healthy == 200 after redirects ---
+  - name: homepage
+    group: external-open
+    url: https://home.mpdavis.com/
+    conditions: &open-conditions
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 48h"
+  - name: paperless
+    group: external-open
+    url: https://paperless.mpdavis.com/
+    conditions: *open-conditions
+  - name: audiobookshelf
+    group: external-open
+    url: https://audiobookshelf.mpdavis.com/
+    conditions: *open-conditions
+  - name: emby
+    group: external-open
+    url: https://emby.mpdavis.com/
+    conditions: *open-conditions
+  - name: seerr
+    group: external-open
+    url: https://seerr.mpdavis.com/
+    conditions: *open-conditions
+  - name: podfetch
+    group: external-open
+    url: https://podfetch.mpdavis.com/
+    conditions: *open-conditions
+  - name: ecm
+    group: external-open
+    url: https://ecm.mpdavis.com/
+    conditions: *open-conditions
+  - name: game-thumbs
+    group: external-open
+    # Root path has no page; /health is the service's liveness endpoint.
+    url: https://thumbs.mpdavis.com/health
+    conditions: *open-conditions
+  - name: mousehole
+    group: external-open
+    url: https://mousehole.mpdavis.com/
+    conditions: *open-conditions
+  - name: grafana
+    group: external-open
+    url: https://grafana.mpdavis.com/login
+    conditions: *open-conditions
+  - name: authentik
+    group: external-open
+    url: https://iam.mpdavis.com/
+    conditions: *open-conditions
+  - name: ntfy
+    group: external-open
+    # /v1/health is unauthenticated even with auth-default-access:
+    # deny-all, so it's a clean 200 liveness signal.
+    url: https://ntfy.mpdavis.com/v1/health
+    conditions: *open-conditions
+  # LAN hosts that never ran in k3s, served by this host's Caddy.
+  - name: birdnet
+    group: external-open
+    url: https://birdnet.mpdavis.com/
+    conditions: *open-conditions
+  - name: proxmox
+    group: external-open
+    url: https://proxmox.mpdavis.com/
+    conditions: *open-conditions
+  # --- Authentik forward-auth protected: healthy == 302 to the auth
+  # portal (iam.mpdavis.com). `Accept: text/html` exercises the real
+  # user-facing browser redirect path.
+  # A 200 would mean the middleware is missing — that's a failure. ---
+  - name: open-webui
+    group: external-auth
+    url: https://ai.mpdavis.com/
+    client: &auth-client
+      ignore-redirect: true
+    headers: &auth-headers
+      Accept: text/html
+    conditions: &auth-conditions
+      - "[STATUS] == 302"
+      - "[CERTIFICATE_EXPIRATION] > 48h"
+  - name: dispatcharr
+    group: external-auth
+    url: https://dispatcharr.mpdavis.com/
+    client: *auth-client
+    headers: *auth-headers
+    conditions: *auth-conditions
+  - name: listenarr
+    group: external-auth
+    url: https://listenarr.mpdavis.com/
+    client: *auth-client
+    headers: *auth-headers
+    conditions: *auth-conditions
+  - name: prowlarr
+    group: external-auth
+    url: https://prowlarr.mpdavis.com/
+    client: *auth-client
+    headers: *auth-headers
+    conditions: *auth-conditions
+  - name: qbittorrent
+    group: external-auth
+    url: https://qbit.mpdavis.com/
+    client: *auth-client
+    headers: *auth-headers
+    conditions: *auth-conditions
+  - name: radarr
+    group: external-auth
+    url: https://radarr.mpdavis.com/
+    client: *auth-client
+    headers: *auth-headers
+    conditions: *auth-conditions
+  - name: sonarr
+    group: external-auth
+    url: https://sonarr.mpdavis.com/
+    client: *auth-client
+    headers: *auth-headers
+    conditions: *auth-conditions
+  - name: teamarr
+    group: external-auth
+    url: https://teamarr.mpdavis.com/
+    client: *auth-client
+    headers: *auth-headers
+    conditions: *auth-conditions
+  - name: flux-ui
+    group: external-auth
+    url: https://flux.mpdavis.com/
+    client: *auth-client
+    headers: *auth-headers
+    conditions: *auth-conditions
+  - name: council-digest
+    group: external-auth
+    url: https://council.mpdavis.com/
+    client: *auth-client
+    headers: *auth-headers
+    conditions: *auth-conditions
+  - name: gridiron
+    group: external-auth
+    url: https://gridiron.mpdavis.com/
+    client: *auth-client
+    headers: *auth-headers
+    conditions: *auth-conditions
+  # --- public DNS for records OpenTofu owns (bootstrap/tofu/cloudflare).
+  # Every probe above resolves through extra_hosts, so none of them can
+  # see a record that is missing or wrong — three services ran without
+  # DNS for hours on 2026-09-25 while everything stayed green. These ask
+  # a public resolver instead. Keep the list in step with `records`.
+  - name: dns-thumbs
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: thumbs.mpdavis.com}
+    conditions: &public-dns ["[DNS_RCODE] == NOERROR", "[BODY] == 46.110.78.19"]
+  - name: dns-seerr
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: seerr.mpdavis.com}
+    conditions: *public-dns
+  - name: dns-audiobookshelf
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: audiobookshelf.mpdavis.com}
+    conditions: *public-dns
+  - name: dns-council
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: council.mpdavis.com}
+    conditions: *public-dns
+  - name: dns-emby
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: emby.mpdavis.com}
+    conditions: *public-dns
+  - name: dns-home
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: home.mpdavis.com}
+    conditions: &compose-tailnet-dns ["[DNS_RCODE] == NOERROR", "[BODY] == 10.0.1.57"]
+  - name: dns-podfetch
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: podfetch.mpdavis.com}
+    conditions: *compose-tailnet-dns
+  - name: dns-gridiron
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: gridiron.mpdavis.com}
+    conditions: *compose-tailnet-dns
+  - name: dns-dispatcharr
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: dispatcharr.mpdavis.com}
+    conditions: *compose-tailnet-dns
+  - name: dns-teamarr
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: teamarr.mpdavis.com}
+    conditions: *compose-tailnet-dns
+  - name: dns-ecm
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: ecm.mpdavis.com}
+    conditions: *compose-tailnet-dns
+  - name: dns-qbit
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: qbit.mpdavis.com}
+    conditions: *compose-tailnet-dns
+  - name: dns-mousehole
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: mousehole.mpdavis.com}
+    conditions: *compose-tailnet-dns
+  - name: dns-prowlarr
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: prowlarr.mpdavis.com}
+    conditions: *compose-tailnet-dns
+  - name: dns-sonarr
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: sonarr.mpdavis.com}
+    conditions: *compose-tailnet-dns
+  - name: dns-radarr
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: radarr.mpdavis.com}
+    conditions: *compose-tailnet-dns
+  - name: dns-listenarr
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: listenarr.mpdavis.com}
+    conditions: *compose-tailnet-dns
+  - name: dns-paperless
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: paperless.mpdavis.com}
+    conditions: *compose-tailnet-dns
+  - name: dns-ai
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: ai.mpdavis.com}
+    conditions: *compose-tailnet-dns
+  - name: dns-proxmox
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: proxmox.mpdavis.com}
+    conditions: &infra-tailnet-dns ["[DNS_RCODE] == NOERROR", "[BODY] == 10.0.1.58"]
+  - name: dns-birdnet
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: birdnet.mpdavis.com}
+    conditions: *infra-tailnet-dns
+  # --- app health behind forward auth ---
+  # Their external-auth checks only prove Authentik answers with a 302,
+  # whether or not the app behind it is up, so these hit an unauthenticated
+  # health path Caddy serves ahead of the auth check. Keep both.
+  - name: open-webui-app
+    group: internal
+    url: https://ai.mpdavis.com/health
+    conditions: &internal-conditions
+      - "[STATUS] == 200"
+  - name: dispatcharr-app
+    group: internal
+    # No dedicated health route; the version API is unauthenticated and
+    # served by the Django app.
+    url: https://dispatcharr.mpdavis.com/api/core/version/
+    conditions: *internal-conditions
+  - name: prowlarr-app
+    group: internal
+    url: https://prowlarr.mpdavis.com/ping
+    conditions: *internal-conditions
+  - name: radarr-app
+    group: internal
+    url: https://radarr.mpdavis.com/ping
+    conditions: *internal-conditions
+  - name: sonarr-app
+    group: internal
+    url: https://sonarr.mpdavis.com/ping
+    conditions: *internal-conditions
+  - name: council-digest-app
+    group: internal
+    url: https://council.mpdavis.com/healthz
+    conditions: *internal-conditions

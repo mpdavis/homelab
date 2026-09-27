@@ -32,6 +32,8 @@ services:
     networks:
       - default
       - doco-cd
+      # Where containers that opt into metrics scraping are reached.
+      - proxy
 
   # Host network, or it reports the container's network interfaces instead of
   # the host's.
@@ -76,4 +78,6 @@ networks:
   # Alloy can scrape its metrics on :9120.
   doco-cd:
     name: doco-cd_default
+    external: true
+  proxy:
     external: true

@@ -1,7 +1,8 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-resources:
-  - ntfy
+# Every app has moved to the compose hosts. This stays until k3s is retired,
+# so the apps Flux Kustomization has something to reconcile.
+resources: []
 
 # Exposure. Every IngressRoute is public by default; label it
 # `homelab.mpdavis.com/exposure: tailnet` to make it LAN/tailnet-only. The label

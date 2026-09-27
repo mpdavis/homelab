@@ -13,6 +13,8 @@ variable "records" {
     audiobookshelf = "public"
     council        = "public"
     emby           = "public"
+    ntfy           = "public"
+    status         = "public"
     home           = "compose_tailnet"
     podfetch       = "compose_tailnet"
     gridiron       = "compose_tailnet"

@@ -34,7 +34,6 @@ kubernetes/         # Flux-managed cluster state (sync root)
     metallb/        # IPAddressPool + L2Advertisement
     traefik/        # Certificate + TLSStore
     monitoring/     # Grafana ingress + ExternalSecret + dashboards
-    gatus/          # Synthetic-monitoring companions (status page IngressRoute + PrometheusRule)
     flux-operator/  # RBAC + IngressRoute for Flux web UI
     flux-notifications/ # Flux Alert/Provider (GitHub commit status)
   clusters/         # Flux Kustomization entrypoints (infra.yaml, apps.yaml, flux-system/)
@@ -91,26 +90,23 @@ Bitwarden (BWS) secret UUIDs are centralized in the `bws-secret-ids` ConfigMap (
 
 ## Synthetic Monitoring
 
-Gatus (`kubernetes/infrastructure/controllers/gatus.yaml`, ns `monitoring`) probes every service
-every 60s; the status page is public at `status.mpdavis.com` (no auth). Failing endpoints alert
-via the `GatusEndpointDown` PrometheusRule. Check conventions:
+Gatus (`infra/gatus/`, on the infra host) probes every service every 60s; the status page
+is public at `status.mpdavis.com` (no auth). Failing endpoints alert through Grafana Cloud
+(`GatusEndpointDown` in `grafana-cloud/rules/gatus.yml`). Check conventions:
 
 - Open services: `[STATUS] == 200` + cert expiry (`*open-conditions` anchor)
 - Authentik-protected services: `ignore-redirect: true` + `Accept: text/html` header
-  (`*auth-headers`) + `[STATUS] == 302` (`*auth-conditions`) — a 200 would mean the
-  forward-auth middleware is missing. The header exercises the browser-style
-  redirect path to `iam.mpdavis.com`. The 302 proves only that Authentik answers, not that the
-  app is up, so if the app has an unauthenticated health endpoint also add an `internal` check
-  against its cluster-DNS Service
-- Internal services (no ingress): cluster-DNS health endpoint, `[STATUS] == 200`
-- `*.mpdavis.com` probes resolve via a `hostAliases` postRenderers patch to the IP that
-  serves the hostname — public Traefik VIP, tailnet Traefik VIP, or the compose host's
-  Caddy (`COMPOSE_TAILNET_IP`) for services already migrated (no NAT-hairpin dependency)
+  (`*auth-headers`) + `[STATUS] == 302` (`*auth-conditions`) — a 200 would mean forward
+  auth is missing. The 302 proves only that Authentik answers, not that the app is up, so
+  if the app has an unauthenticated health path, serve it ahead of `import authentik` in
+  its Caddy site and add an `internal` check against it (see `prowlarr-app`)
+- `*.mpdavis.com` probes resolve through `extra_hosts` in `infra/gatus/compose.yaml` to
+  the Caddy that serves the hostname (no NAT-hairpin dependency); the `dns-*` checks ask
+  a public resolver so a missing record still shows
 
-**When a service gains or loses an IngressRoute, or changes exposure, update BOTH lists in
-`gatus.yaml`:** the `config.endpoints` entry (correct group/conditions) *and* the hostname under
-the correct IP in the `hostAliases` postRenderers patch. The `add-service` skill covers this for
-new services.
+**When a service gains or loses a hostname, or changes exposure, update BOTH lists:** the
+endpoint in `infra/gatus/config.yaml` (correct group/conditions) *and* its `extra_hosts`
+line in `infra/gatus/compose.yaml`.
 
 ## Networking
 

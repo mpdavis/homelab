@@ -6,7 +6,6 @@ resources:
   - external-secrets
   - external-dns
   - flux-operator
-  - gatus
   - metallb
   - traefik
   - monitoring

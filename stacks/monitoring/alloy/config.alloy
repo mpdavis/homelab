@@ -83,6 +83,52 @@ prometheus.relabel "cadvisor" {
   forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
 
+// ---- App metrics: containers that opt in ----
+// A container labelled homelab.metrics.port=<port> is scraped at its address
+// on the proxy network, which Alloy joins on every host. Only the series an
+// alert uses are kept (see the budget note at the top).
+discovery.relabel "app_metrics" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_homelab_metrics_port"]
+    regex         = ".+"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_network_name"]
+    regex         = "proxy"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_network_ip", "__meta_docker_container_label_homelab_metrics_port"]
+    separator     = ":"
+    target_label  = "__address__"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "job"
+  }
+}
+
+prometheus.scrape "app" {
+  targets    = discovery.relabel.app_metrics.output
+  forward_to = [prometheus.relabel.app.receiver]
+}
+
+prometheus.relabel "app" {
+  rule {
+    source_labels = ["__name__"]
+    regex         = "up|gatus_results_endpoint_success"
+    action        = "keep"
+  }
+
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
 prometheus.scrape "doco_cd" {
   job_name   = "doco-cd"
   targets    = [{"__address__" = "doco-cd:9120"}]

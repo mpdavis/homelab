@@ -57,8 +57,8 @@ NXDOMAIN for up to 30 minutes, the zone's SOA minimum.
 Before the TXT is gone, ExternalDNS still owns the record, so an apply here gets
 reset, and removing the IngressRoute deletes it.
 
-Add a matching `dns-<host>` check to `gatus.yaml` alongside the record. Gatus's
-HTTP probes resolve through `hostAliases`, so without it a missing or wrong
+Add a matching `dns-<host>` check to `infra/gatus/config.yaml` alongside the
+record. Gatus's HTTP probes resolve through `extra_hosts`, so without it a missing or wrong
 record goes unnoticed.
 
 `targets` names the destination rather than repeating an address: `public` is
