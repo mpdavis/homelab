@@ -65,9 +65,9 @@ spec:
                       - ecm.mpdavis.com
                       - dispatcharr.mpdavis.com
                       - teamarr.mpdavis.com
+                      - paperless.mpdavis.com
                   - ip: ${TRAEFIK_TAILNET_IP}
                     hostnames:
-                      - paperless.mpdavis.com
                       - grafana.mpdavis.com
                       - ai.mpdavis.com
                       - flux.mpdavis.com
@@ -333,6 +333,11 @@ spec:
           group: dns
           url: "1.1.1.1"
           dns: {query-type: A, query-name: listenarr.mpdavis.com}
+          conditions: *compose-tailnet-dns
+        - name: dns-paperless
+          group: dns
+          url: "1.1.1.1"
+          dns: {query-type: A, query-name: paperless.mpdavis.com}
           conditions: *compose-tailnet-dns
         - name: dns-proxmox
           group: dns

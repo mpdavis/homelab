@@ -28,13 +28,24 @@
 - name: Install NVIDIA drivers and container toolkit
   ansible.builtin.apt:
     name:
-      - nvidia-driver-570
+      - nvidia-driver-580
       - nvidia-container-toolkit
     state: present
 
-- name: Configure containerd for NVIDIA runtime
-  ansible.builtin.command: nvidia-ctk runtime configure --runtime=containerd
-  changed_when: true
+# Docker finds the toolkit's hook on its own for `--gpus` and compose device
+# reservations, so daemon.json (owned by the docker role) needs no runtime
+# entry.
+
+# A freshly built DKMS module is not loaded until the next boot.
+- name: Check whether the driver is loaded
+  ansible.builtin.command: nvidia-smi
+  register: nvidia_smi_probe
+  changed_when: false
+  failed_when: false
+
+- name: Reboot to load the driver
+  ansible.builtin.reboot:
+  when: nvidia_smi_probe.rc != 0
 
 - name: Verify GPU is visible
   ansible.builtin.command: nvidia-smi

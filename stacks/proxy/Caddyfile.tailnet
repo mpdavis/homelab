@@ -93,3 +93,9 @@ listenarr.mpdavis.com {
 		reverse_proxy listenarr:4545
 	}
 }
+
+# No forward auth: Paperless signs users in through Authentik itself (OIDC), and
+# its API clients use tokens they could not get past forward auth with.
+paperless.mpdavis.com {
+	reverse_proxy paperless:8000
+}

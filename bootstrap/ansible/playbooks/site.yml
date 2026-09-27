@@ -22,12 +22,6 @@
   roles:
     - lxc
 
-- name: GPU setup
-  hosts: k3s-agent-gpu
-  become: true
-  roles:
-    - gpu
-
 - name: Install k3s server
   hosts: k3s_server
   become: true
@@ -39,13 +33,3 @@
   become: true
   roles:
     - k3s_agent
-
-- name: Label GPU node
-  hosts: k3s_server
-  become: true
-  tasks:
-    - name: Apply nvidia.com/gpu.present label to GPU node
-      ansible.builtin.command: >
-        k3s kubectl label node k3s-agent-gpu
-        nvidia.com/gpu.present=true --overwrite
-      changed_when: true

@@ -1,0 +1,86 @@
+name: docs
+
+services:
+  # One image runs the web server, consumer and scheduler. It starts as root
+  # for s6 init and drops to uid 1000 itself, so no `user:` here.
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:3.2.1
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: America/Chicago
+      PAPERLESS_TIME_ZONE: America/Chicago
+      PAPERLESS_REDIS: redis://redis:6379
+      # Required for CSRF and cookies behind Caddy.
+      PAPERLESS_URL: https://paperless.mpdavis.com
+      PAPERLESS_PORT: "8000"
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:?resolved by doco-cd from external_secrets}
+      # The break-glass login; everyone else signs in through Authentik.
+      PAPERLESS_ADMIN_USER: ${PAPERLESS_ADMIN_USER:?resolved by doco-cd from external_secrets}
+      PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASSWORD:?resolved by doco-cd from external_secrets}
+      # An Authentik login provisions a Paperless account and syncs Authentik
+      # groups into same-named Paperless groups. Superuser and staff stay manual.
+      PAPERLESS_APPS: allauth.socialaccount.providers.openid_connect
+      PAPERLESS_SOCIAL_AUTO_SIGNUP: "true"
+      PAPERLESS_SOCIALACCOUNT_ALLOW_SIGNUPS: "true"
+      PAPERLESS_SOCIAL_ACCOUNT_SYNC_GROUPS: "true"
+      # The client id is not secret; it matches the Authentik blueprint.
+      PAPERLESS_SOCIALACCOUNT_PROVIDERS: >-
+        {"openid_connect": {"SCOPE": ["openid", "profile", "email", "groups"],
+        "APPS": [{"provider_id": "authentik", "name": "Authentik",
+        "client_id": "2637be93cafb37442b1abb9bd89330fe",
+        "secret": "${PAPERLESS_OIDC_CLIENT_SECRET:?resolved by doco-cd from external_secrets}",
+        "settings": {"server_url": "https://iam.mpdavis.com/application/o/paperless/.well-known/openid-configuration"}}]}}
+    # The server-side OIDC calls go to Authentik, still in k3s behind the public
+    # Caddy. Pinning its hostname there avoids depending on NAT hairpin.
+    extra_hosts:
+      - iam.mpdavis.com:10.0.1.56
+    volumes:
+      - data:/usr/src/paperless/data
+      - media:/usr/src/paperless/media
+      - consume:/usr/src/paperless/consume
+      - export:/usr/src/paperless/export
+    networks:
+      - default
+      - proxy
+
+  # Celery's broker. Holds only the task queue, so it keeps no volume.
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  # SQLite database, search index and classifier — local for IOPS.
+  data:
+  # The NAS directories keep the names the k3s provisioner gave them: the
+  # consume folder is a drop target, and whatever writes to it knows it by
+  # that path. The NAS offers NFSv3 only.
+  media:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=10.0.1.6,nfsvers=3,rw,hard,proto=tcp
+      device: ":/var/nfs/shared/homelab/docs-paperless-media-pvc-f4cdb156-8e36-4275-ac77-ca6a8ec479ca"
+  consume:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=10.0.1.6,nfsvers=3,rw,hard,proto=tcp
+      device: ":/var/nfs/shared/homelab/docs-paperless-consume-pvc-9f7fe3bb-8434-46c9-865f-71fd74bb6a53"
+  export:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=10.0.1.6,nfsvers=3,rw,hard,proto=tcp
+      device: ":/var/nfs/shared/homelab/docs-paperless-export-pvc-ab6e33b5-3e6b-403d-89a6-a25ccf3c37b7"
+
+networks:
+  proxy:
+    external: true

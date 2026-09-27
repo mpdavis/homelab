@@ -112,26 +112,29 @@ variable "vms" {
     tags        = optional(list(string), [])
   }))
   default = {
+    # Named for the GPU it held until the GPU apps moved to the compose host.
+    # Renaming it would recreate the VM. What is left is k3s infrastructure
+    # (Authentik's Postgres, Prometheus, Loki) on its way out.
     k3s-agent-gpu = {
-      vmid        = 202
+      vmid      = 202
+      node      = "pve2"
+      cores     = 6
+      memory    = 12288
+      disk_size = 128
+      tags      = ["k3s", "agent"]
+    }
+    # The Docker Compose host. See docs/compose.md. A VM with a passthrough
+    # device locks all of its RAM, so pve2's 62G is split between this and
+    # k3s-agent-gpu with nothing to spare. Moving the GPU between them takes two
+    # applies, releasing it first: see bootstrap/tofu/CLAUDE.md.
+    docker = {
+      vmid        = 205
       node        = "pve2"
-      cores       = 6
-      memory      = 49152
+      cores       = 4
+      memory      = 40960
       disk_size   = 128
       gpu_mapping = "gpu"
-      tags        = ["k3s", "agent", "gpu"]
-    }
-    # pve2 is becoming the Docker Compose host, pve1 the infrastructure host.
-    # See docs/compose.md. Sized for the migration's first stacks: pve2 has
-    # ~10G of RAM outside k3s-agent-gpu's dedicated 48G, so this grows as that
-    # VM shrinks and eventually inherits its GPU mapping.
-    docker = {
-      vmid      = 205
-      node      = "pve2"
-      cores     = 4
-      memory    = 8192
-      disk_size = 128
-      tags      = ["docker"]
+      tags        = ["docker", "gpu"]
     }
     # Ingress for what does not run on the compose host, so those routes
     # survive pve2 maintenance. A VM, not an LXC: Docker in an LXC breaks on
