@@ -54,6 +54,12 @@ spec:
                       - homeassistant.mpdavis.com
                   - ip: ${COMPOSE_TAILNET_IP}
                     hostnames:
+                      - qbit.mpdavis.com
+                      - mousehole.mpdavis.com
+                      - listenarr.mpdavis.com
+                      - prowlarr.mpdavis.com
+                      - radarr.mpdavis.com
+                      - sonarr.mpdavis.com
                       - home.mpdavis.com
                       - podfetch.mpdavis.com
                       - gridiron.mpdavis.com
@@ -63,14 +69,8 @@ spec:
                   - ip: ${TRAEFIK_TAILNET_IP}
                     hostnames:
                       - paperless.mpdavis.com
-                      - qbit.mpdavis.com
-                      - mousehole.mpdavis.com
                       - grafana.mpdavis.com
                       - ai.mpdavis.com
-                      - listenarr.mpdavis.com
-                      - prowlarr.mpdavis.com
-                      - radarr.mpdavis.com
-                      - sonarr.mpdavis.com
                       - flux.mpdavis.com
                   - ip: ${INFRA_TAILNET_IP}
                     hostnames:
@@ -340,17 +340,17 @@ spec:
           # bridge Service emby's tuner uses, so it checks that path too.
           url: http://dispatcharr.media.svc.cluster.local:9191/api/core/version/
           conditions: *internal-conditions
-        - name: prowlarr
+        - name: prowlarr-app
           group: internal
-          url: http://prowlarr.media.svc.cluster.local:9696/ping
+          url: https://prowlarr.mpdavis.com/ping
           conditions: *internal-conditions
-        - name: radarr
+        - name: radarr-app
           group: internal
-          url: http://radarr.media.svc.cluster.local:7878/ping
+          url: https://radarr.mpdavis.com/ping
           conditions: *internal-conditions
-        - name: sonarr
+        - name: sonarr-app
           group: internal
-          url: http://sonarr.media.svc.cluster.local:8989/ping
+          url: https://sonarr.mpdavis.com/ping
           conditions: *internal-conditions
         - name: council-digest
           group: internal

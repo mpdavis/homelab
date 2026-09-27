@@ -58,3 +58,49 @@ ecm.mpdavis.com {
 		reverse_proxy ecm:6100
 	}
 }
+
+qbit.mpdavis.com {
+	route {
+		import authentik
+		reverse_proxy qbittorrent:8080
+	}
+}
+
+# No forward auth, as before: mousehole has its own password.
+mousehole.mpdavis.com {
+	reverse_proxy mousehole:5010
+}
+
+# /ping is unauthenticated upstream and answers only "OK". Serving it ahead of
+# the auth check lets Gatus test the app itself, which the Authentik redirect
+# on every other path cannot.
+prowlarr.mpdavis.com {
+	route {
+		reverse_proxy /ping prowlarr:9696
+		import authentik
+		reverse_proxy prowlarr:9696
+	}
+}
+
+sonarr.mpdavis.com {
+	route {
+		reverse_proxy /ping sonarr:8989
+		import authentik
+		reverse_proxy sonarr:8989
+	}
+}
+
+radarr.mpdavis.com {
+	route {
+		reverse_proxy /ping radarr:7878
+		import authentik
+		reverse_proxy radarr:7878
+	}
+}
+
+listenarr.mpdavis.com {
+	route {
+		import authentik
+		reverse_proxy listenarr:4545
+	}
+}
