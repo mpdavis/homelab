@@ -3,9 +3,8 @@
 # through the notification policy below, by their severity label.
 
 locals {
-  # ntfy's tpl=1 renders the webhook body into the title and message. Same
-  # template as the k3s Alertmanager route: Grafana's webhook body has the
-  # same status/commonLabels/alerts fields as Alertmanager's.
+  # ntfy's tpl=1 renders the webhook body into the title and message: Grafana's
+  # webhook body has Alertmanager's status/commonLabels/alerts fields.
   ntfy_url = "https://ntfy.mpdavis.com/homelab-alerts?tpl=1&title=%7B%7Bif%20eq%20.status%20%22resolved%22%7D%7D%E2%9C%85%20%7B%7Belse%7D%7D%F0%9F%94%A5%20%7B%7Bend%7D%7D%7B%7B.commonLabels.alertname%7D%7D&message=%7B%7Brange%20.alerts%7D%7D%7B%7B.annotations.description%7D%7D%0A%7B%7Bend%7D%7D"
 
   ntfy_levels = {

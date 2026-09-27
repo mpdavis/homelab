@@ -43,10 +43,6 @@ services:
     depends_on:
       authentik-postgresql:
         condition: service_healthy
-    # The k3s Traefik middleware in front of the Flux UI still forward-auths
-    # here. Goes when k3s does.
-    ports:
-      - 10.0.1.55:9000:9000
     networks:
       - default
       - proxy

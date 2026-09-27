@@ -24,7 +24,9 @@
       - nfs-common
     state: present
 
-- name: Set k3s-required kernel sysctls
+# Reboot rather than hang on a kernel panic, since nobody is at the console.
+# The file keeps its k3s-era name: a new name would leave the old one behind.
+- name: Set panic and overcommit sysctls
   ansible.builtin.sysctl:
     name: "{{ item.key }}"
     value: "{{ item.value }}"

@@ -19,16 +19,13 @@ network:
   hosts:
     pve1: 192.168.1.1
     pve2: 192.168.1.2
-    k3s-server: 192.168.1.50
-    k3s-agent-1: 192.168.1.51
-    k3s-agent-gpu: 192.168.1.52
     tailscale-router: 192.168.1.53
     devbox: 192.168.1.54
     docker: 192.168.1.55
     infra: 192.168.1.58
 
   # Extra addresses on the docker host, one per Caddy instance. They must stay
-  # outside the MetalLB pool.
+  # clear of any address the router or a guest might be handed.
   service_ips:
     compose_public: 192.168.1.56
     compose_tailnet: 192.168.1.57

@@ -32,30 +32,6 @@ variable "containers" {
     tags        = optional(list(string), [])
   }))
   default = {
-    k3s-server = {
-      vmid        = 200
-      node        = "pve1"
-      cores       = 4
-      memory      = 8192
-      disk_size   = 32
-      privileged  = true
-      nesting     = true
-      keyctl      = true
-      start_order = 1
-      tags        = ["k3s", "server"]
-    }
-    k3s-agent-1 = {
-      vmid        = 201
-      node        = "pve1"
-      cores       = 4
-      memory      = 16384
-      disk_size   = 64
-      privileged  = true
-      nesting     = true
-      keyctl      = true
-      start_order = 2
-      tags        = ["k3s", "agent"]
-    }
     tailscale-router = {
       vmid      = 203
       node      = "pve1"
@@ -112,21 +88,9 @@ variable "vms" {
     tags        = optional(list(string), [])
   }))
   default = {
-    # Named for the GPU it held until the GPU apps moved to the compose host.
-    # Renaming it would recreate the VM. What is left is k3s infrastructure
-    # (Authentik's Postgres, Prometheus, Loki) on its way out.
-    k3s-agent-gpu = {
-      vmid      = 202
-      node      = "pve2"
-      cores     = 6
-      memory    = 12288
-      disk_size = 128
-      tags      = ["k3s", "agent"]
-    }
-    # The Docker Compose host. See docs/compose.md. A VM with a passthrough
-    # device locks all of its RAM, so pve2's 62G is split between this and
-    # k3s-agent-gpu with nothing to spare. Moving the GPU between them takes two
-    # applies, releasing it first: see bootstrap/tofu/CLAUDE.md.
+    # The Docker Compose host, and pve2's only guest. See docs/compose.md. A VM
+    # with a passthrough device locks all of its RAM up front, so memory beyond
+    # what the host (62G) needs for itself is never shared back.
     docker = {
       vmid        = 205
       node        = "pve2"

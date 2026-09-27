@@ -109,7 +109,7 @@ resource "proxmox_virtual_environment_container" "container" {
   }
 }
 
-# --- VMs (GPU nodes) ---
+# --- VMs ---
 
 resource "proxmox_virtual_environment_vm" "vm" {
   for_each = var.vms
