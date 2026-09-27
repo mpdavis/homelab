@@ -22,12 +22,21 @@
 	}
 }
 
+# Defines (authentik). Shared with Caddyfile.tailnet.
+import /etc/caddy/authentik.caddy
+
 audiobookshelf.mpdavis.com {
-	import traefik
+	reverse_proxy audiobookshelf:3000
 }
 
+# /healthz answers only "ok". Serving it ahead of the auth check lets Gatus test
+# the app itself, which the Authentik redirect on every other path cannot.
 council.mpdavis.com {
-	import traefik
+	route {
+		reverse_proxy /healthz council:8080
+		import authentik
+		reverse_proxy council:8080
+	}
 }
 
 emby.mpdavis.com {

@@ -1,0 +1,4 @@
+external_secrets:
+  # opencode zen API key; same secret as BWS_AMES_LLM_API_KEY in the
+  # bws-secret-ids ConfigMap.
+  AMES_LLM_API_KEY: c72cbf34-42ce-4ece-b031-b49d00f79eb3

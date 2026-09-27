@@ -147,8 +147,6 @@ When one pod writes files another pod reads (a CronJob producing content an ngin
 Deployment serves), the reader needs group membership in the writer's gid — otherwise it
 depends on world-read bits surviving whatever umask upstream happens to use.
 
-Reference: `kubernetes/apps/civic/ames-council-digest/web-deployment.yaml`.
-
 ---
 
 ## 2. Container hardening
@@ -219,8 +217,7 @@ resources:
 - **`limits.memory` is required.** Memory is incompressible: a leaking container with no
   limit takes the node down instead of just itself.
 - **`limits.cpu` is optional and usually wrong.** CPU is compressible, so a limit buys
-  nothing but throttling. Set it only to deliberately cap a workload
-  (`kubernetes/apps/civic/ames-council-digest/cronjob.yaml` caps at 1 core on purpose).
+  nothing but throttling. Set it only to deliberately cap a workload.
 
 Homelab-scale numbers are fine — `10m` / `32Mi` for a static file server is a real answer.
 The point is a declared number, not a large one.

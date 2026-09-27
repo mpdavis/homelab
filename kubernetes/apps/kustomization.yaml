@@ -3,7 +3,6 @@ kind: Kustomization
 resources:
   - ai
   - automation
-  - civic
   - docs
   - gaming
   - media

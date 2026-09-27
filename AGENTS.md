@@ -23,7 +23,7 @@ bootstrap/          # Pre-Flux provisioning and configuration
   ansible/          # Ansible — node configuration, k3s install, Flux bootstrap, devbox
   tofu/             # OpenTofu — Proxmox guests + Cloudflare DNS (see bootstrap/tofu/CLAUDE.md)
 kubernetes/         # Flux-managed cluster state (sync root)
-  apps/             # Per-service manifests, grouped by namespace (ai/, civic/, media/, homepage/)
+  apps/             # Per-service manifests, grouped by namespace (ai/, docs/, media/, …)
   infrastructure/   # Cluster infrastructure — HelmReleases, HelmRepositories, companion manifests
     sources/        # HelmRepository definitions
     controllers/    # HelmRelease definitions (install CRDs first)

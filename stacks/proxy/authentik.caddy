@@ -1,0 +1,13 @@
+# Authentik forward auth, per the upstream Caddy template. The outpost is
+# reached at its LAN address rather than through Traefik: both the callback
+# route and the auth subrequest have to arrive carrying the application's own
+# host, and Traefik routes iam.mpdavis.com only. `route` in the site block
+# keeps these ahead of the app's own reverse_proxy.
+(authentik) {
+	reverse_proxy /outpost.goauthentik.io/* http://10.0.1.211:9000
+	forward_auth http://10.0.1.211:9000 {
+		uri /outpost.goauthentik.io/auth/caddy
+		copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Entitlements X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version
+		trusted_proxies private_ranges
+	}
+}
