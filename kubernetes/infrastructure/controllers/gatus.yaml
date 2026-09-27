@@ -66,10 +66,10 @@ spec:
                       - dispatcharr.mpdavis.com
                       - teamarr.mpdavis.com
                       - paperless.mpdavis.com
+                      - ai.mpdavis.com
                   - ip: ${TRAEFIK_TAILNET_IP}
                     hostnames:
                       - grafana.mpdavis.com
-                      - ai.mpdavis.com
                       - flux.mpdavis.com
                   - ip: ${INFRA_TAILNET_IP}
                     hostnames:
@@ -274,6 +274,11 @@ spec:
           url: "1.1.1.1"
           dns: {query-type: A, query-name: council.mpdavis.com}
           conditions: *public-dns
+        - name: dns-emby
+          group: dns
+          url: "1.1.1.1"
+          dns: {query-type: A, query-name: emby.mpdavis.com}
+          conditions: *public-dns
         - name: dns-home
           group: dns
           url: "1.1.1.1"
@@ -339,6 +344,11 @@ spec:
           url: "1.1.1.1"
           dns: {query-type: A, query-name: paperless.mpdavis.com}
           conditions: *compose-tailnet-dns
+        - name: dns-ai
+          group: dns
+          url: "1.1.1.1"
+          dns: {query-type: A, query-name: ai.mpdavis.com}
+          conditions: *compose-tailnet-dns
         - name: dns-proxmox
           group: dns
           url: "1.1.1.1"
@@ -363,24 +373,19 @@ spec:
           group: internal
           url: http://loki.loki.svc.cluster.local:3100/ready
           conditions: *internal-conditions
-        - name: ollama
-          group: internal
-          url: http://ollama.ai.svc.cluster.local:11434/api/version
-          conditions: *internal-conditions
         # App health for forward-auth services. Their external-auth checks only
-        # prove the middleware answers with a 302 — Authentik redirects whether
-        # or not the app behind it is up — so these hit the unauthenticated
-        # health endpoint on the in-cluster Service directly. Keep both.
-        - name: open-webui
+        # prove Authentik answers with a 302, whether or not the app behind it
+        # is up, so these hit an unauthenticated health path Caddy serves ahead
+        # of the auth check. Keep both.
+        - name: open-webui-app
           group: internal
-          url: http://open-webui.ai.svc.cluster.local:8080/health
+          url: https://ai.mpdavis.com/health
           conditions: *internal-conditions
-        - name: dispatcharr
+        - name: dispatcharr-app
           group: internal
           # No dedicated health route; the version API is unauthenticated and
-          # served by the Django app. Reaches the compose host through the
-          # bridge Service emby's tuner uses, so it checks that path too.
-          url: http://dispatcharr.media.svc.cluster.local:9191/api/core/version/
+          # served by the Django app.
+          url: https://dispatcharr.mpdavis.com/api/core/version/
           conditions: *internal-conditions
         - name: prowlarr-app
           group: internal

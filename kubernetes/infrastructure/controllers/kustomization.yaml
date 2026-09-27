@@ -12,7 +12,5 @@ resources:
   - alloy.yaml
   - nfs-data.yaml
   - nfs-homelab.yaml
-  - nvidia-device-plugin.yaml
-  - dcgm-exporter.yaml
   - ecowitt-exporter.yaml
   - gatus.yaml

@@ -12,6 +12,7 @@ variable "records" {
     seerr          = "public"
     audiobookshelf = "public"
     council        = "public"
+    emby           = "public"
     home           = "compose_tailnet"
     podfetch       = "compose_tailnet"
     gridiron       = "compose_tailnet"
@@ -25,6 +26,7 @@ variable "records" {
     radarr         = "compose_tailnet"
     listenarr      = "compose_tailnet"
     paperless      = "compose_tailnet"
+    ai             = "compose_tailnet"
     proxmox        = "infra_tailnet"
     birdnet        = "infra_tailnet"
   }

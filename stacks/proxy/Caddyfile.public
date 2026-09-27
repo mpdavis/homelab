@@ -40,7 +40,7 @@ council.mpdavis.com {
 }
 
 emby.mpdavis.com {
-	import traefik
+	reverse_proxy emby:8096
 }
 
 iam.mpdavis.com {

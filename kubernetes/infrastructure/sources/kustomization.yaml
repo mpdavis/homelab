@@ -12,9 +12,6 @@ resources:
   - grafana.yaml
   - grafana-community.yaml
   - nfs-provisioner.yaml
-  - nvidia.yaml
-  - dcgm-exporter.yaml
   - ecowitt-exporter.yaml
-  - ollama.yaml
   - authentik.yaml
   - twin.yaml

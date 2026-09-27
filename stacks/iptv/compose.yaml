@@ -22,11 +22,6 @@ services:
       TZ: America/Chicago
     volumes:
       - dispatcharr-data:/data
-    # Emby, still in k3s, streams its tuner from here through a selectorless
-    # Service (kubernetes/apps/media/emby/dispatcharr-bridge.yaml). Goes when
-    # emby moves to compose.
-    ports:
-      - "10.0.1.55:9191:9191"
     # The image ships no healthcheck; the version API is unauthenticated.
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:9191/api/core/version/"]
@@ -45,10 +40,6 @@ services:
       TZ: America/Chicago
     volumes:
       - teamarr-data:/app/data
-    # Emby is still in k3s; its settings name it http://emby:8096. Goes when
-    # emby moves to compose.
-    extra_hosts:
-      - emby:10.0.1.212
     networks:
       - proxy
 
@@ -67,8 +58,6 @@ services:
     volumes:
       - ecm-config:/config
       - ecm-mcp-secrets:/run/secrets/ecm-mcp
-    extra_hosts:
-      - emby:10.0.1.212
     # The image's own check, with a longer grace period: every boot VACUUMs
     # journal.db before listening, rewriting all of it (~6m for 12G here).
     # Under the image's 2m, doco-cd killed it mid-VACUUM as unhealthy and it
