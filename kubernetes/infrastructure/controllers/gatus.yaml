@@ -264,82 +264,82 @@ spec:
         # a public resolver instead. Keep the list in step with `records`.
         - name: dns-thumbs
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: thumbs.mpdavis.com}
           conditions: &public-dns ["[DNS_RCODE] == NOERROR", "[BODY] == ${PUBLIC_IP}"]
         - name: dns-seerr
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: seerr.mpdavis.com}
           conditions: *public-dns
         - name: dns-home
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: home.mpdavis.com}
           conditions: &compose-tailnet-dns ["[DNS_RCODE] == NOERROR", "[BODY] == ${COMPOSE_TAILNET_IP}"]
         - name: dns-podfetch
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: podfetch.mpdavis.com}
           conditions: *compose-tailnet-dns
         - name: dns-gridiron
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: gridiron.mpdavis.com}
           conditions: *compose-tailnet-dns
         - name: dns-dispatcharr
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: dispatcharr.mpdavis.com}
           conditions: *compose-tailnet-dns
         - name: dns-teamarr
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: teamarr.mpdavis.com}
           conditions: *compose-tailnet-dns
         - name: dns-ecm
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: ecm.mpdavis.com}
           conditions: *compose-tailnet-dns
         - name: dns-qbit
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: qbit.mpdavis.com}
           conditions: *compose-tailnet-dns
         - name: dns-mousehole
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: mousehole.mpdavis.com}
           conditions: *compose-tailnet-dns
         - name: dns-prowlarr
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: prowlarr.mpdavis.com}
           conditions: *compose-tailnet-dns
         - name: dns-sonarr
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: sonarr.mpdavis.com}
           conditions: *compose-tailnet-dns
         - name: dns-radarr
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: radarr.mpdavis.com}
           conditions: *compose-tailnet-dns
         - name: dns-listenarr
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: listenarr.mpdavis.com}
           conditions: *compose-tailnet-dns
         - name: dns-proxmox
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: proxmox.mpdavis.com}
           conditions: &infra-tailnet-dns ["[DNS_RCODE] == NOERROR", "[BODY] == ${INFRA_TAILNET_IP}"]
         - name: dns-birdnet
           group: dns
-          url: "dns://1.1.1.1"
+          url: "1.1.1.1"
           dns: {query-type: A, query-name: birdnet.mpdavis.com}
           conditions: *infra-tailnet-dns
         # --- cluster-internal, no ingress ---
