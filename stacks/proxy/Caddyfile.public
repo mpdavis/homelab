@@ -44,7 +44,7 @@ emby.mpdavis.com {
 }
 
 iam.mpdavis.com {
-	import traefik
+	reverse_proxy authentik-server:9000
 }
 
 # ntfy and the status page run on the infra host, so they keep working while

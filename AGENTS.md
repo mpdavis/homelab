@@ -120,7 +120,7 @@ line in `infra/gatus/compose.yaml`.
   `externalTrafficPolicy: Cluster` SNATs internet traffic to LAN node IPs
 - Wildcard cert: `*.mpdavis.com` via cert-manager (DNS-01, Cloudflare)
 - DNS records: ExternalDNS provisions a per-service Cloudflare A record from each IngressRoute's `Host()` rule (public IP, or the tailnet VIP for tailnet routes). Services migrated off k3s have no IngressRoute, so their records are managed in `bootstrap/tofu/cloudflare` instead
-- Auth: Authentik forward-auth Traefik middleware (`authentik-forward-auth`, domain-level provider on the embedded outpost) protects selected services; native OIDC for apps that support it (e.g. Paperless)
+- Auth: Authentik (`stacks/authentik/`) behind `iam.mpdavis.com`. Caddy sites opt into forward auth with `import authentik` (`stacks/proxy/authentik.caddy`, a domain-level provider on the embedded outpost); apps that support it use native OIDC (e.g. Paperless)
 - Service discovery: Kubernetes-native DNS (`<service>.<namespace>.svc.cluster.local`)
 
 ## Key Tools

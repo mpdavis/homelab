@@ -13,7 +13,7 @@ spec:
       kind: Rule
       middlewares:
         - name: authentik-forward-auth
-          namespace: authentik
+          namespace: flux-system
       services:
         - name: flux-operator
           port: 9080
