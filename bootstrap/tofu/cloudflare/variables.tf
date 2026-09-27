@@ -9,12 +9,19 @@ variable "records" {
   type        = map(string)
   default = {
     thumbs      = "public"
+    seerr       = "public"
     home        = "compose_tailnet"
     podfetch    = "compose_tailnet"
     gridiron    = "compose_tailnet"
     dispatcharr = "compose_tailnet"
     teamarr     = "compose_tailnet"
     ecm         = "compose_tailnet"
+    qbit        = "compose_tailnet"
+    mousehole   = "compose_tailnet"
+    prowlarr    = "compose_tailnet"
+    sonarr      = "compose_tailnet"
+    radarr      = "compose_tailnet"
+    listenarr   = "compose_tailnet"
     proxmox     = "infra_tailnet"
     birdnet     = "infra_tailnet"
   }

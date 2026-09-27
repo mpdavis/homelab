@@ -266,7 +266,12 @@ spec:
           group: dns
           url: "dns://1.1.1.1"
           dns: {query-type: A, query-name: thumbs.mpdavis.com}
-          conditions: ["[DNS_RCODE] == NOERROR", "[BODY] == ${PUBLIC_IP}"]
+          conditions: &public-dns ["[DNS_RCODE] == NOERROR", "[BODY] == ${PUBLIC_IP}"]
+        - name: dns-seerr
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: seerr.mpdavis.com}
+          conditions: *public-dns
         - name: dns-home
           group: dns
           url: "dns://1.1.1.1"
@@ -296,6 +301,36 @@ spec:
           group: dns
           url: "dns://1.1.1.1"
           dns: {query-type: A, query-name: ecm.mpdavis.com}
+          conditions: *compose-tailnet-dns
+        - name: dns-qbit
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: qbit.mpdavis.com}
+          conditions: *compose-tailnet-dns
+        - name: dns-mousehole
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: mousehole.mpdavis.com}
+          conditions: *compose-tailnet-dns
+        - name: dns-prowlarr
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: prowlarr.mpdavis.com}
+          conditions: *compose-tailnet-dns
+        - name: dns-sonarr
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: sonarr.mpdavis.com}
+          conditions: *compose-tailnet-dns
+        - name: dns-radarr
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: radarr.mpdavis.com}
+          conditions: *compose-tailnet-dns
+        - name: dns-listenarr
+          group: dns
+          url: "dns://1.1.1.1"
+          dns: {query-type: A, query-name: listenarr.mpdavis.com}
           conditions: *compose-tailnet-dns
         - name: dns-proxmox
           group: dns
