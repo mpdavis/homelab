@@ -1,0 +1,71 @@
+name: authentik
+
+# Both Caddy instances forward-auth against the embedded outpost in
+# authentik-server, and it serves iam.mpdavis.com. Service names carry the
+# `authentik-` prefix because they share the proxy network with every stack.
+x-authentik-env: &authentik-env
+  AUTHENTIK_POSTGRESQL__HOST: authentik-postgresql
+  AUTHENTIK_POSTGRESQL__USER: authentik
+  AUTHENTIK_POSTGRESQL__NAME: authentik
+  AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?resolved by doco-cd from external_secrets}
+  AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?resolved by doco-cd from external_secrets}
+  AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+  # Only read on a fresh install, to create akadmin.
+  AUTHENTIK_BOOTSTRAP_EMAIL: michael@mpdavis.com
+  AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:?resolved by doco-cd from external_secrets}
+  AUTHENTIK_BOOTSTRAP_TOKEN: ${AUTHENTIK_BOOTSTRAP_TOKEN:?resolved by doco-cd from external_secrets}
+  # Read by blueprints/paperless.yaml through !Env.
+  AUTHENTIK_PAPERLESS_OIDC_SECRET: ${AUTHENTIK_PAPERLESS_OIDC_SECRET:?resolved by doco-cd from external_secrets}
+  TZ: America/Chicago
+
+services:
+  authentik-postgresql:
+    image: postgres:17.11-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_DB: authentik
+      POSTGRES_PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?resolved by doco-cd from external_secrets}
+    volumes:
+      - postgresql:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "authentik", "-U", "authentik"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2026.8.3
+    restart: unless-stopped
+    command: server
+    environment: *authentik-env
+    depends_on:
+      authentik-postgresql:
+        condition: service_healthy
+    # The k3s Traefik middleware in front of the Flux UI still forward-auths
+    # here. Goes when k3s does.
+    ports:
+      - 10.0.1.55:9000:9000
+    networks:
+      - default
+      - proxy
+
+  # Runs background tasks and applies the blueprints on startup.
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2026.8.3
+    restart: unless-stopped
+    command: worker
+    environment: *authentik-env
+    depends_on:
+      authentik-postgresql:
+        condition: service_healthy
+    volumes:
+      - ./blueprints:/blueprints/custom:ro
+
+volumes:
+  postgresql:
+
+networks:
+  proxy:
+    external: true

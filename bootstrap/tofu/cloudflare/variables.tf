@@ -15,6 +15,7 @@ variable "records" {
     emby           = "public"
     ntfy           = "public"
     status         = "public"
+    iam            = "public"
     home           = "compose_tailnet"
     podfetch       = "compose_tailnet"
     gridiron       = "compose_tailnet"

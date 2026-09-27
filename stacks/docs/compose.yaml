@@ -33,8 +33,9 @@ services:
         "client_id": "2637be93cafb37442b1abb9bd89330fe",
         "secret": "${PAPERLESS_OIDC_CLIENT_SECRET:?resolved by doco-cd from external_secrets}",
         "settings": {"server_url": "https://iam.mpdavis.com/application/o/paperless/.well-known/openid-configuration"}}]}}
-    # The server-side OIDC calls go to Authentik, still in k3s behind the public
-    # Caddy. Pinning its hostname there avoids depending on NAT hairpin.
+    # The server-side OIDC calls must use the issuer's public hostname, which
+    # would otherwise resolve to the router. Pinning it to the public Caddy
+    # avoids depending on NAT hairpin.
     extra_hosts:
       - iam.mpdavis.com:10.0.1.56
     # nocopy on the NFS volumes: Docker otherwise seeds an empty volume from the

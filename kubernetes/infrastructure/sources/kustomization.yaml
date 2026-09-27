@@ -13,4 +13,3 @@ resources:
   - grafana-community.yaml
   - nfs-provisioner.yaml
   - ecowitt-exporter.yaml
-  - authentik.yaml
