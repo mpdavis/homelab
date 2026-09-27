@@ -1,0 +1,66 @@
+name: gatus
+
+# Synthetic checks for every service, and the public status page at
+# status.mpdavis.com. On this host so a compose-host outage is still
+# observed. Alerting runs in Grafana Cloud off the metrics Alloy ships.
+services:
+  gatus:
+    image: twinproduction/gatus:v5.34.0
+    restart: unless-stopped
+    user: "65534:65534"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      GATUS_CONFIG_PATH: /config/config.yaml
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
+      # Result history (SQLite).
+      - data:/data
+    # The compose host's public Caddy serves status.mpdavis.com from here;
+    # the router forwards 443 there, not to this host.
+    ports:
+      - 10.0.1.58:8081:8080
+    labels:
+      homelab.metrics.port: "8080"
+    # Probes go to the Caddy that serves each hostname rather than through
+    # public DNS, which would depend on NAT hairpin through the router. The
+    # dns-* checks cover the records themselves.
+    extra_hosts:
+      - audiobookshelf.mpdavis.com:10.0.1.56
+      - council.mpdavis.com:10.0.1.56
+      - emby.mpdavis.com:10.0.1.56
+      - iam.mpdavis.com:10.0.1.56
+      - ntfy.mpdavis.com:10.0.1.56
+      - seerr.mpdavis.com:10.0.1.56
+      - thumbs.mpdavis.com:10.0.1.56
+      - ai.mpdavis.com:10.0.1.57
+      - dispatcharr.mpdavis.com:10.0.1.57
+      - ecm.mpdavis.com:10.0.1.57
+      - gridiron.mpdavis.com:10.0.1.57
+      - home.mpdavis.com:10.0.1.57
+      - listenarr.mpdavis.com:10.0.1.57
+      - mousehole.mpdavis.com:10.0.1.57
+      - paperless.mpdavis.com:10.0.1.57
+      - podfetch.mpdavis.com:10.0.1.57
+      - prowlarr.mpdavis.com:10.0.1.57
+      - qbit.mpdavis.com:10.0.1.57
+      - radarr.mpdavis.com:10.0.1.57
+      - sonarr.mpdavis.com:10.0.1.57
+      - teamarr.mpdavis.com:10.0.1.57
+      - birdnet.mpdavis.com:10.0.1.58
+      - proxmox.mpdavis.com:10.0.1.58
+      # Still on k3s's tailnet Traefik.
+      - flux.mpdavis.com:10.0.1.210
+      - grafana.mpdavis.com:10.0.1.210
+    networks:
+      - proxy
+
+volumes:
+  data:
+
+networks:
+  proxy:
+    external: true

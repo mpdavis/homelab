@@ -13,4 +13,3 @@ resources:
   - nfs-data.yaml
   - nfs-homelab.yaml
   - ecowitt-exporter.yaml
-  - gatus.yaml

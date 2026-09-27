@@ -183,8 +183,8 @@ and every public service is down in the meantime.
 
 1. Add the stack, and the hostname to the right Caddyfile. Merge, then test with
    `curl --resolve <host>:443:<caddy ip> https://<host>/` before touching DNS.
-2. Remove it from `kubernetes/` and move its Gatus `hostAliases` entry to the
-   Caddy IP.
+2. Remove it from `kubernetes/` and point its `extra_hosts` line in
+   `infra/gatus/compose.yaml` at the Caddy IP.
 3. Hand the DNS record to OpenTofu before the IngressRoute goes. Otherwise
    ExternalDNS deletes the record, and resolvers cache the NXDOMAIN for up to
    30 minutes (the zone's SOA minimum) even after Tofu recreates it. See

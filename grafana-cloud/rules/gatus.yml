@@ -1,0 +1,29 @@
+# Synthetic-check alerts, off the gatus_results_endpoint_success series the
+# infra host's Alloy ships (infra/gatus/). Synced like docker-hosts.yml.
+namespace: gatus
+groups:
+  - name: gatus
+    rules:
+      - alert: GatusEndpointDown
+        expr: gatus_results_endpoint_success == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Synthetic check failing: {{ $labels.group }}/{{ $labels.name }}"
+          description: >-
+            Gatus has reported {{ $labels.group }}/{{ $labels.name }} unhealthy
+            for 5 minutes.
+
+      # Gatus runs no healthcheck of its own (the image has no shell), so this
+      # is how its absence is noticed.
+      - alert: GatusAbsent
+        expr: absent_over_time(gatus_results_endpoint_success[10m])
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Gatus is not reporting: synthetic monitoring is blind"
+          description: >-
+            No gatus_results_endpoint_success series has arrived for 10 minutes.
+            Gatus on the infra host is down, or Alloy there is not scraping it.

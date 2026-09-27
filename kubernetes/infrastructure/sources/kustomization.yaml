@@ -14,4 +14,3 @@ resources:
   - nfs-provisioner.yaml
   - ecowitt-exporter.yaml
   - authentik.yaml
-  - twin.yaml

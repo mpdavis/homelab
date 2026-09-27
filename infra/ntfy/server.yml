@@ -1,0 +1,14 @@
+base-url: "https://ntfy.mpdavis.com"
+listen-http: ":8080"
+# Caddy terminates TLS and forwards the client IP and scheme.
+behind-proxy: true
+cache-file: "/var/lib/ntfy/cache.db"
+auth-file: "/var/lib/ntfy/user.db"
+attachment-cache-dir: "/var/lib/ntfy/attachments"
+# Nothing is readable or writable without a token or ACL. Publishers and the
+# phone each hold a token.
+auth-default-access: "deny-all"
+# Instant iOS push: ntfy.sh relays a poll request through APNS. Only the
+# message ID and a hash of the topic URL go upstream; the phone fetches the
+# message from this server.
+upstream-base-url: "https://ntfy.sh"
