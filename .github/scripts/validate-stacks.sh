@@ -94,10 +94,12 @@ for tree in "${trees[@]}"; do
     continue
   fi
 
+  # The whole directory, so files the Caddyfiles import resolve at the same
+  # /etc/caddy paths the stack mounts them at.
   for caddyfile in "$proxy"/Caddyfile.*; do
     if out=$(docker run --rm -e CLOUDFLARE_API_TOKEN="$fake_cf_token" \
-      -v "$PWD/$caddyfile:/etc/caddy/Caddyfile:ro" "$image" \
-      caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile 2>&1); then
+      -v "$PWD/$proxy:/etc/caddy:ro" "$image" \
+      caddy validate --adapter caddyfile --config "/etc/caddy/${caddyfile##*/}" 2>&1); then
       echo "ok   $caddyfile"
     else
       printf '%s\n' "$out"

@@ -184,10 +184,10 @@ and every public service is down in the meantime.
    `curl --resolve <host>:443:<caddy ip> https://<host>/` before touching DNS.
 2. Remove it from `kubernetes/` and move its Gatus `hostAliases` entry to the
    Caddy IP.
-3. Once ExternalDNS has deleted the record, add the hostname to `records` in
-   `bootstrap/tofu/cloudflare` and apply. Earlier just gets it reset —
-   ExternalDNS owns the record through its TXT registry until the IngressRoute
-   is gone.
+3. Hand the DNS record to OpenTofu before the IngressRoute goes. Otherwise
+   ExternalDNS deletes the record, and resolvers cache the NXDOMAIN for up to
+   30 minutes (the zone's SOA minimum) even after Tofu recreates it. See
+   "Taking over a record" in `bootstrap/tofu/CLAUDE.md`.
 
 ### Stateful
 

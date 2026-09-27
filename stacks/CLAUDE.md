@@ -84,9 +84,10 @@ its stacks reference.
 | NFS PVC or inline `nfs:` volume | a volume with `driver_opts` (`type: nfs`, `nfsvers=3`) |
 | `${VAR}` from `cluster-vars` | the literal value — there is no postBuild substitution here |
 | Service DNS (`x.ns.svc.cluster.local`) | the container name on the `proxy` network, or a LAN address |
+| `CronJob` | the image's own scheduler if it has one (recyclarr's `CRON_SCHEDULE`), else a service looping `run; sleep` — sleeping after each run means runs can never overlap |
 | liveness/readiness probe | `healthcheck:` — doco-cd waits on it and restarts on unhealthy |
 | `IngressRoute` | a site block in the right Caddyfile; a service still in k3s uses `import traefik` |
-| Authentik forward-auth middleware | `forward_auth` in the site block |
+| Authentik forward-auth middleware | `import authentik` inside a `route` block; the snippet is `stacks/proxy/authentik.caddy`, shared by both Caddyfiles |
 
 **The NAS exports are restricted by client IP.** A host that is not on the
 allowlist gets `permission denied` at mount time, which surfaces as a failed

@@ -3,5 +3,4 @@ kind: Kustomization
 namespace: media
 resources:
   - namespace.yaml
-  - audiobookshelf
   - emby

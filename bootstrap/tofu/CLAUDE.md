@@ -40,11 +40,22 @@ export TF_VAR_ntfy_token="$(bws secret get 47079c89-adab-4d19-8173-b48d01492747 
 
 ## DNS records
 
-`cloudflare/` owns only what the compose hosts serve. ExternalDNS owns the rest
-and deletes a record when its IngressRoute goes away, so cutting a service over
-means: merge the removal from `kubernetes/`, wait for ExternalDNS to delete the
-record, then add the hostname to `records` here and apply. Adding it earlier
-just gets it reset — ExternalDNS still owns it through its TXT registry.
+`cloudflare/` owns only what the compose hosts serve. ExternalDNS owns the rest,
+and deletes a record when its IngressRoute goes away. Waiting for that deletion
+and then recreating the record here leaves a gap that resolvers cache as
+NXDOMAIN for up to 30 minutes, the zone's SOA minimum.
+
+### Taking over a record
+
+1. Add the hostname to `records` and import the existing A record (below), so
+   `plan` shows no create.
+2. Once the IngressRoute's removal is merged but not yet pruned (the `apps`
+   Kustomization suspended), delete ExternalDNS's ownership record, the TXT
+   named `a-<host>.mpdavis.com`. Then delete the IngressRoute, or resume Flux.
+   ExternalDNS deletes only records it owns, so the A record stays.
+
+Before the TXT is gone, ExternalDNS still owns the record, so an apply here gets
+reset, and removing the IngressRoute deletes it.
 
 Add a matching `dns-<host>` check to `gatus.yaml` alongside the record. Gatus's
 HTTP probes resolve through `hostAliases`, so without it a missing or wrong

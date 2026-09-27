@@ -272,6 +272,16 @@ spec:
           url: "1.1.1.1"
           dns: {query-type: A, query-name: seerr.mpdavis.com}
           conditions: *public-dns
+        - name: dns-audiobookshelf
+          group: dns
+          url: "1.1.1.1"
+          dns: {query-type: A, query-name: audiobookshelf.mpdavis.com}
+          conditions: *public-dns
+        - name: dns-council
+          group: dns
+          url: "1.1.1.1"
+          dns: {query-type: A, query-name: council.mpdavis.com}
+          conditions: *public-dns
         - name: dns-home
           group: dns
           url: "1.1.1.1"
@@ -387,7 +397,7 @@ spec:
           group: internal
           url: https://sonarr.mpdavis.com/ping
           conditions: *internal-conditions
-        - name: council-digest
+        - name: council-digest-app
           group: internal
-          url: http://ames-council-digest-web.civic.svc.cluster.local/healthz
+          url: https://council.mpdavis.com/healthz
           conditions: *internal-conditions

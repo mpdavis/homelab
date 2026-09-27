@@ -1,0 +1,44 @@
+name: media
+
+services:
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:2.36.1
+    restart: unless-stopped
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      TZ: America/Chicago
+      PORT: "3000"
+    volumes:
+      - config:/config
+      - metadata:/metadata
+      - media:/media
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:3000/healthcheck"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - proxy
+
+volumes:
+  # SQLite database.
+  config:
+  # Covers, cached images and backups.
+  metadata:
+  # Libraries point at /media/audiobooks and /media/podcasts, where the
+  # downloads stack writes. The NAS offers NFSv3 only.
+  media:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=10.0.1.6,nfsvers=3,rw,hard,proto=tcp
+      device: ":/var/nfs/shared/data/media"
+
+networks:
+  proxy:
+    external: true
