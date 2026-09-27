@@ -1,545 +1,141 @@
 ---
 name: add-service
 description: >
-  Scaffold and integrate a new service into this homelab k3s/FluxCD GitOps repository.
-  Use this skill whenever the user wants to add, deploy, install, or set up a new application
-  or service in the homelab cluster — whether it's a media app, utility, database, dashboard,
-  monitoring tool, or anything else. Also use when the user says things like "deploy X",
-  "set up X in the cluster", "add X to kubernetes", or "I want to run X". This skill ensures
-  the new service follows all established patterns, conventions, and FluxCD best practices
-  from the existing codebase.
+  Add a new service to this homelab as a Docker Compose stack deployed by doco-cd.
+  Use this skill whenever the user wants to add, deploy, install, or set up a new
+  application or service — a media app, utility, database, dashboard, monitoring tool,
+  or anything else. Also use when the user says things like "deploy X", "set up X",
+  "add X to the homelab", or "I want to run X". It covers the stack, the Caddy site,
+  Gatus checks, the DNS record, and the homepage tile, so nothing is left unmonitored
+  or unreachable.
 user-invocable: true
 argument-hint: "[service-name]"
-arguments: [service_name]
 ---
 
-# Add Service to Homelab
+# Add a service
 
-Add a new service to the k3s cluster following the exact patterns established in this repository.
+A service is a compose stack under `stacks/` (compose host, 10.0.1.55) or `infra/`
+(infra host, 10.0.1.58). doco-cd polls `main` every 60s and deploys whatever changed, so
+merging the PR is the deploy. Read `stacks/CLAUDE.md` first: it holds the authoring rules
+this skill does not repeat. `docs/compose.md` is the host runbook.
 
-**Read `docs/manifest-conventions.md` before writing manifests.** It is the source of truth for
-the workload baseline — runtime uid/gid, container hardening, resource requests, image pinning,
-and monitoring registration — and `manifest-hygiene-check.yml` enforces the checkable parts of it
-with kube-linter, against the rendered tree, on every finding a PR introduces. Step 3.5 below is
-the short version; the doc has the reasoning and the exception cases.
+## 1. Gather the facts
 
-A new service is where this bites hardest: it has no baseline, so *every* violation it carries is
-a new finding. Get the container `securityContext`, the resource requests and the pinned tag right
-the first time rather than in a review round-trip. Real exceptions go in an
-`ignore-check.kube-linter.io/<check>` annotation with the reason as the value.
+From the project's docs, image page, and repo (use WebFetch; ask the user only for what
+you cannot find):
 
-**Default to a HelmRelease.** Every new service should be a HelmRelease unless there is a
-strong reason not to. Services with an official/well-maintained chart use that chart;
-everything else uses the generic **bjw-s `app-template`** chart (already proven in this repo by
-`recyclarr`). Standardizing on HelmReleases is deliberate — it is what lets us move toward
-automatically testing services on deploy. Plain Kustomize manifests are now a fallback, not the
-default.
+- the image and a **pinned** tag or digest (never `latest`/`edge`)
+- the HTTP port, and whether it has its own login
+- what it persists (database, config) and whether that belongs on the NAS
+- the secrets it needs
+- its healthcheck: prefer the one the image ships
+  (`docker inspect <image> --format '{{.Config.Healthcheck}}'`)
+- whether it needs the GPU
+- exposure: **tailnet by default**; public only if people off the tailnet need it
 
-## Step 1: Gather Requirements
+## 2. Pick the stack
 
-Before writing any manifests, determine the following by asking the user (skip questions where the answer is already clear from context):
+Put it in the stack that matches what it does (grouping table in `stacks/CLAUDE.md`), or a
+new `stacks/<name>/` if nothing fits. Get this right first time: moving a service later
+renames its volumes. Anything that has to keep working while the compose host is down
+(monitoring, alerting) goes under `infra/` instead — see `infra/CLAUDE.md`.
 
-1. **Service name** — lowercase, kebab-case (e.g., `bazarr`, `tautulli`, `homepage`)
-2. **Namespace** — which namespace this belongs to. Group related services together:
-   - Media stack (arr apps, players, download clients, request managers) → `media`
-   - AI/inference → `ai`
-   - Anything genuinely new → its own namespace named after the domain
-3. **Deployment type** — default is **HelmRelease**. Decide which chart:
-   - **Official chart** — if the service publishes (or has a well-maintained community) Helm
-     chart, use it. Prefer OCI registries (`oci://`).
-   - **app-template** (default fallback) — if there is no good dedicated chart, use the bjw-s
-     `app-template` chart. This covers the common "single container + config volume + maybe an
-     ingress" case and keeps everything HelmRelease-shaped. Only drop to plain Kustomize
-     manifests if app-template genuinely can't express what's needed (rare).
-4. **Container image** — full image reference, pinned (e.g., `ghcr.io/recyclarr/recyclarr:7.4.1`).
-   Never `latest`/`edge` for new services — pin a tag or digest (the `image-pin-check.yml`
-   workflow will fail the PR otherwise).
-5. **Port** — the container's primary HTTP port
-6. **Ingress** — does it need a web UI at `<name>.mpdavis.com`? This repo terminates all ingress
-   at Traefik via a separate `IngressRoute` (not the chart's built-in ingress). Every service
-   that gets an IngressRoute also gets a Homepage tile (Step 3) — note which Homepage section it
-   belongs to (Media, IPTV, Infrastructure, AI, …) and a one-line description.
-   **Exposure** — public internet or tailnet-only? Default to **tailnet** (admin UIs, *arr-style
-   tools, anything only Michael uses). Choose **public** only when people or clients off the
-   tailnet need it (shared media servers, request portals, mobile apps, webhooks).
-7. **Storage** — what persistent storage does it need?
-   - **Config/database** — `local-path`, `ReadWriteOnce`. For SQLite DBs and app config. Typical 2–5Gi.
-   - **Media** — `nfs-data` storage class, or an inline NFS mount (`server: ${NAS_IP}`,
-     `path: ${NAS_DATA_PATH}/media`), `ReadWriteMany`.
-   - **Appdata bulk** — `nfs-homelab` storage class, `ReadWriteMany`.
-   - **None** — stateless services.
-8. **Secrets** — does it need secrets from Bitwarden Secrets Manager (BWS)? If so, get the BWS
-   secret UUIDs and desired key names. BWS secret UUIDs are **not** hardcoded in ExternalSecrets —
-   they live in the central `bws-secret-ids` ConfigMap and are referenced via `${BWS_*}`
-   placeholders (Step 3).
-9. **Special requirements** — GPU (`nvidia.com/gpu` + `runtimeClassName: nvidia`), node selection
-   (`nodeSelector`), sidecar containers, extra environment variables, ConfigMaps, cronjob
-   schedule, etc.
-   - **Service-link env collision** — if the app reads its own config from env vars prefixed
-     with its (upper-cased) name — e.g. `MOUSEHOLE_PORT`, `<NAME>_HOST` — they will collide with
-     the legacy Docker-style **service-link** env vars Kubernetes injects for every Service in the
-     namespace (`<SERVICENAME>_PORT=tcp://<clusterIP>:<port>`, `<SERVICENAME>_SERVICE_HOST`, …).
-     Since this repo names the Service after the app, the injected `<NAME>_PORT` shadows the app's
-     own `<NAME>_PORT` and crash-loops it (it gets a `tcp://…` URL where it expects a number). Set
-     `enableServiceLinks: false` to disable the injection (the links are unused here — containers
-     use explicit env + cluster DNS). See the gotcha in Step 3.
+## 3. Write the service
 
-## Step 2: Place the Service (Namespace-Grouped Layout)
+In `stacks/<stack>/compose.yaml`, following `stacks/CLAUDE.md`:
 
-Services are grouped by namespace on disk: **`kubernetes/apps/<namespace>/<service>/`**. The
-namespace directory owns the `Namespace` object and a group `kustomization.yaml` that sets
-`namespace: <namespace>` and lists its member services. Each service is a subdirectory whose own
-kustomization just lists that service's files — it inherits the namespace from the group.
+- `restart: unless-stopped`, no `container_name`
+- `user: "1000:1000"` unless the image drops privileges itself (s6/gosu images)
+- a `healthcheck` using a binary the image actually has — doco-cd waits on it and
+  restarts the container when it goes unhealthy, so a wrong check becomes a restart loop
+- routed services join the external `proxy` network; name services so they cannot
+  collide there (prefix generic names like `server` or `web`)
+- local state in a named volume; NAS data in a volume with NFS `driver_opts`
+  (`nfsvers=3`), mounted with the long syntax and `volume: {nocopy: true}` — without it an
+  empty NFS volume fails to start with `lchown ... operation not permitted`
+- config files bind-mounted from the stack directory (doco-cd recreates the service when
+  they change)
+- GPU: a `deploy.resources.reservations.devices` entry with `driver: cdi` and
+  `device_ids: [nvidia.com/gpu=all]`
+- secrets as `${VAR:?resolved by doco-cd from external_secrets}`, with the Bitwarden UUID
+  in the stack's `.doco-cd.yml` under `external_secrets`. Never put secret values in git;
+  create the Bitwarden secret first and ask the user for its UUID if you cannot create it.
+- only `timeout:` in `.doco-cd.yml` if first start is slow (default 180s)
 
-```
-kubernetes/apps/
-  <namespace>/
-    namespace.yaml          # the Namespace object
-    kustomization.yaml      # namespace: <namespace>; lists namespace.yaml + ./<service> subdirs
-    <service>/
-      kustomization.yaml    # lists this service's files (no namespace: — inherited from group)
-      helmrelease.yaml
-      ...
+## 4. Route it
+
+Add a site block to exactly one Caddyfile:
+
+| Exposure | File |
+|---|---|
+| tailnet (default) | `stacks/proxy/Caddyfile.tailnet` |
+| public | `stacks/proxy/Caddyfile.public` |
+| tailnet, on the infra host | `infra/proxy/Caddyfile.tailnet` |
+
+```caddy
+app.mpdavis.com {
+	reverse_proxy app:8080
+}
 ```
 
-Reference examples: `kubernetes/apps/media/` (the arr stack, emby, etc.) and `kubernetes/apps/ai/`
-(ollama + open-webui).
+With no login of its own, put it behind Authentik's forward auth. If the app has an
+unauthenticated health path, serve it ahead of the auth check so Gatus can test the app
+itself:
 
-Determine the placement case:
-
-- **Case A — namespace group already exists** (`media`, `ai`, …): create
-  `apps/<namespace>/<service>/` and register `./<service>` in the existing
-  `apps/<namespace>/kustomization.yaml`. The namespace is already created — do **not** add another
-  `namespace.yaml`.
-
-- **Case B — brand-new namespace**: create the group directory `apps/<namespace>/` with a
-  `namespace.yaml` and a group `kustomization.yaml`, plus the service subdirectory. Register the
-  namespace directory in `apps/kustomization.yaml` (Step 4).
-
-The `Namespace` object must be defined exactly once per namespace. If unsure whether it already
-exists, `grep -rl "kind: Namespace" kubernetes/apps` and check.
-
-**`apps/<namespace>/namespace.yaml`** (Case B only):
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: <namespace>
+```caddy
+app.mpdavis.com {
+	route {
+		reverse_proxy /health app:8080
+		import authentik
+		reverse_proxy app:8080
+	}
+}
 ```
 
-**`apps/<namespace>/kustomization.yaml`** (the group — sets the namespace, lists members):
-```yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-namespace: <namespace>
-resources:
-  - namespace.yaml        # Case B (new namespace) only
-  - ./<service>
-  # ...other services in this namespace
-```
+Apps with native OIDC (like Paperless) skip forward auth and get an Authentik provider
+instead — add a blueprint under `stacks/authentik/blueprints/`.
 
-> The group sets `namespace:` once and the leaf service kustomizations omit it (see `media`,
-> `homepage`). The older `ai` group instead sets `namespace: ai` on each leaf — if you add a
-> service under `ai`, match its siblings.
+## 5. Monitor it
 
-## Step 3: Create the Service Manifests
+In `infra/gatus/`:
 
-All of a service's files live in `kubernetes/apps/<namespace>/<service>/`.
+- `config.yaml`: an endpoint in the right group — `external-open` (`*open-conditions`,
+  expects 200) or `external-auth` (`*auth-client`, `*auth-headers`, `*auth-conditions`,
+  expects the 302 to Authentik; a 200 means forward auth is missing). With a health path
+  served ahead of auth, also an `internal` `<name>-app` check against it.
+- `config.yaml`: a `dns-<host>` check under the matching anchor (`*public-dns`,
+  `*compose-tailnet-dns`, `*infra-tailnet-dns`).
+- `compose.yaml`: an `extra_hosts` line mapping the hostname to the Caddy that serves it
+  (10.0.1.56 public, 10.0.1.57 compose tailnet, 10.0.1.58 infra).
 
-### HelmRelease — generic `app-template` (default)
+## 6. DNS and the homepage
 
-This is the default for any service without a dedicated chart. The `bjw-s` HelmRepository is
-**already registered** (`kubernetes/infrastructure/sources/bjw-s.yaml`,
-`oci://ghcr.io/bjw-s-labs/helm`) — no new source needed. Mirror
-`apps/media/recyclarr/helmrelease.yaml`.
+- Add the hostname to `records` in `bootstrap/tofu/cloudflare/variables.tf` with its target
+  (`public`, `compose_tailnet`, `infra_tailnet`). The apply is manual and runs from the
+  primary checkout (`tofu -chdir=~/git/homelab/bootstrap/tofu/cloudflare apply`), after
+  merge — see `bootstrap/tofu/CLAUDE.md`. Tell the user it is pending.
+- Add a tile to `stacks/homepage/config/services.yaml` unless it is machine-facing only.
 
-**kustomization.yaml** (the leaf — no `namespace:`; inherited from the group, Step 2):
-```yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  # Order: external-secret → configmap → pvc → helmrelease → ingressroute
-  - pvc.yaml
-  - helmrelease.yaml
-  - ingressroute.yaml
-```
+## 7. Check before opening the PR
 
-**helmrelease.yaml**:
-```yaml
-apiVersion: helm.toolkit.fluxcd.io/v2
-kind: HelmRelease
-metadata:
-  name: <service-name>
-spec:
-  interval: 30m
-  chart:
-    spec:
-      chart: app-template
-      version: "~5.0"          # pin to the app-template major; never "*"
-      sourceRef:
-        kind: HelmRepository
-        name: bjw-s
-        namespace: flux-system
-  install:
-    remediation:
-      retries: 3
-  upgrade:
-    remediation:
-      retries: 3
-      strategy: rollback
-    crds: CreateReplace
-  values:
-    controllers:
-      main:
-        # For any service with a local-path RWO PVC, force Recreate so a rolling
-        # update doesn't hang: the new pod can't mount the volume still attached
-        # to the old pod. Stateless services may omit this.
-        strategy: Recreate
-        # type: cronjob        # for scheduled jobs (see recyclarr); omit for long-running
-        containers:
-          main:
-            image:
-              repository: <image-repo>     # e.g. ghcr.io/org/app
-              tag: <pinned-tag>            # pin — no latest/edge
-            # Container-level hardening. Do NOT add runAsNonRoot here — many
-            # images (Home Assistant, unpackerr, etc.) legitimately run as root
-            # and pin uid/gid at the pod level instead (see defaultPodOptions
-            # note below). Keep allowPrivilegeEscalation: false + drop ALL.
-            securityContext:
-              allowPrivilegeEscalation: false
-              capabilities:
-                drop:
-                  - ALL
-              # readOnlyRootFilesystem: true   # only if the app can run read-only
-              #                                   # (needs a tmp emptyDir — see unpackerr)
-            # Always set requests; limits only where a runaway process is a risk
-            # (memory-hungry apps like HA, or long-lived Python/Node services).
-            resources:
-              requests:
-                cpu: 100m
-                memory: 128Mi
-              # limits:
-              #   cpu: "1"
-              #   memory: 1Gi
-            env:
-              TZ: ${TZ}
-              # PUID: "1000"               # LinuxServer.io images only
-              # PGID: "1000"
-              # SOME_API_KEY:              # secret value, inline secretKeyRef:
-              #   secretKeyRef:
-              #     name: <service-name>-secrets
-              #     key: some-api-key
-    # If the app needs to write files owned by a specific uid/gid (e.g. the media
-    # share), pin it at the pod level (see listenarr/unpackerr):
-    # defaultPodOptions:
-    #   securityContext:
-    #     runAsUser: 1000
-    #     runAsGroup: 1000
-    #     fsGroup: 1000
-    service:
-      main:
-        controller: main
-        ports:
-          http:
-            port: <port>
-    persistence:
-      config:
-        existingClaim: <service-name>      # references the PVC from pvc.yaml
-        globalMounts:
-          - path: /config
-      # media:                             # inline NFS for the media share
-      #   type: nfs
-      #   server: ${NAS_IP}
-      #   path: ${NAS_DATA_PATH}/media
-      #   globalMounts:
-      #     - path: /media
-```
+- `bash .github/scripts/validate-stacks.sh` on a host with Docker (the devbox cannot run
+  it; the compose host can): renders every compose file, verifies the Bitwarden UUIDs,
+  runs `caddy validate`, and rejects a hostname served twice
+- the image reference resolves (`image-pin-check` does this in CI)
+- the NAS export allowlist includes the host if it mounts NFS (`showmount -e 10.0.1.6`)
 
-app-template conventions (v5):
-- `controllers.main.containers.main` is the canonical name pair; `service.main.controller: main`
-  wires the Service to it.
-- `env` is a **map** (`TZ: ${TZ}`), and secret values use an inline `secretKeyRef:` block under
-  the env key (see `recyclarr`).
-- `persistence.<name>.existingClaim` references a PVC you define in `pvc.yaml`. Use
-  `globalMounts` for a simple mount, `advancedMounts` to target a specific container/path.
-- Leave the chart's `ingress:` disabled — this repo uses a standalone Traefik `IngressRoute`.
-- `${TZ}`, `${NAS_IP}`, `${NAS_DATA_PATH}` are substituted by Flux postBuild from cluster-vars.
-- **Hardening is mandatory, not optional** — reviewers flag its absence on every PR:
-  - `controllers.main.strategy: Recreate` whenever the service has a `local-path` RWO PVC
-    (stateful). Rolling updates hang on an attached RWO volume without it.
-  - Container-level `securityContext` with `allowPrivilegeEscalation: false` +
-    `capabilities.drop: [ALL]`. Never `runAsNonRoot` — many images run as root and pin
-    uid/gid at the pod level instead.
-  - `resources.requests` on the container (limits where the app is memory-hungry).
-
-> **Gotcha — service-link env collision.** If the app reads config from env vars prefixed with
-> its own name (`<NAME>_PORT`, `<NAME>_HOST`, …), disable Kubernetes service-link env injection so
-> the Service's auto-generated `<NAME>_PORT=tcp://…` vars don't shadow the app's config and
-> crash-loop it. In app-template set it at the values root:
-> ```yaml
-> defaultPodOptions:
->   enableServiceLinks: false
-> ```
-> For a plain Deployment (fallback), set `spec.template.spec.enableServiceLinks: false`. This bit
-> `mousehole` in the `qbittorrent` pod (its `MOUSEHOLE_PORT` got a `tcp://` URL).
-
-### HelmRelease — official chart
-
-When the service has its own chart, add a HelmRepository source and reference it. Mirror
-`apps/ai/ollama/` (+ `infrastructure/sources/ollama.yaml`) or `apps/media/seerr/`.
-
-**1. Add a HelmRepository** in `kubernetes/infrastructure/sources/<service-name>.yaml`:
-```yaml
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
-  name: <service-name>
-  namespace: flux-system
-spec:
-  type: oci                  # omit `type` for classic https chart repos
-  interval: 1h
-  url: <oci-or-https-url>
-```
-Then register it in `kubernetes/infrastructure/sources/kustomization.yaml`. Prefer `oci://`.
-
-**2. helmrelease.yaml** — same `interval`/`install`/`upgrade` block as above, but point
-`chart.spec.chart` + `sourceRef.name` at the official chart, and pin the version with a semver
-constraint (e.g. `"~3.6"`, `"1.x"`). Keep values inline under `spec.values`; use
-`spec.valuesFrom` referencing a Secret only for sensitive values.
-
-### Supporting manifests (both HelmRelease paths)
-
-**pvc.yaml** (config/database storage):
-```yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: <service-name>
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: local-path
-  resources:
-    requests:
-      storage: 2Gi
-```
-Storage classes: `local-path` (RWO, config/DB), `nfs-data` (RWX, media), `nfs-homelab` (RWX,
-bulk appdata).
-
-**ingressroute.yaml** (only if the service has a web UI):
-```yaml
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: <service-name>
-  labels:
-    homelab.mpdavis.com/exposure: tailnet   # omit label + use `websecure` for a public service
-spec:
-  entryPoints:
-    - tailnet                               # `websecure` for a public service
-  routes:
-    - match: Host(`<service-name>.mpdavis.com`)
-      kind: Rule
-      services:
-        - name: <service-name>
-          port: <port>
-  tls: {}
-```
-The `*.mpdavis.com` wildcard cert is already provisioned — `tls: {}` uses it automatically. The
-`apps/kustomization.yaml` patches auto-add the ExternalDNS target annotation (public IP, or the
-tailnet VIP for labelled routes) and force labelled routes onto the `tailnet` entrypoint, so no
-per-service annotation is needed. The label is what actually keeps a route off the internet —
-never rely on an IP allowlist middleware. (Note: app-template names its
-Service `<service-name>` via the chart's fullname; verify the rendered Service name and match it
-here.)
-
-**Homepage tile — required whenever the service has an IngressRoute.** Every service with a web
-UI must also appear on the Homepage dashboard. Add an entry to the `services.yaml` block in
-`kubernetes/apps/homepage/configmap.yaml`, under the section that matches its namespace/domain
-(`Media`, `IPTV`, `AI`, `Infrastructure`, …):
-```yaml
-  services.yaml: |
-    - Media:
-        # ...existing services...
-        - <Service Display Name>:
-            icon: <service>.png          # Dashboard Icons slug; or an mdi-* icon
-            href: https://<service-name>.mpdavis.com
-            description: <one-line description>
-```
-Conventions:
-- Match the `href` host to the IngressRoute's `Host(...)` rule exactly.
-- Prefer a [Dashboard Icons](https://github.com/walkxcode/dashboard-icons) slug (`sonarr.png`,
-  `emby.png`); fall back to a Material Design Icon (`mdi-television-classic`) when there's no logo.
-- If the service belongs to a section that doesn't exist yet, add the section to **both** the
-  `services.yaml` block and the `layout:` map in `settings.yaml` (same ConfigMap) so it renders.
-- Homepage lives in its own namespace and reads this ConfigMap at startup — no per-service
-  annotations or label-based discovery are used here; the tile is added manually.
-
-**Gatus check — required whenever the service has an IngressRoute.** Every service with a
-hostname must be probed by the synthetic-monitoring stack, in **two places** in
-`kubernetes/infrastructure/controllers/gatus.yaml`:
-
-1. An entry in `spec.values.config.endpoints`, reusing the existing anchors:
-```yaml
-        - name: <service-name>
-          group: external-open          # service is NOT behind Authelia
-          url: https://<service-name>.mpdavis.com/
-          conditions: *open-conditions
-```
-```yaml
-        - name: <service-name>
-          group: external-auth          # service IS behind the authelia middleware
-          url: https://<service-name>.mpdavis.com/
-          client: *auth-client
-          headers: *auth-headers        # Accept: text/html — makes Authelia 302 (not 401)
-          conditions: *auth-conditions
-```
-2. The hostname added to the `hostAliases` list in the `postRenderers` patch (same file) — in-cluster
-   probes resolve `*.mpdavis.com` via the Traefik VIP, not public DNS.
-3. **Auth-protected services only:** the 302 comes from the middleware whether or not the app is
-   up, so if the app has an unauthenticated health endpoint (`/health`, `/healthz`, `/ping` on
-   *arr apps), also add an app-health check against the in-cluster Service:
-```yaml
-        - name: <service-name>
-          group: internal
-          url: http://<service-name>.<namespace>.svc.cluster.local:<port>/health
-          conditions: *internal-conditions
-```
-
-Pick the group by whether the IngressRoute has the `authelia` middleware: protected services are
-healthy when they 302 to the auth portal; open services when they return 200. Skipping this means
-the new service is invisible to `GatusEndpointDown` alerting.
-
-**external-secret.yaml** (only if the service needs secrets from Bitwarden).
-
-First, **register each BWS secret UUID centrally** — never hardcode a UUID in an ExternalSecret.
-Add a `BWS_*` key for every secret to the `bws-secret-ids` ConfigMap in
-`kubernetes/clusters/homelab/flux-system/bws-secret-ids.yaml`, grouped under a comment for the
-service:
-```yaml
-data:
-  # <Service Name>
-  BWS_<SERVICE>_<KEY>: "<bitwarden-uuid>"
-```
-These UUIDs are not sensitive (the actual values are fetched at runtime by ESO); the ConfigMap is
-the single source of truth so an ID is defined once and reused everywhere. Flux postBuild
-substitution resolves the `${BWS_*}` placeholders.
-
-Then reference them in the ExternalSecret via `${BWS_*}` placeholders:
-```yaml
-apiVersion: external-secrets.io/v1
-kind: ExternalSecret
-metadata:
-  name: <service-name>-secrets
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: bitwarden
-    kind: ClusterSecretStore
-  target:
-    name: <service-name>-secrets
-  data:
-    - secretKey: <key-name>
-      remoteRef:
-        key: ${BWS_<SERVICE>_<KEY>}
-```
-The `apps` Kustomization already lists `bws-secret-ids` in its `postBuild.substituteFrom`, so a
-service under `kubernetes/apps/` needs no extra wiring. (Only if you place an ExternalSecret in a
-**new** Flux Kustomization path outside `apps`/`infrastructure` would you add `bws-secret-ids` to
-that Kustomization's `substituteFrom` in `kubernetes/clusters/homelab/`.)
-
-Reference secret values inline in the app-template `env` map via `secretKeyRef:` (see
-`recyclarr`), or in an official chart's values as that chart expects.
-
-### Plain Kustomize manifests (fallback only)
-
-Only use this when neither an official chart nor app-template fits. The pattern is a standard
-`deployment.yaml` + `service.yaml` (+ `pvc.yaml`/`ingressroute.yaml`) in the service's leaf
-directory (namespace inherited from the group, Step 2). Conventions: `strategy.type: Recreate`
-for stateful apps, label `app: <service-name>` consistently on the pod template and Service
-selector, `${TZ}`/`${NAS_IP}`/`${NAS_DATA_PATH}` for substituted values, port name `http`. See
-`apps/media/sonarr` and `apps/media/emby` for examples — but prefer a HelmRelease.
-
-## Step 4: Register the Service
-
-1. **Namespace group kustomization** — add `./<service>` to
-   `kubernetes/apps/<namespace>/kustomization.yaml` (Case A and B).
-2. **Apps kustomization** — only if you created a new namespace group directory (Case B), add
-   `<namespace>` to `kubernetes/apps/kustomization.yaml`:
-   ```yaml
-   resources:
-     - ai
-     - media
-     - <namespace>   # ← add the new namespace dir
-     - homepage
-   ```
-3. **Sources kustomization** — for an official-chart service with a new HelmRepository, add it to
-   `kubernetes/infrastructure/sources/kustomization.yaml`. (app-template needs nothing — `bjw-s`
-   is already registered.)
-
-## Step 5: Update Documentation
-
-Update documentation **anywhere it would otherwise go stale** because of this service. Check each
-of these and update the ones the change touches:
-
-- **`docs/design.md`** — update the "Repository Structure" tree and relevant prose if the service
-  introduces:
-  - A new namespace — add it to the structure tree and the description
-  - A new storage pattern, GPU usage, node selection, sidecars — document the decision (and add a
-    row to the Decisions Log if it's a notable tradeoff)
-- **`README.md`** (repo root) — if it enumerates services/namespaces, keep it in sync.
-- **`CLAUDE.md`** — only if the service establishes a *new convention* future work should follow
-  (a new storage class, a new namespace grouping, etc.).
-- **Homepage** — already covered in Step 3 (required for any service with an IngressRoute).
-
-If you're unsure whether a doc references the area you changed, grep for the old value (namespace
-name, storage class, service name) across `docs/`, `README.md`, and `CLAUDE.md` and reconcile.
-
-## Step 6: Validate
-
-Run `kubectl kustomize kubernetes/` or `kustomize build kubernetes/` to check that the manifests
-render without errors. If kustomize is not available locally, at minimum verify:
-- All YAML files parse correctly
-- Each `kustomization.yaml` resource list matches the actual files / subdirectories present
-- The `Namespace` object is defined exactly once for the target namespace (no duplicates)
-- Variable references use `${VAR}` syntax (not `$VAR` or `{{ }}`)
-- For app-template: `controllers`/`service`/`persistence` keys are consistent and the
-  `existingClaim` matches the PVC name
-- `controllers.main.strategy: Recreate` is present if the service uses a `local-path` RWO PVC
-- Container `securityContext` is set (`allowPrivilegeEscalation: false` + `capabilities.drop: [ALL]`)
-- Container `resources.requests` are set
-- Port numbers are consistent across HelmRelease/Service and IngressRoute
-- The image tag is pinned (no `latest`/`edge`)
-- If the service uses secrets, every `remoteRef.key` is a `${BWS_*}` placeholder backed by a key
-  in `bws-secret-ids` (no hardcoded UUIDs; placeholder name matches a ConfigMap key exactly)
-- If the service has an IngressRoute, a matching Homepage tile exists in
-  `apps/homepage/configmap.yaml` and its `href` host matches the IngressRoute
-- If the service has an IngressRoute, `infrastructure/controllers/gatus.yaml` has BOTH a matching
-  `config.endpoints` entry (group matches the service's Authelia status) AND the hostname in the
-  `hostAliases` postRenderers patch
+After merge, confirm the deploy in doco-cd's log (`ssh root@10.0.1.55 docker logs
+doco-cd-doco-cd-1`), then `curl --resolve <host>:443:<caddy ip> https://<host>/`, and
+that its Gatus checks go green once the DNS record is applied.
 
 ## Checklist
 
-Before considering the service complete, verify:
-
-- [ ] Service directory created at `kubernetes/apps/<namespace>/<service>/`
-- [ ] Deployed as a **HelmRelease** (official chart, or `app-template`) unless there's a strong reason not to
-- [ ] `app-template` HelmRelease mirrors `apps/media/recyclarr` (chart `app-template`, source `bjw-s`, version pinned `~5.0`)
-- [ ] Chart version pinned with a semver constraint (never `"*"`)
-- [ ] Image tag/digest pinned (no `latest`/`edge` — `image-pin-check.yml` enforces this)
-- [ ] Leaf `kustomization.yaml` lists exactly the files present and omits `namespace:` (inherited from the group)
-- [ ] `Namespace` defined exactly once — only the group dir's `namespace.yaml` defines it (Case B)
-- [ ] `./<service>` registered in `apps/<namespace>/kustomization.yaml`; new namespace group also registered in `apps/kustomization.yaml`
-- [ ] Environment uses `${TZ}` (not a hardcoded timezone); NFS uses `${NAS_IP}`/`${NAS_DATA_PATH}`
-- [ ] If the app reads `<NAME>_*` env vars for config, `enableServiceLinks: false` is set (avoids the service-link env collision)
-- [ ] IngressRoute has `tls: {}` and the right exposure: tailnet (label `homelab.mpdavis.com/exposure: tailnet` + `tailnet` entryPoint) unless off-tailnet users need it, else `websecure`; Service name matches the rendered chart name
-- [ ] **Service with an IngressRoute has a Homepage tile** in `apps/homepage/configmap.yaml` (correct section, `href` matches the route)
-- [ ] **Service with an IngressRoute has a Gatus check** — endpoint entry (correct group: `external-open` vs `external-auth`) **and** hostname under the matching VIP in the `hostAliases` patch, both in `infrastructure/controllers/gatus.yaml`
-- [ ] PVC uses the right StorageClass (`local-path` RWO config/DB; `nfs-data`/`nfs-homelab` RWX bulk)
-- [ ] `controllers.main.strategy: Recreate` set whenever the service has a `local-path` RWO PVC (stateful)
-- [ ] Container `securityContext` set: `allowPrivilegeEscalation: false` + `capabilities.drop: [ALL]` (no `runAsNonRoot`)
-- [ ] Container `resources.requests` set (limits added for memory-hungry apps)
-- [ ] For an official-chart service: HelmRepository added to `infrastructure/sources/` and its `kustomization.yaml`
-- [ ] No plaintext secrets — ExternalSecret + inline `secretKeyRef` for anything sensitive
-- [ ] BWS secret UUIDs registered in the central `bws-secret-ids` ConfigMap; ExternalSecret `remoteRef.key` uses a `${BWS_*}` placeholder (never a hardcoded UUID)
-- [ ] Documentation reconciled where the change touches it (`docs/design.md`, `README.md`, `CLAUDE.md` — Step 5)
+- [ ] Stack chosen per the grouping in `stacks/CLAUDE.md`; image pinned
+- [ ] Healthcheck uses a binary in the image
+- [ ] NFS volumes use `nocopy: true`; GPU via CDI
+- [ ] Secrets only as Bitwarden UUIDs in `.doco-cd.yml`
+- [ ] Site in exactly one Caddyfile, tailnet unless public is needed; forward auth unless
+      the app has its own login or OIDC
+- [ ] Gatus endpoint, `dns-<host>` check, and `extra_hosts` line
+- [ ] `records` entry in `bootstrap/tofu/cloudflare`, apply flagged as pending
+- [ ] Homepage tile

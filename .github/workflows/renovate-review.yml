@@ -41,9 +41,11 @@ jobs:
           # reviewing its PRs is the whole point of this workflow.
           allowed_bots: "renovate[bot]"
           prompt: |
-            You are reviewing a Renovate dependency-bump PR in a GitOps homelab repo
-            (k3s + FluxCD, manifests under kubernetes/). Your job is to judge how safe
-            this bump is to merge.
+            You are reviewing a Renovate dependency-bump PR in a GitOps homelab repo.
+            Services run as Docker Compose stacks (stacks/ on the compose host, infra/
+            on the infra host) with pinned images, and doco-cd deploys a stack within
+            a minute of the merge — so merging IS deploying. Your job is to judge how
+            safe this bump is to merge.
 
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
@@ -54,18 +56,20 @@ jobs:
                changelog summary in the PR body — read it. Fetch the linked changelog
                with WebFetch if you need detail the body doesn't give you.
             2. Assess merge safety for the version delta. Weigh:
-               - Breaking changes, removed/renamed flags, schema or CRD apiVersion changes
+               - Breaking changes, removed/renamed flags or env vars, config or database
+                 schema changes, data migrations that cannot be rolled back
                - Deprecations that affect how THIS repo uses the dependency (grep the repo)
                - Security fixes (these raise the value of merging)
-               - Whether it's a Helm chart, container image, or Flux/k8s resource, and
-                 whether values/manifests in this repo must change to match
+               - Whether it's a container image, a GitHub Action, a tool or provider
+                 version, and whether compose files, config files, or Caddyfiles in this
+                 repo must change to match
                - Major version crossings: Renovate gates majors behind manual dashboard
                  approval, so a major slipping through here is itself a red flag
             3. Post ONE top-level comment with `gh pr comment` containing:
                - A verdict line: "✅ Safe to merge", "⚠️ Review recommended", or
                  "❌ Do not merge as-is"
                - 2–5 bullets of the key findings driving that verdict
-               - Any concrete follow-up the repo needs (e.g. a values change)
+               - Any concrete follow-up the repo needs (e.g. a config or env var change)
             4. ONLY IF your verdict is "✅ Safe to merge", submit an approval:
                `gh pr review <num> --approve --body "Automated safety review: safe to merge."`
                If approval fails because the token lacks permission, note that briefly

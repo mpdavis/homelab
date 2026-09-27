@@ -6,60 +6,42 @@ never replace the symlink with a copy.
 
 ## What This Repo Is
 
-GitOps repository for a homelab k3s cluster managed by FluxCD (via FluxOperator). The full design is in `docs/design.md`.
+GitOps repository for a homelab that runs Docker Compose stacks on two Proxmox VMs.
+doco-cd on each host polls `main` and deploys what changed. The design is in
+`docs/design.md`; the host runbook is `docs/compose.md`.
 
 ## Architecture
 
 - **Proxmox VE** on two physical nodes (pve1 + pve2)
-- **k3s** for Kubernetes — control plane + general workloads in LXC containers and a VM
-- **FluxCD** watches this repo on GitHub and reconciles cluster state
-- **Compose host** (VM `docker` on pve2) holds the NVIDIA RTX 3050 passthrough, for Emby transcoding and Ollama
+- **Compose host** — VM `docker` on pve2 (10.0.1.55). Runs `stacks/`, and holds the
+  NVIDIA RTX 3050 passthrough for Emby transcoding and Ollama
+- **Infra host** — VM `infra` on pve1 (10.0.1.58). Runs `infra/`: what must keep
+  working while the compose host is down (Gatus, ntfy, ingress for LAN hosts)
+- **Caddy** for ingress: public (10.0.1.56, the router forwards 443 here) and tailnet
+  (10.0.1.57) on the compose host, tailnet on the infra host
+- **Grafana Cloud** for metrics, logs and alerting; alerts reach the phone via ntfy
 - **Unifi NAS** provides NFS storage for media and bulk data
 
 ## Repository Layout
 
 ```text
-bootstrap/          # Pre-Flux provisioning and configuration
-  ansible/          # Ansible — node configuration, k3s install, Flux bootstrap, devbox
-  tofu/             # OpenTofu — Proxmox guests + Cloudflare DNS (see bootstrap/tofu/CLAUDE.md)
-kubernetes/         # Flux-managed cluster state (sync root)
-  apps/             # Per-service manifests, grouped by namespace (ai/, media/, …)
-  infrastructure/   # Cluster infrastructure — HelmReleases, HelmRepositories, companion manifests
-    sources/        # HelmRepository definitions
-    controllers/    # HelmRelease definitions (install CRDs first)
-    cert-manager/   # ClusterIssuer + ExternalSecret
-    external-secrets/ # ClusterSecretStore + TLS
-    external-dns/   # ExternalDNS RBAC + companions (Cloudflare per-service DNS)
-    authentik/      # Authentik IdP (HelmRelease, blueprints, forward-auth middleware)
-    metallb/        # IPAddressPool + L2Advertisement
-    traefik/        # Certificate + TLSStore
-    monitoring/     # Grafana ingress + ExternalSecret + dashboards
-    flux-operator/  # RBAC + IngressRoute for Flux web UI
-    flux-notifications/ # Flux Alert/Provider (GitHub commit status)
-  clusters/         # Flux Kustomization entrypoints (infra.yaml, apps.yaml, flux-system/)
-images/             # Container images built from this repo (see images/CLAUDE.md)
-stacks/             # Docker Compose stacks for the compose host (stacks/<stack>/)
-infra/              # Docker Compose stacks for the infra host (ingress for non-compose services)
+bootstrap/          # Provisioning, applied by hand
+  ansible/          # Host configuration: Docker, doco-cd, GPU driver, devbox, Proxmox
+  tofu/             # OpenTofu — Proxmox guests, Cloudflare DNS, Grafana Cloud routing (see bootstrap/tofu/CLAUDE.md)
+stacks/             # Compose stacks for the compose host (see stacks/CLAUDE.md)
+infra/              # Compose stacks for the infra host (see infra/CLAUDE.md)
 doco-cd/            # doco-cd deploy configs (one per host) + the doco-cd instance itself
-docs/               # Design documents (devbox.md = dev-host runbook, compose.md = compose hosts)
+images/             # Container images built from this repo (see images/CLAUDE.md)
+grafana-cloud/      # Alert rules synced into Grafana Cloud by CI
+docs/               # Design (design.md), host runbook (compose.md), devbox runbook (devbox.md)
 ```
-
-**Migration in progress:** services are moving from k3s to Docker Compose one at a
-time. A service lives in exactly one of `kubernetes/`, `stacks/` or `infra/`, never
-more. `stacks/CLAUDE.md` has the rules for writing a stack; `docs/compose.md` has the
-deploy path and the host runbook.
 
 Custom images (gridiron, ames-council-digest) live in their own repos —
 `mpdavis/<name>` — which publish `ghcr.io/mpdavis/<name>` from main; Renovate bumps
 the pinned tag here like any third-party image. Images with no source of their own
 are built from `images/` instead — see `images/CLAUDE.md`.
 
-## Manifest Strategy
-
-- **HelmRelease** for third-party software with official Helm charts (one per component, values inline)
-- **Kustomize** for custom deployments or apps without good charts
-- Each infrastructure component is a self-contained directory with its own `kustomization.yaml`
-- Dependency chain: `infrastructure-sources` → `infrastructure-controllers` → `infrastructure` → `apps` (via Flux Kustomization `dependsOn`)
+The `add-service` skill walks through everything a new service needs.
 
 ## Comments
 
@@ -69,24 +51,23 @@ value that looks wrong but is deliberate. Never restate what a line does, never 
 block with its own name, and never add a comment to a change merely because it is a
 change. If a comment would be obvious to someone reading the code, delete it.
 
-This applies to YAML as much as to code — a `# image tag` above `tag:` is noise. Explain
-*why* a Helm value, resource limit, or annotation is set the way it is, not *that* it is
-set.
+This applies to YAML as much as to code — a `# image tag` above `image:` is noise.
+Explain *why* a setting, limit, or label is set the way it is, not *that* it is set.
 
-## Storage Classes
+## Storage
 
-| StorageClass | Backing | Use Case |
-|---|---|---|
-| `nfs-data` | Unifi NAS `data` share via NFS provisioner | Media files (ReadWriteMany) |
-| `nfs-homelab` | Unifi NAS `homelab` share via NFS provisioner | Bulk appdata, model weights, backups (ReadWriteMany) |
-| `local-path` | Local SSD via k3s local-path-provisioner | Databases (SQLite, Postgres), Prometheus TSDB, Loki WAL (ReadWriteOnce) |
-| `longhorn` | Replicated (future) | HA storage if/when needed |
+- Named Docker volumes on the host's disk for databases and app state (SQLite,
+  Postgres). They are named `<stack>_<key>`, so a service's stack decides them.
+- NFS volumes on the NAS for media and bulk data, declared in the stack with
+  `driver_opts` (`nfsvers=3`, `nocopy`). The NAS exports only to allowlisted IPs.
+  See `stacks/CLAUDE.md`.
 
 ## Secrets
 
-External Secrets Operator syncs from Bitwarden Secrets Manager into Kubernetes Secrets. ExternalSecret CRs reference only the secret store and Bitwarden UUIDs — never secret data.
-
-Bitwarden (BWS) secret UUIDs are centralized in the `bws-secret-ids` ConfigMap (`kubernetes/clusters/homelab/flux-system/bws-secret-ids.yaml`). Each UUID is defined once as a `BWS_*` key and referenced from an ExternalSecret's `remoteRef.key` as a `${BWS_*}` placeholder, resolved by Flux postBuild substitution (the same mechanism as `cluster-vars`). Any Flux Kustomization holding an ExternalSecret lists `bws-secret-ids` in its `spec.postBuild.substituteFrom`.
+Never in git. A stack's `.doco-cd.yml` maps env vars to Bitwarden Secrets Manager
+UUIDs under `external_secrets`; doco-cd fetches them at deploy time with the host's
+machine account. Compose files reference them as `${VAR:?...}` so a missing one
+fails the deploy.
 
 ## Synthetic Monitoring
 
@@ -110,22 +91,21 @@ line in `infra/gatus/compose.yaml`.
 
 ## Networking
 
-- Ingress: Traefik as single entry point for all HTTP/HTTPS (k8s and external services)
-- MetalLB VIPs: `10.0.1.200` public Traefik (router port-forwards 443 here), `10.0.1.210` tailnet-only Traefik (never forwarded)
-- Exposure: IngressRoutes are **public** by default. Admin/personal tools get the label
-  `homelab.mpdavis.com/exposure: tailnet` (+ `entryPoints: [tailnet]`); the root kustomization
-  patches then force the `tailnet` entrypoint and a DNS target of the tailnet VIP. Remote access
-  is via the Tailscale subnet router advertising `10.0.1.0/24`. Default new services to tailnet
-  unless people off the tailnet need them. Never use an IP allowlist for this — Traefik's
-  `externalTrafficPolicy: Cluster` SNATs internet traffic to LAN node IPs
-- Wildcard cert: `*.mpdavis.com` via cert-manager (DNS-01, Cloudflare)
-- DNS records: ExternalDNS provisions a per-service Cloudflare A record from each IngressRoute's `Host()` rule (public IP, or the tailnet VIP for tailnet routes). Services migrated off k3s have no IngressRoute, so their records are managed in `bootstrap/tofu/cloudflare` instead
-- Auth: Authentik (`stacks/authentik/`) behind `iam.mpdavis.com`. Caddy sites opt into forward auth with `import authentik` (`stacks/proxy/authentik.caddy`, a domain-level provider on the embedded outpost); apps that support it use native OIDC (e.g. Paperless)
-- Service discovery: Kubernetes-native DNS (`<service>.<namespace>.svc.cluster.local`)
+- Exposure: a hostname is public or tailnet-only by which Caddyfile serves it
+  (`stacks/CLAUDE.md`). Default new services to tailnet unless people off the tailnet
+  need them. Remote access is via the Tailscale subnet router advertising `10.0.1.0/24`
+- Certificates: each Caddy gets its own from Let's Encrypt over DNS-01 (Cloudflare)
+- DNS records: `bootstrap/tofu/cloudflare`, applied by hand from the primary checkout.
+  Public hostnames point at the router; tailnet ones at a Caddy's LAN address
+- Auth: Authentik (`stacks/authentik/`) behind `iam.mpdavis.com`. Caddy sites opt into
+  forward auth with `import authentik` (`stacks/proxy/authentik.caddy`, a domain-level
+  provider on the embedded outpost); apps that support it use native OIDC (e.g. Paperless)
+- Service discovery: containers on the shared `proxy` network reach each other by
+  service name
 
 ## Key Tools
 
-- `kubectl` for cluster interaction
-- `helm` for chart templating/debugging
-- `kustomize` (or `kubectl -k`) for kustomize-based apps
-- `flux` CLI for Flux management
+- `ssh root@10.0.1.55` / `root@10.0.1.58`, then `docker` and `docker compose` for the hosts
+- `docker logs doco-cd-doco-cd-1` for what doco-cd deployed or why it failed
+- `tofu` and `ansible-playbook` for `bootstrap/`, run from the primary checkout
+- `bws` for Bitwarden secrets (pass `--color no` when piping its JSON)

@@ -24,12 +24,11 @@ a worktree, symlink the primary checkout's copy in first.
 | Group | Hosts | Purpose |
 | --- | --- | --- |
 | `pve` | pve1, pve2 | Proxmox VE hypervisors |
-| `k3s_cluster` | `k3s_server` + `k3s_agent` | k3s-server; k3s-agent-1, k3s-agent-gpu |
 | `docker_hosts` | docker, infra | Docker Compose hosts, deployed by doco-cd |
 | `gpu` | docker | Holds the passthrough GPU |
 | `tailscale_router` | tailscale-router | Tailscale subnet router for the LAN |
 | `development` | devbox | Always-on development host |
-| `lxc` / `vm` | every guest, by type | Sets `node_type`; target platform roles with e.g. `k3s_cluster:&vm` |
+| `lxc` / `vm` | every guest, by type | Sets `node_type`; target platform roles with e.g. `docker_hosts:&vm` |
 
 ## Playbooks
 
@@ -39,22 +38,17 @@ Run from `bootstrap/ansible/`: `ansible-playbook playbooks/<playbook>.yml`.
 | --- | --- | --- |
 | `setup-pve.yml` | `pve` | Post-install config: no-subscription repos, nag removal, NIC offload fix, sysctls, dist-upgrade |
 | `setup-pve-cluster.yml` | `pve` | Creates the Proxmox cluster on the first node and joins the rest; safe to re-run |
-| `site.yml` | `k3s_cluster` | Prepares the nodes and installs k3s (server, then agents) |
-| `bootstrap-secrets.yml` | `k3s_server` | Creates the Bitwarden access token secret for External Secrets (prompts) |
-| `bootstrap-flux.yml` | `k3s_server` | Installs the Flux Operator and applies the FluxInstance |
 | `docker-host.yml` | `docker_hosts` | Docker, service IPs, and the doco-cd instance; see `docs/compose.md` |
 | `tailscale-router.yml` | `tailscale_router` | The subnet router (prompts for an auth key) |
 | `devbox.yml` | `development` | The development host; see `docs/devbox.md` |
 
-A fresh cluster, in order:
+From bare Proxmox, in order (doco-cd then deploys every stack from `main`):
 
 ```bash
 ansible-playbook playbooks/setup-pve.yml
 ansible-playbook playbooks/setup-pve-cluster.yml
 tofu -chdir=../tofu/proxmox apply
-ansible-playbook playbooks/site.yml
-ansible-playbook playbooks/bootstrap-secrets.yml
-ansible-playbook playbooks/bootstrap-flux.yml
+ansible-playbook playbooks/docker-host.yml
 ```
 
 ## Roles
@@ -63,13 +57,11 @@ Every guest play starts with `common`; the rest are applied by group.
 
 | Role | Applied to | Purpose |
 | --- | --- | --- |
-| `pve` | Proxmox hosts | Repos, subscription nag, HA off, NIC offloading, k3s sysctls, update |
-| `common` | every guest | Cloud-init wait, `resolv.conf`, apt cache, base packages, k3s sysctls on VMs |
-| `lxc` | LXC guests | AppArmor removal, `/dev/kmsg` symlink, shared mount for k3s and Docker |
+| `pve` | Proxmox hosts | Repos, subscription nag, HA off, NIC offloading, panic/overcommit sysctls, update |
+| `common` | every guest | Cloud-init wait, `resolv.conf`, apt cache, base packages, panic/overcommit sysctls on VMs |
+| `lxc` | LXC guests | AppArmor removal, `/dev/kmsg` symlink, shared mount for Docker |
 | `vm` | VM guests | qemu-guest-agent |
 | `gpu` | `gpu` hosts | NVIDIA driver and container toolkit; reboots once to load a fresh driver |
-| `k3s_server` | k3s-server | k3s server install, kubeconfig fetch |
-| `k3s_agent` | k3s agents | k3s agent install and cluster join |
 | `docker` | docker hosts, devbox | Docker Engine, daemon config, shared networks |
 | `service_ips` | docker hosts | Extra addresses on the primary interface (netplan drop-in) |
 | `doco_cd` | docker hosts | Bitwarden token and the doco-cd instance |

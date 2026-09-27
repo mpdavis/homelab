@@ -11,7 +11,7 @@ body:
         Tell us **what** to run and **where** — that's it. When you submit, this issue is
         labeled `new service`, which kicks off automation that researches the service from
         the documentation link below, scaffolds it following this repo's conventions
-        (HelmRelease, pinned image, Traefik ingress, Homepage tile), and opens a **PR for
+        (compose stack, pinned image, Caddy site, Gatus check, Homepage tile), and opens a **PR for
         you to review**. You don't need to figure out the image, port, storage, or secrets
         up front — the automation proposes a first pass and flags anything it had to guess.
 
@@ -25,14 +25,16 @@ body:
       required: true
 
   - type: dropdown
-    id: namespace
+    id: stack
     attributes:
-      label: Namespace
-      description: Which namespace this belongs to. Pick an existing group or request a new one.
+      label: Stack
+      description: Which compose stack this belongs to (see stacks/CLAUDE.md). Pick an existing one or request a new one.
       options:
-        - media (arr apps, players, download clients, request managers)
+        - downloads (arr apps, download clients, request managers)
+        - media (players and library servers)
+        - iptv (live TV)
         - ai (inference / model serving)
-        - New namespace (name it in "Anything else")
+        - New stack (name it in "Anything else")
       default: 0
     validations:
       required: true
@@ -43,7 +45,7 @@ body:
       label: Documentation link
       description: >
         A link the automation can research from — the project's docs, GitHub repo,
-        Docker image page, or Helm chart. Used to determine the image, port, storage,
+        or Docker image page. Used to determine the image, port, storage,
         ingress, and any secrets.
       placeholder: https://github.com/org/project
     validations:
@@ -54,7 +56,7 @@ body:
     attributes:
       label: Anything else (optional)
       description: >
-        Anything that shouldn't be guessed — a specific image/tag, a new namespace name,
+        Anything that shouldn't be guessed — a specific image/tag, a new stack name,
         GPU/node requirements, or "no web UI". Leave blank to let the automation decide.
     validations:
       required: false

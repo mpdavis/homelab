@@ -1,50 +1,57 @@
 # Homelab
 
-GitOps repository for a multi-node homelab running **k3s** on **Proxmox VE**, managed by **FluxCD**.
+GitOps repository for a two-node homelab on **Proxmox VE**. Services run as
+**Docker Compose** stacks, deployed by **doco-cd** from `main`.
 
 ## Architecture
 
-- **Proxmox VE** hypervisor across two SFF Lenovo nodes (pve1 + pve2)
-- **k3s** for Kubernetes — LXC containers for control plane + general workloads, VM for GPU node
-- **FluxCD** (via FluxOperator) watches this repo on GitHub and reconciles cluster state
-- **External Secrets Operator** syncs secrets from Bitwarden Secrets Manager
+- **Proxmox VE** on two SFF Lenovo nodes (pve1 + pve2)
+- **Compose host** (VM on pve2) runs every service, with the RTX 3050 passed
+  through for Emby transcoding and Ollama
+- **Infra host** (VM on pve1) runs what must survive the compose host being
+  down: Gatus, ntfy, and the Caddy for LAN hosts
+- **Caddy** terminates TLS, one instance per host and exposure (public or
+  tailnet); **Authentik** provides SSO
+- **Bitwarden Secrets Manager** holds every secret; doco-cd resolves them at
+  deploy time
+- **Grafana Cloud** holds metrics, logs and alert rules; alerts arrive through
+  ntfy
 
-See [docs/design.md](docs/design.md) for the full design document, hardware details, storage strategy, and deploy sequence.
+See [docs/design.md](docs/design.md) for the design and
+[docs/compose.md](docs/compose.md) for the runbook.
 
 ## Deploy Pipeline & Health
 
-Merging to `main` *is* deploying — Flux reconciles the cluster from `main`.
-**Gatus** ([status.mpdavis.com](https://status.mpdavis.com)) continuously probes every
-service — HTTP status, TLS validity, and that Authentik-protected hosts actually redirect to
-the auth portal. Results feed Prometheus; failing endpoints raise the `GatusEndpointDown`
-alert.
+Merging to `main` is deploying: each host's doco-cd polls `main` every minute
+and applies what changed. **Gatus** ([status.mpdavis.com](https://status.mpdavis.com))
+probes every service — HTTP status, TLS validity, and that Authentik-protected
+hosts actually redirect to the login page — and failing checks alert through
+Grafana Cloud.
 
-See [.github/workflows/README.md](.github/workflows/README.md) for the full workflow reference
-and [docs/design.md](docs/design.md#deploy-verification--synthetic-monitoring) for the design.
+See [.github/workflows/README.md](.github/workflows/README.md) for CI.
 
 ## Repository Layout
 
 ```text
-bootstrap/            # Pre-Flux provisioning and configuration
-  tofu/               # OpenTofu (IaC) — Proxmox LXC/VM provisioning
-  ansible/            # Ansible — Proxmox/node setup, k3s install, Flux bootstrap
-kubernetes/           # Flux-managed cluster state (sync root)
-  apps/               # Per-service K8s manifests
-  infrastructure/     # Cluster infrastructure (HelmReleases, HelmRepositories, companion manifests)
-    sources/          # HelmRepository definitions
-    controllers/      # HelmRelease definitions
-  clusters/           # Flux Kustomization entrypoints (infra.yaml, apps.yaml, flux-system/)
-docs/                 # Design documents (incl. devbox.md — the dev host runbook)
+stacks/               # the compose host's projects, one directory per stack
+infra/                # the infra host's projects
+doco-cd/              # doco-cd config per host + the doco-cd instance itself
+images/               # container images built from this repo
+grafana-cloud/        # alert rules, synced to Grafana Cloud on merge
+bootstrap/
+  tofu/               # OpenTofu — Proxmox guests, Cloudflare DNS, alert routing
+  ansible/            # Ansible — Proxmox and guest configuration, doco-cd
+docs/                 # design, compose runbook, devbox runbook
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
-- [OpenTofu](https://opentofu.org/docs/intro/install/) — LXC/VM provisioning
-- [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/) — node configuration
-- [kubectl](https://kubernetes.io/docs/tasks/tools/) — cluster interaction
-- SSH access to Proxmox hosts (pve1, pve2)
+- [OpenTofu](https://opentofu.org/docs/intro/install/) — guests and DNS
+- [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/) — host configuration
+- SSH access to the Proxmox hosts (pve1, pve2)
+- `bootstrap/network.yaml` (git-ignored; `network.example.yaml` shows its shape)
 
 ### Configure Proxmox Hosts
 
@@ -56,47 +63,31 @@ ansible-playbook playbooks/setup-pve.yml          # repos, subscription nag, NIC
 ansible-playbook playbooks/setup-pve-cluster.yml  # form/join the Proxmox cluster
 ```
 
-### Provision Infrastructure
+### Provision the Guests
 
 ```bash
 cd bootstrap/tofu/proxmox
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your PVE API token and SSH keys
-tofu init
-tofu apply
+cp terraform.tfvars.example terraform.tfvars      # SSH keys, Proxmox password
+tofu init && tofu apply
 ```
 
-### Configure Nodes and Install k3s
+### Configure the Docker Hosts
 
 ```bash
 cd bootstrap/ansible
-ansible-playbook playbooks/site.yml           # install k3s + apply common/lxc/vm/gpu roles
+ansible-playbook playbooks/docker-host.yml        # Docker, networks, GPU driver, doco-cd
 ```
 
-### Bootstrap Cluster
-
-```bash
-ansible-playbook playbooks/bootstrap-secrets.yml  # BWSM access token
-ansible-playbook playbooks/bootstrap-flux.yml     # install FluxOperator + FluxInstance
-```
+The playbook prompts for each host's Bitwarden access token. Once doco-cd is
+running it deploys every stack from `main` on its own; DNS records are applied
+from `bootstrap/tofu/cloudflare`.
 
 ### Provision the Development Host
 
 `devbox` is an always-on LXC for writing code — coding agents run there and
-[herdr](https://herdr.dev) attaches over SSH from a laptop or phone. It sits
-outside the cluster on purpose; see [docs/devbox.md](docs/devbox.md).
+[herdr](https://herdr.dev) attaches over SSH from a laptop or phone. See
+[docs/devbox.md](docs/devbox.md).
 
 ```bash
 ansible-playbook playbooks/devbox.yml             # user, sshd, tooling, repos, Tailscale
 ```
-
-### Access the Cluster
-
-`site.yml` fetches the kubeconfig to the repo root:
-
-```bash
-export KUBECONFIG=$(git rev-parse --show-toplevel)/kubeconfig.yaml
-kubectl get nodes
-```
-
-Flux will automatically reconcile all infrastructure and apps from the repo.

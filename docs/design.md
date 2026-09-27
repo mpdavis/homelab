@@ -1,368 +1,211 @@
 # Homelab Infrastructure Design
 
-Multi-node homelab running k3s on Proxmox VE with FluxCD-driven GitOps.
+Two Proxmox VE nodes running Docker Compose stacks, deployed from this
+repository by doco-cd.
+
+This page is the why. The how lives next to the code:
+
+| Topic | Where |
+|---|---|
+| Deploy path, host runbook, monitoring, adding a service | `docs/compose.md` |
+| Writing a stack: exposure, routing, secrets, pinning | `stacks/CLAUDE.md`, `infra/CLAUDE.md` |
+| Proxmox guests, DNS records, alert routing | `bootstrap/tofu/CLAUDE.md` |
+| Images built from this repo | `images/CLAUDE.md` |
+| The development host | `docs/devbox.md` |
 
 ## Goals
 
-- Multi-node cluster with central hardware visibility (Proxmox)
-- Kubernetes (k3s) for orchestration and service discovery
-- GitOps via FluxCD — push manifests, cluster converges
-- GPU-accelerated local AI inference
-- Easy to experiment with new services (deploy a Helm chart, done)
-- Proper storage tiering: fast local disks for databases, NAS for bulk media
-- Anything the cluster depends on to exist lives outside the cluster (DNS)
+- Central hardware visibility (Proxmox)
+- GitOps: merge to `main`, the hosts converge
+- GPU-accelerated media transcoding and local AI inference
+- Easy to add a service: a compose file, a Caddy site, a DNS record
+- Fast local disks for databases, the NAS for bulk media
+- Alerting that still works when the homelab is down
+- Anything the services depend on to exist lives outside them (DNS, monitoring)
 
 ## Hardware
 
 ### Node 1 — pve1
 
-SFF Lenovo, integrated GPU only, 32 GB RAM.
+SFF Lenovo, integrated GPU only, 32 GB RAM. `10.0.1.1`.
 
-- Hostname: `pve1`
-- IP: `10.0.1.1`
-- Role: Proxmox host for k3s control plane + general workload LXC containers
+Runs what should not depend on pve2: the infra host, the Tailscale subnet
+router and the development host.
 
 ### Node 2 — pve2
 
-SFF Lenovo, NVIDIA RTX 3050 6GB, 64 GB RAM.
+SFF Lenovo, NVIDIA RTX 3050 6GB, 64 GB RAM. `10.0.1.2`.
 
-- Hostname: `pve2`
-- IP: `10.0.1.2`
-- Role: Proxmox host for GPU VM
+Runs the compose host, which holds the GPU.
 
 ### Unifi NAS
 
-Existing network-attached storage at `10.0.1.6`. Exports via NFS to all cluster nodes.
+Network-attached storage at `10.0.1.6`, exporting NFSv3 only, to an allowlist
+of client IPs.
 
-- Path: `/var/nfs/shared/`
-- Data: `/var/nfs/shared/data/`
-- Homelab: `/var/nfs/shared/homelab/`
+- `/var/nfs/shared/data/` — media
+- `/var/nfs/shared/homelab/` — bulk appdata, model weights, archives
 
 ## Architecture
 
 ```text
-                     ┌─────────────────────────────────────────┐
-                     │                  LAN                     │
-                     │         DNS: Cloudflare                  │
-                     └────────┬──────────────┬─────────────────┘
-                              │              │
-          ┌───────────────────▼──┐    ┌──────▼───────────────────┐
+          ┌──────────────────────┐    ┌──────────────────────────┐
           │  pve1                │    │  pve2                    │
-          │  Proxmox VE         │    │  Proxmox VE              │
           │                      │    │  RTX 3050                │
-          │  ┌────────────────┐  │    │                          │
-          │  │ k3s-server     │  │    │  ┌────────────────────┐  │
-          │  │ LXC            │  │    │  │ k3s-agent-gpu      │  │
-          │  │ Control plane  │  │    │  │ VM                  │  │
-          │  │ + workloads    │  │    │  │ VFIO GPU pass-thru │  │
-          │  └────────────────┘  │    │  │ AI inference        │  │
-          │                      │    │  └────────────────────┘  │
-          │  ┌────────────────┐  │    │                          │
-          │  │ k3s-agent-1    │  │    │                          │
-          │  │ LXC            │  │    │                          │
-          │  │ General        │  │    │                          │
-          │  │ workloads      │  │    │                          │
+          │  ┌────────────────┐  │    │  ┌────────────────────┐  │
+          │  │ infra     VM   │  │    │  │ docker        VM   │  │
+          │  │ Gatus, ntfy,   │  │    │  │ every service,     │  │
+          │  │ Caddy for LAN  │  │    │  │ public + tailnet   │  │
+          │  │ hosts          │  │    │  │ Caddy, Authentik,  │  │
+          │  └────────────────┘  │    │  │ GPU passthrough    │  │
+          │  ┌────────────────┐  │    │  └────────────────────┘  │
+          │  │ devbox    LXC  │  │    │                          │
           │  └────────────────┘  │    │                          │
-          │                      │    │                          │
-          │  ┌────────────────┐  │    │                          │
-          │  │ devbox         │  │    │                          │
-          │  │ LXC            │  │    │                          │
-          │  │ SSH + coding   │  │    │                          │
-          │  │ agents (herdr) │  │    │                          │
-          │  └────────────────┘  │    │                          │
-          │                      │    │                          │
           │  ┌────────────────┐  │    │                          │
           │  │ tailscale-     │  │    │                          │
-          │  │ router   LXC   │  │    │                          │
-          │  │ 10.0.1.0/24    │  │    │                          │
+          │  │ router    LXC  │  │    │                          │
           │  └────────────────┘  │    │                          │
-          └──────────┬───────────┘    └──────────┬───────────────┘
-                     │                           │
-                     └─────────┬─────────────────┘
-                               │ NFS
-                     ┌─────────▼─────────┐
-                     │   Unifi NAS        │
-                     └───────────────────┘
+          └──────────┬───────────┘    └────────────┬─────────────┘
+                     └──────────────┬──────────────┘
+                                    │ NFS
+                          ┌─────────▼─────────┐
+                          │   Unifi NAS        │
+                          └───────────────────┘
 ```
 
-## Kubernetes Distribution: k3s
+Both Docker hosts are VMs rather than LXCs: Docker in an LXC fights runc and
+AppArmor (see the devbox), and GPU passthrough needs a VM anyway.
 
-- Lightweight, single-binary Kubernetes
-- Built-in: CoreDNS, Traefik ingress controller, local-path-provisioner, metrics-server
-- Easy multi-node: `k3s server` on one node, `k3s agent --server` on others
-- Supports HA control plane via embedded etcd (can promote later if needed)
-- k3s server and general agents run in privileged LXC containers (lower overhead than VMs)
-- GPU agent runs in a full VM (VFIO passthrough requires it)
+Each host runs one doco-cd, which polls `main` and deploys its tree: `stacks/`
+on the compose host, `infra/` on the infra host. A stack is one compose
+project; services are grouped by what they do (`media`, `downloads`, `iptv`,
+`ai`, …), not one per stack.
 
-### Cluster Topology
+## Storage
 
-| Node | Host | Type | IP | Role |
-|------|------|------|----|------|
-| k3s-server | pve1 | LXC | 10.0.1.50 | server (control plane + workloads) |
-| k3s-agent-1 | pve1 | LXC | 10.0.1.51 | agent, general workloads |
-| k3s-agent-gpu | pve2 | VM | 10.0.1.52 | agent, GPU passthrough, AI workloads |
+- **Databases and app config** live in named volumes on the VM's local disk.
+  Embedded single-writer engines (SQLite, DuckDB) belong here rather than on
+  NFS, and the choice shapes the service: gridiron's DuckDB takes one writer, so
+  its ingest runs as a thread inside the web process and the service must never
+  run as two containers.
+- **Media and bulk data** are NFS volumes (`driver_opts`, `nfsvers=3`) straight
+  from the NAS, mounted with `nocopy` — Docker otherwise seeds an empty volume
+  from the image and chowns it, which the NAS refuses.
 
-### LXC Requirements for k3s
-
-Privileged containers with: `nesting=true`, `keyctl=true`, AppArmor unconfined,
-`/dev/kmsg` symlink, `mount --make-rshared /`.
-
-## GitOps: FluxCD
-
-FluxCD watches this repository on GitHub and reconciles cluster state from
-committed manifests.
-
-### Why FluxCD
-
-- Declarative, pull-based GitOps — no UI to maintain or secure
-- FluxOperator manages Flux lifecycle via Helm; FluxInstance CR bootstraps the sync
-- HelmRelease CRDs for individual Helm charts (no umbrella chart boilerplate)
-- Kustomization CRDs with `dependsOn` chains for ordering
-- Lightweight — just controllers, no web server or database
-
-### How It Works
-
-1. Push manifests to GitHub
-2. Flux source-controller detects the change
-3. kustomize-controller / helm-controller reconcile the desired state
-4. Dependency chain: `infrastructure-sources` → `infrastructure-controllers` → `infrastructure` → `apps` (plus `infrastructure-notifications`, which depends on `infrastructure`)
-
-## Storage Strategy
-
-Three tiers of storage, matched to workload characteristics:
-
-### Tier 1: NAS (NFS)
-
-For bulk data that doesn't need low-latency random I/O.
-
-- **What**: Media files, large appdata directories, backups, model weights
-- **Where**: Unifi NAS, exported via NFS
-- **K8s mechanism**: `nfs-subdir-external-provisioner` (one HelmRelease per NAS share)
-- **Access mode**: ReadWriteMany (multiple pods can mount simultaneously)
-- **StorageClass names**: `nfs-data` (NAS `data` share, media) and `nfs-homelab` (NAS `homelab` share, bulk appdata/backups)
-
-### Tier 2: Local SSD
-
-For latency-sensitive, random-I/O workloads. Data lives on the node's local
-disk. Not replicated — rely on backups.
-
-- **What**: SQL databases, SQLite files, DuckDB files, Prometheus TSDB, Loki WAL/index
-- **Where**: Local SSD on the Proxmox host, passed through to container/VM disk
-- **K8s mechanism**: `local-path-provisioner` (bundled with k3s)
-- **Access mode**: ReadWriteOnce (pinned to the node where the PV lives)
-- **StorageClass name**: `local-path`
-
-Embedded single-writer engines belong here rather than on NFS, and the choice
-constrains the workload's deployment shape as well as its storage. `gridiron`
-is the worked example: DuckDB takes one writer, so its ingest runs on a daemon
-thread *inside* the web process instead of as a separate CronJob (a CronJob
-would be locked out of the file the server holds open), and the Deployment uses
-`strategy: Recreate` so a rolling update never starts a second pod against the
-same file. The cost is that a wedged refresh does not appear in
-`kubectl get jobs`, so the service reports its own refresh state on a `/status`
-page.
-
-### Tier 3: Replicated (future, optional)
-
-For workloads where you want data to survive a node failure without manual restore.
-
-- **What**: Anything requiring HA storage
-- **Where**: Replicated across nodes via Longhorn or Rook-Ceph
-- **K8s mechanism**: Longhorn CSI driver
-- **Access mode**: ReadWriteOnce (with replication factor 2-3)
-- **StorageClass name**: `longhorn`
+Nothing is replicated. The NAS holds what matters most (media, documents,
+model weights, the council digest's state); local volumes rely on being
+rebuildable or on app-level backups.
 
 ## Networking
 
-### Ingress
+### Exposure
 
 ```text
-Public:   Internet → Cloudflare DNS (A record → public IP, e.g. emby.mpdavis.com)
-                   → Router port-forward 443 → MetalLB VIP 10.0.1.200 (Service traefik)
-                   → Traefik `websecure` entrypoint
-Tailnet:  LAN / Tailscale client → Cloudflare DNS (A record → 10.0.1.210, e.g. sonarr.mpdavis.com)
-                   → Tailscale subnet router (10.0.1.0/24) → MetalLB VIP 10.0.1.210 (Service traefik-tailnet)
-                   → Traefik `tailnet` entrypoint
-Both      → IngressRoute → k8s Services
+Public:   Internet → Cloudflare DNS (A → public IP) → router forwards 443
+                   → caddy-public 10.0.1.56 on the compose host → container
+Tailnet:  LAN / Tailscale client → Cloudflare DNS (A → 10.0.1.57 or .58)
+                   → Tailscale subnet router (10.0.1.0/24) → caddy-tailnet → container
 ```
 
-Traefik handles HTTP/HTTPS routing for what still runs in the cluster. Services
-migrated to the compose hosts, and LAN hosts that never ran here at all, are
-served by Caddy instead — see `docs/compose.md`. Each hostname's DNS record
-points at whichever proxy serves it.
+Three Caddy instances, one per host and exposure. A hostname is public or
+tailnet-only by which Caddyfile it appears in, so exposure is structural rather
+than a label that can be forgotten; CI rejects a hostname served twice. Default
+to tailnet unless people off the tailnet need it.
+
+Tailnet-only records are public DNS entries holding private addresses — they
+resolve anywhere but route only on the LAN or tailnet. Remote access is the
+Tailscale subnet router (`tailscale-router`, `10.0.1.53`) advertising
+`10.0.1.0/24`.
+
+The router forwards 443 to one IP, so every public hostname terminates on the
+compose host. The infra host's public services (ntfy, the status page) are
+proxied there from its LAN ports; their backends survive a compose-host
+outage, their public route does not.
+
+TLS is a Let's Encrypt certificate per Caddy, issued by DNS-01 through the
+Cloudflare plugin built into `images/caddy-cloudflare`.
 
 ### Authentication
 
-Authentik is the cluster's identity provider, reachable at `iam.mpdavis.com`.
-It runs from the official Helm chart with bundled PostgreSQL and Redis; its
-secret key, database password, and `akadmin` bootstrap credentials come from
-Bitwarden via ExternalSecrets. Providers and applications are managed
-declaratively as blueprint ConfigMaps mounted into the server/worker.
+Authentik (`stacks/authentik`, `iam.mpdavis.com`) is the identity provider.
+Its providers and applications are blueprints in the stack, applied by the
+worker on startup.
 
-Two integration modes are in use:
-
-- **Forward auth** (most services): a domain-level proxy provider on the
-  embedded outpost backs the `authentik-forward-auth` Traefik middleware
-  (namespace `authentik`). IngressRoutes for services that should sit behind
-  login attach that middleware; Traefik defers each request to the outpost
-  before proxying to the backend. One provider covers `*.mpdavis.com`, so a
-  single login gives SSO across all gated services.
-- **Native OIDC** (services that support it, e.g. Paperless): a per-app OAuth2
-  provider + application blueprint, with the client secret injected from
-  Bitwarden via the environment.
-
-(Authelia previously provided forward-auth; it was replaced by Authentik in
-July 2026.)
-
-### Service Discovery
-
-K8s native: services find each other via DNS (`<service>.<namespace>.svc.cluster.local`).
-
-### External Access
-
-One Traefik deployment is fronted by two pinned MetalLB VIPs:
-
-| VIP | Service | Entrypoints | Reachable from |
-|---|---|---|---|
-| `10.0.1.200` | `traefik` | `web`, `websecure` | Internet (router port-forwards 443) + LAN |
-| `10.0.1.210` | `traefik-tailnet` | `tailnet-web`, `tailnet` | LAN + tailnet only (never port-forwarded) |
-
-Every IngressRoute is **public** by default. Labelling it
-`homelab.mpdavis.com/exposure: tailnet` makes it **tailnet-only**: the root
-`kustomization.yaml` patches in `kubernetes/apps/` and `kubernetes/infrastructure/`
-force such routes onto the `tailnet` entrypoint and point their DNS record at the
-tailnet VIP. Remote access is via the Tailscale subnet router (LXC `tailscale-router`,
-`10.0.1.53`), which advertises `10.0.1.0/24`.
-
-Isolation is by entrypoint, not source IP. The Traefik Service uses
-`externalTrafficPolicy: Cluster`, so internet traffic is SNATed to a node IP by
-kube-proxy — an `ipAllowList` on `10.0.1.0/24` would therefore admit it.
-
-Current split:
-
-- **Public:** Emby, Seerr, Audiobookshelf, game-thumbs (media clients fetch artwork),
-  Authentik (`iam`, needed by any public forward-auth/OIDC login), Gatus status page,
-  ntfy, Home Assistant, council digest.
-- **Tailnet:** the *arr stack, qBittorrent, mousehole, Dispatcharr, Teamarr, ECM,
-  Podfetch, Open WebUI, Flux UI, Grafana, Homepage, Paperless, Proxmox, BirdNET,
-  gridiron.
+- **Forward auth** for most services: one domain-level proxy provider on the
+  embedded outpost covers `*.mpdavis.com`, so a single login gives SSO across
+  every gated site. A Caddy site opts in with `import authentik`.
+- **Native OIDC** where the app supports it (Paperless), with the client secret
+  from Bitwarden.
 
 ### DNS
 
-Cloudflare as authoritative DNS for `mpdavis.com`. ExternalDNS (Cloudflare
-provider, Traefik IngressRoute source) auto-provisions an individual A record
-per service from the `Host()` rule on each IngressRoute, pointing at the public
-ingress IP for public routes or at the private tailnet VIP (`10.0.1.210`) for
-tailnet routes — the record is public, but its address is only routable on the
-LAN or tailnet. A previous wildcard `*.mpdavis.com` record was removed: the
-search-domain interaction (`ndots`) meant any pod's lookup of an external host
-could match the wildcard and resolve to our own ingress, causing TLS
-mismatches. Per-service records resolve only explicitly-defined subdomains.
-The `*.mpdavis.com` TLS certificate (cert-manager DNS-01) is unaffected and
-still used for all routes.
+Cloudflare is authoritative for `mpdavis.com`. Every record is managed in
+`bootstrap/tofu/cloudflare` as a hostname mapped to a named target (`public`,
+`compose_tailnet`, `infra_tailnet`), applied by hand. There is no wildcard
+record: per-service records resolve only hostnames that exist.
 
-### IP Address Plan
+### IP address plan
 
-| IP | Host | Type | Purpose |
-|----|------|------|---------|
-| 10.0.1.1 | pve1 | Proxmox host | Hypervisor management |
-| 10.0.1.2 | pve2 | Proxmox host | Hypervisor management |
-| 10.0.1.6 | NAS | Unifi NAS | NFS storage |
-| 10.0.1.50 | k3s-server | LXC on pve1 | k3s control plane + workloads |
-| 10.0.1.51 | k3s-agent-1 | LXC on pve1 | k3s general workloads |
-| 10.0.1.52 | k3s-agent-gpu | VM on pve2 | k3s GPU workloads |
-| 10.0.1.53 | tailscale-router | LXC on pve1 | Tailscale subnet router (advertises 10.0.1.0/24) |
-| 10.0.1.54 | devbox | LXC on pve1 | Always-on development host (SSH, coding agents) |
-| 10.0.1.200 | (MetalLB VIP) | Virtual | Traefik public ingress (port-forward target) |
-| 10.0.1.210 | (MetalLB VIP) | Virtual | Traefik tailnet-only ingress |
+| IP | Host | Purpose |
+|----|------|---------|
+| 10.0.1.1 | pve1 | Proxmox |
+| 10.0.1.2 | pve2 | Proxmox |
+| 10.0.1.6 | NAS | NFS |
+| 10.0.1.53 | tailscale-router (LXC, pve1) | Tailscale subnet router |
+| 10.0.1.54 | devbox (LXC, pve1) | development host |
+| 10.0.1.55 | docker (VM 205, pve2) | compose host |
+| 10.0.1.56 | docker | public Caddy — the router's 443 target |
+| 10.0.1.57 | docker | tailnet Caddy |
+| 10.0.1.58 | infra (VM 206, pve1) | infra host and its Caddy |
 
-## Secrets Management
+Addresses come from `bootstrap/network.yaml` (git-ignored), which Tofu and
+Ansible both read.
 
-### External Secrets Operator (ESO)
+## Secrets
 
-Bitwarden Secrets Manager as the source of truth. ESO syncs BWSM secrets into
-Kubernetes Secrets automatically.
+Bitwarden Secrets Manager is the source of truth. A stack's `.doco-cd.yml` maps
+environment variables to secret UUIDs; doco-cd resolves them at deploy time
+with the host's machine-account token. Nothing secret is in the repo.
 
-BWSM secret UUIDs are centralized in the `bws-secret-ids` ConfigMap under
-`kubernetes/clusters/homelab/flux-system/`. Each UUID is defined once as a
-`BWS_*` key and referenced from `ExternalSecret` `remoteRef.key` fields as a
-`${BWS_*}` placeholder, resolved by Flux postBuild substitution (the same
-mechanism as `cluster-vars`). This keeps each ID in one place — referenced
-wherever needed — instead of being duplicated across manifests.
+## Monitoring
 
-## Deploy Verification & Synthetic Monitoring
+- **Grafana Cloud** (free tier) holds metrics, logs and alert rules. An Alloy
+  agent on each host ships container logs and trimmed metrics; the rules in
+  `grafana-cloud/rules/` notify through ntfy. Off-site evaluation is the point:
+  a dead host still alerts.
+- **Gatus** on the infra host probes every service every 60s and publishes the
+  status page at `status.mpdavis.com`. Authentik-protected hosts are expected
+  to answer with a 302 to the login page, so a missing `import authentik` shows
+  up as a failure. `GatusEndpointDown` alerts through Grafana Cloud.
+- **ntfy** on the infra host delivers every alert to the phone.
 
-Flux applying manifests is necessary but not sufficient: the `infrastructure` and `apps`
-Kustomizations reconcile with `wait: false` (ExternalSecrets defeat kstatus health checking),
-so a merge could "deploy green" while pods crash-loop or Traefik routes nowhere. Gatus closes
-that gap by probing real traffic continuously.
+## GPU
 
-### Gatus (continuous synthetic checks)
-
-Gatus runs in the `monitoring` namespace (HelmRelease in `infrastructure/controllers/`,
-companions in `infrastructure/gatus/`) and probes every service every 60s:
-
-- **Open services**: HTTP 200 + TLS certificate validity
-- **Authentik-protected services**: expect a 302 redirect to the auth portal with redirects
-  disabled — this *proves the forward-auth middleware is active* (a 200 would mean it's missing)
-- **Internal services** (Prometheus, Alertmanager, Loki, Ollama): cluster-DNS health endpoints
-
-`*.mpdavis.com` probes resolve to the Traefik VIP via a `hostAliases` patch rather than public
-DNS, so checks exercise Traefik + wildcard TLS + Authentik without depending on NAT hairpin.
-The status page is public (read-only) at `status.mpdavis.com`. Results export to Prometheus
-(`gatus_results_endpoint_success`); the `GatusEndpointDown` and `GatusAbsent` PrometheusRules
-alert on failures and on the monitoring itself going dark. Deeper per-app API checks (e.g.
-Radarr `/api/v3/health` with an API key) can be added later via an ExternalSecret exposed to
-Gatus as env vars — Gatus expands `${VAR}` in its config.
-
-## GPU Setup
-
-### Proxmox GPU Passthrough
-
-1. Enable IOMMU in BIOS and Proxmox kernel params
-2. Blacklist nouveau on the Proxmox host
-3. Add VFIO modules (`vfio`, `vfio_iommu_type1`, `vfio_pci`)
-4. Pass GPU PCI device to the `k3s-agent-gpu` VM
-
-### Kubernetes GPU Scheduling
-
-1. NVIDIA drivers (570) + `nvidia-container-toolkit` installed in the GPU VM via Ansible
-2. `nvidia-device-plugin` DaemonSet advertises `nvidia.com/gpu` resource (GPU time-slicing enabled so multiple pods can share the card)
-3. Pods request GPU via resource limits:
-
-```yaml
-resources:
-  limits:
-    nvidia.com/gpu: 1
-```
-
-### AI Inference Stack
-
-- **Ollama**: Model management, OpenAI-compatible API
-- **Open WebUI**: Chat interface pointing at Ollama
-
-Model storage on NAS (Tier 1). Inference scratch/KV cache uses local memory/GPU VRAM.
+The RTX 3050 is passed through (VFIO, `hostpci` mapping `gpu`) to the compose
+host. Emby (NVENC/NVDEC) and Ollama request it through CDI
+(`driver: cdi`, `device_ids: [nvidia.com/gpu=all]`). The NVIDIA toolkit's
+`nvidia-cdi-refresh` unit rewrites the spec when the driver changes, so Docker
+needs no runtime configuration. A passthrough VM locks all of its RAM, so
+pve2's memory is effectively dedicated to the compose host.
 
 ## Development Host
 
 `devbox` (LXC 204, `10.0.1.54`, 4 cores / 8 GB / 40 GB) is an always-on machine
-for writing code, deliberately outside the cluster. Coding agents run on it and
-[herdr](https://herdr.dev) attaches to it over SSH, so a laptop, a phone or any
-other client drives the same long-lived sessions.
+for writing code. Coding agents run on it and [herdr](https://herdr.dev)
+attaches over SSH, so a laptop, a phone or any other client drives the same
+long-lived sessions.
 
-### Why not a pod
+### Why its own host
 
-The obvious alternative was a container in k3s, which would have been
-Flux-managed like everything else. It was rejected on lifecycle grounds: herdr's
-value is that a background server keeps agent processes alive across
-disconnects, and a pod is restarted by every image bump, node drain and
-HelmRelease upgrade. An always-on host that is rescheduled weekly is not an
-always-on host. Nested Docker and a local working tree are both far easier
-outside Kubernetes too.
+herdr's value is that a background server keeps agent processes alive across
+disconnects. As a compose stack it would be recreated by every image bump that
+doco-cd deploys; an always-on host that restarts whenever a dependency moves is
+not an always-on host. Nested Docker and a local working tree are simpler on a
+plain host too.
 
-The cost is honest: this box is provisioned by Tofu and configured by Ansible,
-not reconciled by Flux, so it can drift. The Ansible role is idempotent and
-re-running it is the correction.
+The cost: it is provisioned by Tofu and configured by Ansible, not deployed
+from `main`, so it can drift. The Ansible role is idempotent and re-running it
+is the correction.
 
 ### Shape
 
@@ -370,7 +213,8 @@ re-running it is the correction.
   `bootstrap/ansible/playbooks/devbox.yml`.
 - **Privileged LXC with nesting**, for two reasons: tailscaled needs
   `/dev/net/tun` — passed through by Tofu's `device_passthrough`, exactly as
-  for `tailscale-router` — and Docker will not start in a container without nesting.
+  for `tailscale-router` — and Docker will not start in a container without
+  nesting.
 - **Its own tailnet node**, not merely a host behind the subnet router, so it
   stays reachable if the router LXC is down and gets a MagicDNS name. Tailscale
   SSH is enabled alongside ordinary key-based sshd: the tailnet ACL authorises
@@ -383,61 +227,10 @@ re-running it is the correction.
 
 ### Capacity note
 
-pve1's LVM thin pool is 141 GB and was ~69% consumed before this host existed.
-The 40 GB disk is thin-provisioned, so only written blocks are charged, but a
-pool that genuinely fills can wedge every guest on the node. `lvs pve/data` is
-the number to watch; `docs/devbox.md` lists what to move to NFS first.
-
-## Repository Structure
-
-```text
-homelab/
-├── docs/
-│   └── design.md              ← this file
-├── bootstrap/                 # Pre-Flux provisioning and configuration
-│   ├── tofu/                  # OpenTofu — LXC/VM provisioning
-│   └── ansible/               # Ansible — node config, k3s install, Flux bootstrap
-├── kubernetes/                # Flux-managed cluster state (sync root)
-│   ├── kustomization.yaml     # Entry point — includes only Flux plumbing
-│   ├── apps/                  # grouped by namespace, one dir per service
-│   │   ├── kustomization.yaml
-│   │   ├── ai/                # ollama, open-webui
-│   │   ├── docs/              # paperless-ngx (document management)
-│   │   ├── gridiron/          # gridiron (college football betting research)
-│   │   ├── media/             # emby, *arr, qbittorrent, seerr, ...
-│   │   ├── ntfy/              # ntfy (push notifications / Alertmanager sink)
-│   │   └── homepage/
-│   ├── infrastructure/
-│   │   ├── kustomization.yaml
-│   │   ├── sources/           # HelmRepository definitions
-│   │   ├── controllers/       # HelmRelease definitions
-│   │   ├── cert-manager/
-│   │   ├── external-secrets/
-│   │   ├── external-dns/
-│   │   ├── authentik/
-│   │   ├── metallb/
-│   │   ├── traefik/
-│   │   ├── monitoring/
-│   │   ├── gatus/             # status-page IngressRoute + PrometheusRule
-│   │   ├── flux-operator/
-│   │   └── flux-notifications/
-│   └── clusters/
-│       └── homelab/
-│           ├── flux-system/
-│           │   ├── kustomization.yaml
-│           │   ├── flux-instance.yaml
-│           │   ├── cluster-vars.yaml
-│           │   └── bws-secret-ids.yaml
-│           ├── infra.yaml
-│           └── apps.yaml
-└── README.md
-```
-
-### Manifest Strategy
-
-- **HelmRelease** for third-party software with official Helm charts (one per component)
-- **Kustomize** for custom deployments or apps without good charts
-- Each infrastructure component is a self-contained directory with a kustomization.yaml
+pve1's LVM thin pool is 141 GB. The devbox's 40 GB disk is thin-provisioned, so
+only written blocks are charged, but a pool that genuinely fills can wedge every
+guest on the node. `lvs pve/data` is the number to watch; `docs/devbox.md` lists
+what to move to NFS first.
 
 ## Decisions Log
 
@@ -454,24 +247,10 @@ homelab/
 | 2026-07-17 | Gatus for synthetic monitoring | One declarative tool for continuous health checks (→ Prometheus alerts) |
 | 2026-09-15 | Removed the post-merge deploy canary | Too brittle to keep relying on; Gatus probes and `GatusEndpointDown` alerting remain |
 | 2026-09-01 | DuckDB (not Postgres) for gridiron, ingest inside the server pod | Every query is an analytical scan over ~10M plays, which an embedded columnar engine answers in the time a Postgres round trip would take — no second pod, no second PVC, backup is one file. The price is a single writer, which is why ingest is an in-process thread and the Deployment is `Recreate` on an RWO local-path PVC |
-
-## Deploy Sequence
-
-```bash
-# Phase 0: Manual Proxmox reinstall on both nodes
-#   pve1 at 10.0.1.1 (no GPU, 32GB)
-#   pve2 at 10.0.1.2 (RTX 3050, 64GB)
-#   Create API tokens, enable IOMMU on pve2
-
-# Phase 1: Provision infrastructure
-tofu apply                                        # create LXC containers + GPU VM
-
-# Phase 2: Configure nodes
-ansible-playbook playbooks/site.yml                # install k3s on all 3 nodes
-
-# Phase 3: Bootstrap cluster services
-ansible-playbook playbooks/bootstrap-secrets.yml   # BWSM access token
-ansible-playbook playbooks/bootstrap-flux.yml      # install FluxOperator + FluxInstance
-
-# Flux pulls from GitHub and auto-reconciles everything
-```
+| 2026-09-18 | Move from k3s to Docker Compose | Kubernetes taught what it was meant to; Compose is simpler to run and reason about day to day |
+| 2026-09-19 | doco-cd over GitHub Actions pushing deploys | Pull-based like Flux: the hosts need no inbound credentials, and a merge converges without a runner |
+| 2026-09-22 | Caddy replaces Traefik; two Docker VMs | Caddy's config is short and its per-instance exposure model is structural. pve2 hosts everything, pve1 the few things that must survive pve2 being down |
+| 2026-09-25 | Grafana Cloud for monitoring | Off-site alerting is the win: a dead homelab still pages. Self-hosting stays possible — the agent and rules are standard formats |
+| 2026-09-27 | Retired homeassistant, minecraft and holmes | Not in use; not worth migrating. Their data is archived on the NAS under `homelab/retired/` |
+| 2026-09-27 | GPU moved to the compose host | Emby and Ollama were the last reasons for a GPU node in k3s |
+| 2026-09-27 | k3s retired | Every service, Authentik, Gatus and ntfy run on the Docker hosts |
