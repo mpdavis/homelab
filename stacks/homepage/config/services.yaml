@@ -58,10 +58,6 @@
         href: https://ai.mpdavis.com
         description: AI chat interface (Ollama)
 - Personal:
-    - Home Assistant:
-        icon: home-assistant.png
-        href: https://homeassistant.mpdavis.com
-        description: Home automation platform
     - Paperless:
         icon: paperless-ngx.png
         href: https://paperless.mpdavis.com

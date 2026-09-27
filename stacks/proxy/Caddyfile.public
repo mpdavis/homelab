@@ -43,10 +43,6 @@ emby.mpdavis.com {
 	import traefik
 }
 
-homeassistant.mpdavis.com {
-	import traefik
-}
-
 iam.mpdavis.com {
 	import traefik
 }
