@@ -5,7 +5,7 @@ name: gatus
 # observed. Alerting runs in Grafana Cloud off the metrics Alloy ships.
 services:
   gatus:
-    image: twinproduction/gatus:v5.34.0
+    image: twinproduction/gatus:v5.37.0
     restart: unless-stopped
     user: "65534:65534"
     read_only: true
