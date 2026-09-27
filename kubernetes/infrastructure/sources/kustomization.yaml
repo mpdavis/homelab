@@ -18,4 +18,3 @@ resources:
   - ollama.yaml
   - authentik.yaml
   - twin.yaml
-  - minecraft.yaml
