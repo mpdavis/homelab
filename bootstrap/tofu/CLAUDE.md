@@ -33,29 +33,15 @@ All three read them from the environment, so nothing lands in a file:
 
 ```sh
 export PROXMOX_VE_PASSWORD=...                                   # proxmox/
-export CLOUDFLARE_API_TOKEN="$(bws secret get 67c9d80b-ca8e-47b5-a2eb-b442005fab6a -o json | jq -r .value)"  # cloudflare/
-export GRAFANA_AUTH="$(bws secret get 0e847022-1d64-467a-9bf5-b4d000090360 -o json | jq -r .value)"  # grafana/: stack service account token
-export TF_VAR_ntfy_token="$(bws secret get 47079c89-adab-4d19-8173-b48d01492747 -o json | jq -r .value)"  # grafana/
+export CLOUDFLARE_API_TOKEN="$(bws secret get 67c9d80b-ca8e-47b5-a2eb-b442005fab6a -o json --color no | jq -r .value)"  # cloudflare/
+export GRAFANA_AUTH="$(bws secret get 0e847022-1d64-467a-9bf5-b4d000090360 -o json --color no | jq -r .value)"  # grafana/: stack service account token
+export TF_VAR_ntfy_token="$(bws secret get 47079c89-adab-4d19-8173-b48d01492747 -o json --color no | jq -r .value)"  # grafana/
 ```
 
 ## DNS records
 
-`cloudflare/` owns only what the compose hosts serve. ExternalDNS owns the rest,
-and deletes a record when its IngressRoute goes away. Waiting for that deletion
-and then recreating the record here leaves a gap that resolvers cache as
-NXDOMAIN for up to 30 minutes, the zone's SOA minimum.
-
-### Taking over a record
-
-1. Add the hostname to `records` and import the existing A record (below), so
-   `plan` shows no create.
-2. Once the IngressRoute's removal is merged but not yet pruned (the `apps`
-   Kustomization suspended), delete ExternalDNS's ownership record, the TXT
-   named `a-<host>.mpdavis.com`. Then delete the IngressRoute, or resume Flux.
-   ExternalDNS deletes only records it owns, so the A record stays.
-
-Before the TXT is gone, ExternalDNS still owns the record, so an apply here gets
-reset, and removing the IngressRoute deletes it.
+`cloudflare/` owns every record in the zone that points at a homelab service.
+Adding a service means adding its hostname to `records` and applying.
 
 Add a matching `dns-<host>` check to `infra/gatus/config.yaml` alongside the
 record. Gatus's HTTP probes resolve through `extra_hosts`, so without it a missing or wrong
@@ -70,21 +56,6 @@ An existing record is adopted, not recreated:
 ```sh
 tofu -chdir=... import 'cloudflare_dns_record.service["<host>"]' '<zone_id>/<record_id>'
 ```
-
-## Moving the GPU between VMs
-
-The `gpu` PCI mapping can be attached to one running VM at a time, and pve2's
-RAM is fully committed because a passthrough VM locks all of its memory. So
-release first, then claim, in two applies:
-
-```sh
-tofu -chdir=... apply -target='proxmox_virtual_environment_vm.vm["<old holder>"]'
-tofu -chdir=... apply
-```
-
-Each apply reboots the VM it changes (`reboot_after_update` defaults to true, and
-neither memory nor `hostpci` hot-plugs here). A single apply can try to start the
-new holder while the old one still has the device and its RAM.
 
 ## Provider upgrades
 

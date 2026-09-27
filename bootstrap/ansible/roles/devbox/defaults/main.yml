@@ -9,8 +9,8 @@ devbox_spaceship_repo: https://github.com/spaceship-prompt/spaceship-prompt.git
 
 # Off by default, deliberately. The flag bypasses the permission system, which
 # is precisely what moshi-hook routes to the phone as approvals — turning it on
-# means those prompts never fire. On a box that also holds a cluster-admin
-# kubeconfig that is a decision worth making on purpose, not inheriting.
+# means those prompts never fire. On a box that can reach every host, that
+# is a decision worth making on purpose, not inheriting.
 devbox_claude_skip_permissions: false
 
 # Empty means "reuse the keys Tofu injected for root" (see tasks/user.yml).
@@ -64,10 +64,6 @@ devbox_claude_code_version: "2.1.283"
 # renovate: datasource=npm depName=opencode-ai
 devbox_opencode_version: "1.18.32"
 
-# renovate: datasource=github-releases depName=kubernetes/kubernetes
-devbox_kubectl_version: "v1.37.1"
-# renovate: datasource=github-releases depName=fluxcd/flux2
-devbox_flux_version: "v2.9.5"
 # renovate: datasource=github-releases depName=cli/cli
 devbox_gh_version: "v2.101.0"
 

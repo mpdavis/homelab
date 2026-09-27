@@ -4,14 +4,17 @@ One directory per compose project, discovered automatically by doco-cd — the
 project takes the directory's name, and nothing lists it anywhere else. This
 tree belongs to the compose host; `infra/` is the same shape for the infra host.
 
-Services are grouped by what they do, not one stack each. The k3s `media`
-namespace becomes three:
+Services are grouped by what they do, not one stack each:
 
 | Stack | Holds |
 |---|---|
 | `media` | what serves a library: emby, audiobookshelf |
-| `iptv` | dispatcharr, teamarr, ecm, game-thumbs |
 | `downloads` | what acquires: qbittorrent (with gluetun and mousehole), prowlarr, sonarr, radarr, unpackerr, recyclarr, podfetch, listenarr, seerr |
+| `iptv` | dispatcharr, teamarr, ecm, game-thumbs |
+| `ai` | ollama, open-webui |
+| `authentik` | the identity provider every forward-auth site and OIDC app uses |
+| `docs`, `civic`, `gridiron`, `homepage` | one app each |
+| `proxy`, `monitoring` | the host's Caddy instances and its Grafana Cloud agent |
 
 Put a service in the right stack the first time. Moving it later renames the
 compose project, which renames its volumes — so the data has to be copied
@@ -51,9 +54,7 @@ external_secrets:
 
 and the compose file refers to each as `${VAR:?resolved by doco-cd from
 external_secrets}`, so a missing secret fails loudly instead of starting with an
-empty value. A UUID that also appears in the `bws-secret-ids` ConfigMap gets a
-comment naming its `BWS_*` key, so the two can be matched until `kubernetes/` is
-retired. The host's Bitwarden machine account has to be able to read whatever
+empty value. The host's Bitwarden machine account has to be able to read whatever
 its stacks reference.
 
 ## Conventions
@@ -72,23 +73,21 @@ its stacks reference.
   (`docker inspect <image> --format '{{.Config.Healthcheck}}'`) over writing
   one, and if you do write one, use a binary the image actually has.
 - **Volumes are named `<project>_<key>`,** so the stack a service lives in
-  decides its volume names. Data copied during a migration has to go to the
-  name the final stack will use.
+  decides its volume names. Data copied in by hand has to go to that name.
+- **Service names are global on the `proxy` network.** A generic name (`web`,
+  `server`, `redis`) collides with another stack's; prefix it, or keep the
+  service off `proxy` if only its own stack talks to it.
+- **Forward auth** is `import authentik` inside a `route` block, ahead of the
+  app's `reverse_proxy`. An unauthenticated health path goes before the import,
+  so Gatus can check the app itself (see `prowlarr` in `Caddyfile.tailnet`).
+- **Scheduled jobs** use the image's own scheduler if it has one (recyclarr's
+  `CRON_SCHEDULE`), else a service looping `run; sleep` — sleeping after each
+  run means runs can never overlap (see `stacks/civic`).
+- **The GPU** is requested through CDI: a `deploy.resources.reservations.devices`
+  entry with `driver: cdi` and `device_ids: [nvidia.com/gpu=all]`. Only the
+  compose host has one.
 
-## Translating a k3s workload
-
-| In the cluster | In a stack |
-|---|---|
-| `securityContext.runAsUser/runAsGroup` | `user: "1000:1000"` — keep the same ids or the service loses access to files it owns on NFS |
-| `local-path` PVC | a named volume; its data is copied in before first start |
-| NFS PVC or inline `nfs:` volume | a volume with `driver_opts` (`type: nfs`, `nfsvers=3`) |
-| `${VAR}` from `cluster-vars` | the literal value — there is no postBuild substitution here |
-| Service DNS (`x.ns.svc.cluster.local`) | the container name on the `proxy` network, or a LAN address |
-| `CronJob` | the image's own scheduler if it has one (recyclarr's `CRON_SCHEDULE`), else a service looping `run; sleep` — sleeping after each run means runs can never overlap |
-| `nvidia.com/gpu` limit + `runtimeClassName: nvidia` | a `deploy.resources.reservations.devices` entry with `driver: cdi` and `device_ids: [nvidia.com/gpu=all]`; the host must be in the Ansible `gpu` group |
-| liveness/readiness probe | `healthcheck:` — doco-cd waits on it and restarts on unhealthy |
-| `IngressRoute` | a site block in the right Caddyfile; a service still in k3s uses `import traefik` |
-| Authentik forward-auth middleware | `import authentik` inside a `route` block; the snippet is `stacks/proxy/authentik.caddy`, shared by both Caddyfiles |
+## NFS
 
 **Mount NFS volumes with `nocopy: true`** (long volume syntax) wherever the
 image has files at the mount path. When the volume is empty, Docker seeds it
@@ -98,7 +97,7 @@ container fails to start with `lchown ... operation not permitted`.
 **The NAS exports are restricted by client IP.** A host that is not on the
 allowlist gets `permission denied` at mount time, which surfaces as a failed
 deployment rather than anything about permissions in the app. Check with
-`showmount -e 10.0.1.6` from the host before moving anything that touches NFS.
+`showmount -e 10.0.1.6` from the host before adding anything that touches NFS.
 
 ## What CI checks
 

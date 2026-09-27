@@ -1,25 +1,9 @@
 # Internet-facing sites: the router forwards 443 here.
 #
-# A hostname listed here is public. Services still in k3s are proxied on to
-# Traefik unchanged — migrating one means swapping `import traefik` for a
-# `reverse_proxy <container>:<port>`, with no router or DNS change. See
-# docs/compose.md.
+# A hostname listed here is public. See stacks/CLAUDE.md.
 {
 	email michael@mpdavis.com
 	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-}
-
-# reverse_proxy rewrites Host to the upstream address by default, and Traefik
-# routes on Host — without this every proxied request is a 404. tls_server_name
-# matches the SNI to the hostname so the wildcard cert verifies against the VIP
-# we dial.
-(traefik) {
-	reverse_proxy https://10.0.1.200 {
-		header_up Host {host}
-		transport http {
-			tls_server_name {host}
-		}
-	}
 }
 
 # Defines (authentik). Shared with Caddyfile.tailnet.

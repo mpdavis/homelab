@@ -11,7 +11,7 @@
 - name: Fix NIC offloading for Intel e1000e/e1000
   ansible.builtin.import_tasks: nic-offloading.yml
 
-- name: Set k3s-required kernel sysctls
+- name: Set panic and overcommit sysctls
   ansible.builtin.import_tasks: k3s-sysctls.yml
 
 - name: Update system

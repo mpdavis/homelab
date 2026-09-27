@@ -1,9 +1,9 @@
 # gitleaks config — see .github/workflows/lint-secrets.yml
 #
 # Defence in depth. This repo is built so secret *data* never lands in git:
-# External Secrets Operator syncs from Bitwarden and every ExternalSecret holds
-# only store names and UUIDs (see CLAUDE.md). gitleaks is the backstop for a
-# mistake that bypasses that pattern — a pasted kubeconfig, an inline token.
+# doco-cd fetches each stack's secrets from Bitwarden at deploy time, and a
+# stack's .doco-cd.yml holds only Bitwarden UUIDs (see stacks/CLAUDE.md).
+# gitleaks is the backstop for a mistake that bypasses that — an inline token.
 
 title = "homelab gitleaks"
 
@@ -27,7 +27,7 @@ paths = [
 ]
 
 regexes = [
-  # Bitwarden Secrets Manager UUIDs in bws-secret-ids.yaml and ExternalSecrets are
-  # opaque identifiers, not secret material.
+  # Bitwarden Secrets Manager UUIDs in .doco-cd.yml files and docs are opaque
+  # identifiers, not secret material.
   '''[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}''',
 ]

@@ -1,17 +1,12 @@
 # Docker Compose hosts
 
-The homelab is moving from k3s + Flux to Docker Compose, one namespace-shaped stack
-at a time. During the migration both run side by side: `kubernetes/` stays
-authoritative for everything that has not been cut over, and `stacks/` holds what
-has.
-
-The target split is pve2 as the Compose host — it holds the GPU, and
-`k3s-agent-gpu` already carries most of the load — and pve1 as the
-infrastructure host for things that should not depend on it.
+Everything runs as Docker Compose projects on two VMs: pve2's compose host,
+which holds the GPU and nearly every service, and pve1's infra host, for what
+has to keep working while the compose host is down.
 
 This page is the runbook: how a change reaches a host, how to bring one up, and
-how to cut a service over. The rules for writing a stack — exposure, routing,
-secrets, pinning — live in `stacks/CLAUDE.md`.
+what adding a service touches. The rules for writing a stack — exposure,
+routing, secrets, pinning — live in `stacks/CLAUDE.md` and `infra/CLAUDE.md`.
 
 ## Layout
 
@@ -29,10 +24,10 @@ infra/                    # the infra host's projects, same shape
   <stack>/
 ```
 
-| Host     | Where                       | Runs                                     |
-| -------- | --------------------------- | ---------------------------------------- |
-| `docker` | VM 205 on pve2, `10.0.1.55` | the migrated services + their Caddies    |
-| `infra`  | VM 206 on pve1, `10.0.1.58` | Caddy for what is not on the docker host |
+| Host     | Where                       | Runs                                             |
+| -------- | --------------------------- | ------------------------------------------------ |
+| `docker` | VM 205 on pve2, `10.0.1.55` | every service, its two Caddies, the GPU          |
+| `infra`  | VM 206 on pve1, `10.0.1.58` | Gatus, ntfy, Caddy for LAN hosts (Proxmox, BirdNET) |
 
 Each host runs one doco-cd, told which tree to deploy by its poll target: the
 compose host uses the default config, the infra host sets `DOCO_TARGET=infra`
@@ -42,15 +37,14 @@ compose host uses the default config, the infra host sets `DOCO_TARGET=infra`
 ## How a change deploys
 
 [doco-cd](https://doco.cd) runs on the host and polls `main` every 60 seconds.
-It fills the role Flux has today. When a commit touches a stack, doco-cd:
+When a commit touches a stack, doco-cd:
 
 - resolves the stack's `external_secrets` from Bitwarden;
 - runs the compose up, building any `build:` images;
 - recreates services whose bind-mounted files changed.
 
 Deleting a stack's directory removes the project. Its volumes are kept.
-doco-cd also restarts containers that turn unhealthy, which covers what
-Kubernetes liveness probes did.
+doco-cd also restarts containers that turn unhealthy.
 
 **doco-cd does not deploy itself.** Recreating its own container mid-deploy would
 kill the deploy, so the `doco_cd` Ansible role owns `doco-cd/compose.yaml`:
@@ -65,18 +59,20 @@ has the reason.
 
 ## Monitoring
 
-Metrics, logs and alerting for the Docker hosts live in a free Grafana Cloud
-stack — nothing monitoring-related runs here except an agent. Off-site means a
-dead host, a dead pve1 or a dead homelab still alerts, which nothing on the
-LAN can do about itself. The k3s Grafana keeps watching the cluster until it
-is retired.
+Metrics, logs and alerting live in a free Grafana Cloud stack — nothing
+monitoring-related runs here except an agent and Gatus. Off-site means a dead
+host, a dead pve1 or a dead homelab still alerts, which nothing on the LAN can
+do about itself.
 
 Every Docker host runs the same agent — Alloy, node-exporter and cAdvisor, in
 `infra/monitoring/` and `stacks/monitoring/` — which pushes:
 
 - every container's logs, labelled `host`, `stack`, `service`, `container`;
 - host metrics (`job="node"`), per-container metrics (`job="cadvisor"`) and
-  doco-cd's own (`job="doco-cd"`), labelled `host`.
+  doco-cd's own (`job="doco-cd"`), labelled `host`;
+- metrics from any container labelled `homelab.metrics.port`, reached on the
+  `proxy` network — today only Gatus, trimmed to
+  `gatus_results_endpoint_success`.
 
 A new stack needs nothing to be monitored. Alloy's config is identical on
 every host — only `HOST_LABEL` differs — and is copied per tree because a
@@ -92,9 +88,8 @@ cost-management page before adding a scrape.
 Alert rules are Prometheus-format files in `grafana-cloud/rules/`.
 `grafana-cloud.yml` validates them on PRs and, on merge, syncs them into the
 stack as Grafana-managed rules, so change them here rather than in the UI.
-Where they notify — the same ntfy topic and template as the cluster's, routed
-on `severity` — is `bootstrap/tofu/grafana`, applied by hand like the
-Cloudflare records.
+Where they notify — the `homelab-alerts` ntfy topic, routed on `severity` — is
+`bootstrap/tofu/grafana`, applied by hand like the Cloudflare records.
 
 Going back to self-hosting is a change of the agent's endpoints plus an
 Alertmanager config: the agent and rules are standard Prometheus/Loki formats.
@@ -106,22 +101,18 @@ Caddyfile and the IP differ.
 
 | Instance              | Host   | IP           | Serves                                             |
 | --------------------- | ------ | ------------ | -------------------------------------------------- |
-| `proxy/caddy-tailnet` | docker | `10.0.1.57`  | migrated services, by container name               |
-| `proxy/caddy-public`  | docker | `10.0.1.56`  | the same, once any of them is public               |
+| `proxy/caddy-tailnet` | docker | `10.0.1.57`  | tailnet services, by container name                |
+| `proxy/caddy-public`  | docker | `10.0.1.56`  | public services, by container name                 |
 | `proxy/caddy-tailnet` | infra  | `10.0.1.58`  | Proxmox, BirdNET — LAN endpoints, reached directly |
 
-No instance proxies through another: each hostname's DNS record points at the IP
-that serves it. `validate-stacks` rejects a hostname that appears in two
+Each hostname's DNS record points at the IP that serves it. `validate-stacks` rejects a hostname that appears in two
 Caddyfiles, on one host or across both.
 
 **Every public hostname terminates on the compose host's `caddy-public`,** which
 the router forwards 443 to. Public routes cannot be split, because the router
-forwards to exactly one IP.
-
-Public services still in k3s are listed in `Caddyfile.public` with
-`import traefik`, which proxies them on to Traefik's VIP unchanged. Migrating
-one is then a one-line swap to `reverse_proxy <container>:<port>` — no router
-change, no DNS change, and nothing else moves with it.
+forwards to exactly one IP. The infra host's two public services, ntfy and the
+Gatus status page, publish a port on `10.0.1.58` that `caddy-public` proxies
+to — the only case of one host's Caddy reaching another's service.
 
 ## Bringing up a host
 
@@ -132,10 +123,8 @@ change, no DNS change, and nothing else moves with it.
    granted per project, and every secret lives in the single `homelab` project,
    so any token that can read the Cloudflare API token can read all of them —
    a second machine account buys independent rotation and a distinguishable
-   audit trail, not narrower access. Create one for the host anyway, so
-   revoking it doesn't also break External Secrets; reusing the ESO token
-   (`secret/bitwarden-access-token` in `external-secrets`) works if you prefer
-   one credential. Narrower access would mean splitting the project.
+   audit trail, not narrower access. Narrower access would mean splitting the
+   project.
 3. Run the playbook:
    `ansible-playbook playbooks/docker-host.yml`. Paste the
    Bitwarden token at the prompt. Add `--limit <host>` to do one host.
@@ -145,84 +134,30 @@ change, no DNS change, and nothing else moves with it.
    - `curl --resolve <hostname>:443:<caddy ip> https://<hostname>/` returns the
      page, before DNS points anywhere near it.
 
-doco-cd polls `main`, so provision after this branch merges. If you provision
-first, it logs "config not found" until the merge lands, then converges on its
-own.
+doco-cd polls `main`, so provision after the host's tree and doco-cd config are
+merged. If you provision first, it logs "config not found" until the merge
+lands, then converges on its own.
 
-## Cutting a service over
+The NAS exports are restricted by client IP: add a new host in the Unifi NAS UI
+before it mounts anything, or the mount fails with `permission denied`
+(`showmount -e 10.0.1.6` from the host shows the allowlist).
 
-### First, check what the service drags with it
+## Adding a service
 
-- **Is it public?** No router work is needed — the forward already points at
-  the public Caddy — but the swap happens in `Caddyfile.public`, from
-  `import traefik` to a `reverse_proxy` at the container.
-- **Does it mount NFS?** The host must be on the NAS export allowlist
-  (`showmount -e 10.0.1.6`), or the mount fails with `permission denied`.
-- **Does anything in the cluster talk to it?** A consumer using
-  `x.ns.svc.cluster.local` stops resolving the moment the Service is gone.
-  Look inside the apps too: URLs saved in their settings (`http://emby:8096`)
-  are invisible to a grep of this repo. Bridge both ways instead of editing
-  them — a selectorless Service with an EndpointSlice at a port the stack
-  publishes on the host keeps the k3s name resolving, and a `<name>-lan`
-  LoadBalancer plus `extra_hosts` in the stack keeps a compose app's name for a
-  k3s service. Each bridge retires with whichever side moves last. Emby and the
-  iptv apps were bridged this way until Emby moved; the git history of
-  `kubernetes/apps/media/emby/dispatcharr-bridge.yaml` has the pattern.
-- **Does it share files with another service?** Two copies writing the same
-  share is worse than downtime; stop one before starting the other.
+A new hostname touches four places besides its stack:
 
-Test with `curl --resolve <host>:443:<caddy ip> https://<host>/`. Use port 443 —
-a different port puts `:port` in the `Host` header, which stops Traefik matching
-and looks like a routing bug that isn't.
+1. A site block in the right Caddyfile — see `stacks/CLAUDE.md` for which one,
+   and `import authentik` inside a `route` block to put it behind login.
+2. A Gatus endpoint in `infra/gatus/config.yaml`, plus an `extra_hosts` line in
+   `infra/gatus/compose.yaml` pointing the hostname at the Caddy that serves it.
+3. A DNS record: the hostname in `records` in `bootstrap/tofu/cloudflare`, then
+   `tofu apply` from the primary checkout.
+4. A matching `dns-<host>` Gatus check — the HTTP probe resolves through
+   `extra_hosts`, so without it a missing record goes unnoticed.
 
-Never move the router's 443 forward before the Caddyfile that serves those
-hostnames is merged: the target answers nothing until doco-cd has deployed it,
-and every public service is down in the meantime.
+Test before DNS points anywhere with
+`curl --resolve <host>:443:<caddy ip> https://<host>/`.
 
-### Stateless
-
-1. Add the stack, and the hostname to the right Caddyfile. Merge, then test with
-   `curl --resolve <host>:443:<caddy ip> https://<host>/` before touching DNS.
-2. Remove it from `kubernetes/` and point its `extra_hosts` line in
-   `infra/gatus/compose.yaml` at the Caddy IP.
-3. Hand the DNS record to OpenTofu before the IngressRoute goes. Otherwise
-   ExternalDNS deletes the record, and resolvers cache the NXDOMAIN for up to
-   30 minutes (the zone's SOA minimum) even after Tofu recreates it. See
-   "Taking over a record" in `bootstrap/tofu/CLAUDE.md`.
-
-### Stateful
-
-The data has to be copied while nothing is writing it, and the stack must not
-start before the data is in place — doco-cd deploys within a minute of the
-merge, so the copy happens **before** it, not after:
-
-1. Open the PR (stack added, `kubernetes/` copy removed) but do not merge.
-2. Stop the cluster copy. Suspend first, or Flux scales it straight back up:
-
-   ```sh
-   flux suspend helmrelease <name> -n <ns>
-   kubectl -n <ns> scale deploy <name> --replicas=0
-   ```
-
-   A suspended HelmRelease is pruned on merge but never uninstalled, so its
-   Deployment and Service outlive it — unless the whole namespace goes too,
-   which takes the release with it. When the namespace stays, clean up with
-   `helm -n <ns> uninstall <name>`; `helm list` is how you spot the leftovers.
-
-3. Copy the data into the target volume, and check it landed:
-
-   ```sh
-   docker volume create <project>_<volume>
-   ssh <k3s node> 'cd /var/lib/rancher/k3s/storage/pvc-*_<ns>_<name> && tar cf - .' \
-     | ssh <compose host> 'tar xf - -C /var/lib/docker/volumes/<project>_<volume>/_data'
-   ```
-
-   Then `chown` to the uid the container runs as, and compare checksums. An
-   embedded database keeps a WAL — copy it and its sidecar files, not just the
-   `.db`.
-
-   **Verify before merging, not after.** Flux prunes the PVC too, and
-   local-path deletes the directory with it, so once the merge lands the copy on
-   the compose host is the only copy.
-4. Merge. Flux prunes the cluster copy; doco-cd starts the stack on the data.
-5. DNS as above.
+A stateful service that moves between stacks gets new volume names
+(`<project>_<key>`), so stop it, copy the data into the new volumes, and check
+it before merging — doco-cd starts the stack within a minute of the merge.

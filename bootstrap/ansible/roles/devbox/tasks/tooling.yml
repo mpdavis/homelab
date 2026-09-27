@@ -43,22 +43,6 @@
   when: (installed[item.name] | default({})).version | default('') != item.version
   changed_when: true
 
-- name: Install kubectl
-  ansible.builtin.get_url:
-    url: "https://dl.k8s.io/release/{{ devbox_kubectl_version }}/bin/linux/amd64/kubectl"
-    dest: /usr/local/bin/kubectl
-    mode: "0755"
-
-- name: Install flux
-  ansible.builtin.unarchive:
-    src: "https://github.com/fluxcd/flux2/releases/download/{{ devbox_flux_version }}/flux_{{ devbox_flux_version | regex_replace('^v', '') }}_linux_amd64.tar.gz"
-    dest: /usr/local/bin
-    remote_src: true
-    include:
-      - flux
-    mode: "0755"
-    creates: /usr/local/bin/flux
-
 - name: Install gh
   ansible.builtin.unarchive:
     src: "https://github.com/cli/cli/releases/download/{{ devbox_gh_version }}/gh_{{ devbox_gh_version | regex_replace('^v', '') }}_linux_amd64.tar.gz"

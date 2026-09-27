@@ -75,19 +75,11 @@
         icon: authentik.png
         href: https://iam.mpdavis.com
         description: Identity provider & SSO
-    - Grafana:
+    - Grafana Cloud:
         icon: grafana.png
-        href: https://grafana.mpdavis.com
-        description: Monitoring & dashboards
+        href: https://luckyzeppelin876.grafana.net
+        description: Metrics, logs & alerting
     - ntfy:
         icon: mdi-bell-ring
         href: https://ntfy.mpdavis.com
         description: Push notifications (alerting)
-    - Flux:
-        icon: flux-cd.png
-        href: https://flux.mpdavis.com
-        description: GitOps delivery
-    - Traefik:
-        icon: traefik.png
-        href: https://traefik.mpdavis.com
-        description: Ingress controller

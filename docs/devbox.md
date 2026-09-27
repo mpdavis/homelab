@@ -6,13 +6,13 @@ and [herdr](https://herdr.dev) attaches to it over SSH — from a laptop, a phon
 or anything else that can hold a terminal. Close the lid and the agents keep
 working; reattach later and the panes are where you left them.
 
-The rationale for putting it outside the cluster is in
+The rationale for running it as its own host is in
 [design.md](design.md#development-host). This file is the runbook.
 
 ## Provisioning
 
 Three secrets are needed before you start. All three live in Bitwarden Secrets
-Manager alongside the cluster's; the playbook prompts for them and writes
+Manager alongside the other hosts'; the playbook prompts for them and writes
 nothing back to this repo.
 
 | Prompt | What it is |
@@ -109,7 +109,7 @@ prompt, so spaceship is installed here the oh-my-zsh way instead — cloned into
 
 The laptop's `~/.zshenv` is deliberately **not** replicated: it exports a
 Bitwarden Secrets Manager access token, which would give anything running here
-read access to every secret backing the cluster.
+read access to every secret backing the homelab.
 
 ### Where environment belongs
 
@@ -130,7 +130,7 @@ alias claude="claude --dangerously-skip-permissions"
 
 It is off on purpose. The flag bypasses the permission system, which is the
 thing moshi-hook forwards to the phone as approvals — with it on, those prompts
-never fire. On a host that also holds a cluster-admin kubeconfig, that is worth
+never fire. On a host that holds push access to this repo, that is worth
 turning on deliberately rather than inheriting from a copied dotfile.
 
 ## Working from a phone
@@ -216,8 +216,8 @@ lvs pve/data
 ```
 
 The container's disk is thin-provisioned, so only written blocks are charged,
-but a pool that actually fills can wedge every guest on pve1 — including the k3s
-nodes. If `Data%` climbs past ~90%, reclaim space in this order:
+but a pool that actually fills can wedge every guest on pve1 — including the infra
+host. If `Data%` climbs past ~90%, reclaim space in this order:
 
 1. `docker system prune -a` — build caches are usually the biggest and the
    cheapest to lose.

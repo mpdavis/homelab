@@ -52,9 +52,6 @@ services:
       - teamarr.mpdavis.com:10.0.1.57
       - birdnet.mpdavis.com:10.0.1.58
       - proxmox.mpdavis.com:10.0.1.58
-      # Still on k3s's tailnet Traefik.
-      - flux.mpdavis.com:10.0.1.210
-      - grafana.mpdavis.com:10.0.1.210
     networks:
       - proxy
 

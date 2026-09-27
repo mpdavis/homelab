@@ -6,8 +6,5 @@ kubeconfig.yaml
 # Local scratch notes — never committed (may contain secrets)
 local.md
 
-# Scratch render from `mise run lint:render`
-rendered.yaml
-
 # Bootstrap addresses; see bootstrap/network.example.yaml
 bootstrap/network.yaml

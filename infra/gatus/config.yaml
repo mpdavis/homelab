@@ -46,10 +46,6 @@ endpoints:
     group: external-open
     url: https://mousehole.mpdavis.com/
     conditions: *open-conditions
-  - name: grafana
-    group: external-open
-    url: https://grafana.mpdavis.com/login
-    conditions: *open-conditions
   - name: authentik
     group: external-open
     url: https://iam.mpdavis.com/
@@ -60,7 +56,7 @@ endpoints:
     # deny-all, so it's a clean 200 liveness signal.
     url: https://ntfy.mpdavis.com/v1/health
     conditions: *open-conditions
-  # LAN hosts that never ran in k3s, served by this host's Caddy.
+  # LAN hosts outside Docker, served by this host's Caddy.
   - name: birdnet
     group: external-open
     url: https://birdnet.mpdavis.com/
@@ -122,12 +118,6 @@ endpoints:
   - name: teamarr
     group: external-auth
     url: https://teamarr.mpdavis.com/
-    client: *auth-client
-    headers: *auth-headers
-    conditions: *auth-conditions
-  - name: flux-ui
-    group: external-auth
-    url: https://flux.mpdavis.com/
     client: *auth-client
     headers: *auth-headers
     conditions: *auth-conditions
