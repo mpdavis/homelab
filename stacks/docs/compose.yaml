@@ -37,11 +37,25 @@ services:
     # Caddy. Pinning its hostname there avoids depending on NAT hairpin.
     extra_hosts:
       - iam.mpdavis.com:10.0.1.56
+    # nocopy on the NFS volumes: Docker otherwise seeds an empty volume from the
+    # image and chowns it, which the NAS refuses, and the container never starts.
     volumes:
       - data:/usr/src/paperless/data
-      - media:/usr/src/paperless/media
-      - consume:/usr/src/paperless/consume
-      - export:/usr/src/paperless/export
+      - type: volume
+        source: media
+        target: /usr/src/paperless/media
+        volume:
+          nocopy: true
+      - type: volume
+        source: consume
+        target: /usr/src/paperless/consume
+        volume:
+          nocopy: true
+      - type: volume
+        source: export
+        target: /usr/src/paperless/export
+        volume:
+          nocopy: true
     networks:
       - default
       - proxy

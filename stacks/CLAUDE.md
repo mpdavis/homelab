@@ -89,6 +89,11 @@ its stacks reference.
 | `IngressRoute` | a site block in the right Caddyfile; a service still in k3s uses `import traefik` |
 | Authentik forward-auth middleware | `import authentik` inside a `route` block; the snippet is `stacks/proxy/authentik.caddy`, shared by both Caddyfiles |
 
+**Mount NFS volumes with `nocopy: true`** (long volume syntax) wherever the
+image has files at the mount path. When the volume is empty, Docker seeds it
+from the image and chowns the result, the NAS refuses the chown, and the
+container fails to start with `lchown ... operation not permitted`.
+
 **The NAS exports are restricted by client IP.** A host that is not on the
 allowlist gets `permission denied` at mount time, which surfaces as a failed
 deployment rather than anything about permissions in the app. Check with
