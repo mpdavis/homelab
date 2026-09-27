@@ -1,0 +1,11 @@
+# gluetun can take up to five minutes to hold a forwarded port and turn
+# healthy, and qbittorrent and mousehole wait for it — past doco-cd's 180s
+# default, which would fail the deploy and restart them mid-start.
+timeout: 600
+external_secrets:
+  # Same secrets as BWS_PROTONVPN_WIREGUARD_PRIVATE_KEY, BWS_MOUSEHOLE_AUTH_PASSWORD,
+  # BWS_SONARR_API_KEY and BWS_RADARR_API_KEY in the bws-secret-ids ConfigMap.
+  PROTONVPN_WIREGUARD_PRIVATE_KEY: 0c89eb67-af7c-40ad-b6b3-b489011b27eb
+  MOUSEHOLE_AUTH_PASSWORD: 4f6ae5ae-e5b8-48c1-859d-b473013e79f0
+  SONARR_API_KEY: d84fd750-7fc2-45bf-8c91-b3e001210193
+  RADARR_API_KEY: 9f883764-3296-4f58-9f0f-b3e001213e2a

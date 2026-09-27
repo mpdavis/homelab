@@ -47,7 +47,7 @@ ntfy.mpdavis.com {
 }
 
 seerr.mpdavis.com {
-	import traefik
+	reverse_proxy seerr:5055
 }
 
 status.mpdavis.com {

@@ -1,6 +1,258 @@
 name: downloads
 
 services:
+  # qbittorrent and mousehole live in gluetun's network namespace, so their
+  # traffic can only leave through the VPN. They have no network identity of
+  # their own: the aliases are how the *arrs and Caddy still reach them by the
+  # names already stored in the apps' databases.
+  gluetun:
+    image: qmcgaw/gluetun:v3.41.3
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      VPN_SERVICE_PROVIDER: protonvpn
+      # WireGuard is far more stable than OpenVPN here and keeps NAT-PMP port
+      # forwarding alive. Forwarding is unlocked by generating the key in the
+      # ProtonVPN dashboard with "NAT-PMP (Port Forwarding)" on.
+      VPN_TYPE: wireguard
+      WIREGUARD_PRIVATE_KEY: ${PROTONVPN_WIREGUARD_PRIVATE_KEY:?resolved by doco-cd from external_secrets}
+      # The "Address" line of the generated WireGuard config.
+      WIREGUARD_ADDRESSES: 10.2.0.2/32
+      SERVER_COUNTRIES: Netherlands
+      VPN_PORT_FORWARDING: "on"
+      PORT_FORWARD_ONLY: "on"
+      VPN_PORT_FORWARDING_UP_COMMAND: /bin/sh -c 'wget -O- -nv --retry-connrefused --post-data "json={\"listen_port\":{{PORT}},\"random_port\":false,\"upnp\":false}" http://127.0.0.1:8080/api/v2/app/setPreferences'
+      VPN_PORT_FORWARDING_DOWN_COMMAND: /bin/sh -c 'wget -O- -nv --retry-connrefused --post-data "json={\"listen_port\":0}" http://127.0.0.1:8080/api/v2/app/setPreferences'
+      # The ports the *arrs and Caddy reach through the aliases.
+      FIREWALL_INPUT_PORTS: "8080,5010"
+      DOT: "off"
+      DNS_ADDRESS: 1.1.1.1
+      TZ: America/Chicago
+    # The image's check covers the VPN; a failed NAT-PMP renewal instead
+    # empties the forwarded-port file and leaves the client unconnectable while
+    # the tunnel still looks healthy, so both have to hold.
+    healthcheck:
+      test: ["CMD-SHELL", "/gluetun-entrypoint healthcheck && test -s /tmp/gluetun/forwarded_port"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 300s
+      start_interval: 10s
+    networks:
+      proxy:
+        aliases:
+          - qbittorrent
+          - mousehole
+
+  qbittorrent:
+    image: linuxserver/qbittorrent:5.2.1_v2.0.13-ls460
+    restart: unless-stopped
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
+        restart: true
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: America/Chicago
+      WEBUI_PORT: "8080"
+    volumes:
+      - qbittorrent-config:/config
+      - media:/media
+    # When gluetun restarts it gets a fresh network namespace and this container
+    # is left in the dead one — no VPN, no way out. gluetun's control server
+    # listens on :8000 in the shared namespace, so losing it means stranded, and
+    # doco-cd restarts this into the new one.
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "--max-time", "5", "http://127.0.0.1:8000/"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Reports and updates the ProtonVPN exit IP for the tracker session — the
+  # same IP torrent traffic leaves from.
+  mousehole:
+    image: tmmrtn/mousehole:0.5.0
+    restart: unless-stopped
+    network_mode: service:gluetun
+    user: "1000:1000"
+    depends_on:
+      gluetun:
+        condition: service_healthy
+        restart: true
+    environment:
+      MOUSEHOLE_AUTH_PASSWORD: ${MOUSEHOLE_AUTH_PASSWORD:?resolved by doco-cd from external_secrets}
+      # The default host allowlist is localhost only.
+      MOUSEHOLE_ALLOWED_HOSTS: mousehole.mpdavis.com
+      # Caddy terminates TLS and forwards over HTTP, so the same-origin default
+      # rejects the browser's https Origin.
+      MOUSEHOLE_ALLOWED_ORIGINS: https://mousehole.mpdavis.com
+      MOUSEHOLE_HTTPS_ONLY_COOKIES: "true"
+      TZ: America/Chicago
+    volumes:
+      - mousehole-data:/var/lib/mousehole
+    # The image's own check, plus the same stranded-namespace test as
+    # qbittorrent.
+    healthcheck:
+      test: ["CMD-SHELL", "bun -e \"try { const h = await fetch('http://localhost:5010/health'); await fetch('http://localhost:8000/'); process.exit(h.ok ? 0 : 1) } catch { process.exit(1) }\""]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  prowlarr:
+    image: linuxserver/prowlarr:2.4.0.5397-ls149
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: America/Chicago
+      # Authentik in front of Caddy is the login.
+      PROWLARR__AUTH__METHOD: External
+      PROWLARR__AUTH__REQUIRED: DisabledForLocalAddresses
+    volumes:
+      - prowlarr-config:/config
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "-o", "/dev/null", "http://localhost:9696/ping"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - proxy
+
+  sonarr:
+    image: linuxserver/sonarr:4.0.17.2952-ls313
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: America/Chicago
+      SONARR__AUTH__METHOD: External
+    volumes:
+      - sonarr-config:/config
+      - media:/media
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "-o", "/dev/null", "http://localhost:8989/ping"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - proxy
+
+  radarr:
+    image: linuxserver/radarr:6.2.1.10461-ls305
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: America/Chicago
+      RADARR__AUTH__METHOD: External
+    volumes:
+      - radarr-config:/config
+      - media:/media
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "-o", "/dev/null", "http://localhost:7878/ping"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - proxy
+
+  unpackerr:
+    image: ghcr.io/unpackerr/unpackerr:v0.16.1
+    restart: unless-stopped
+    # The uid that owns the media share, so extracted files land with the
+    # ownership qbittorrent and the *arrs expect.
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      TZ: America/Chicago
+      UN_LOG_FILE: ""
+      UN_INTERVAL: 2m
+      UN_SONARR_0_URL: http://sonarr:8989
+      UN_SONARR_0_API_KEY: ${SONARR_API_KEY:?resolved by doco-cd from external_secrets}
+      # Where qbittorrent drops completed downloads, not the whole library.
+      UN_SONARR_0_PATHS_0: /media/downloads
+      UN_RADARR_0_URL: http://radarr:7878
+      UN_RADARR_0_API_KEY: ${RADARR_API_KEY:?resolved by doco-cd from external_secrets}
+      UN_RADARR_0_PATHS_0: /media/downloads
+    volumes:
+      - unpackerr-config:/config
+      # Mounted at the same path the *arrs report, or the paths they hand over
+      # would not exist here.
+      - media:/media
+    networks:
+      - proxy
+
+  recyclarr:
+    image: ghcr.io/recyclarr/recyclarr:8.7.2
+    restart: unless-stopped
+    user: "1000:1000"
+    environment:
+      TZ: America/Chicago
+      # The image's own cron mode, replacing the k3s CronJob.
+      CRON_SCHEDULE: "0 */6 * * *"
+      SONARR_API_KEY: ${SONARR_API_KEY:?resolved by doco-cd from external_secrets}
+      RADARR_API_KEY: ${RADARR_API_KEY:?resolved by doco-cd from external_secrets}
+    volumes:
+      - recyclarr-config:/config
+      - ./recyclarr.yml:/config/recyclarr.yml:ro
+    networks:
+      - proxy
+
+  listenarr:
+    # Only canary prereleases are published so far.
+    image: ghcr.io/listenarrs/listenarr:canary-1.1.0
+    restart: unless-stopped
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      TZ: America/Chicago
+    volumes:
+      - listenarr-config:/app/config
+      - media:/media
+    networks:
+      - proxy
+
+  seerr:
+    image: ghcr.io/seerr-team/seerr:v3.2.0
+    restart: unless-stopped
+    environment:
+      TZ: America/Chicago
+    volumes:
+      - seerr-config:/app/config
+    # Emby still runs in k3s, which the compose host cannot reach by service
+    # name, so seerr talks to it at its public hostname. Pinning that to the
+    # public Caddy avoids depending on NAT hairpin through the router. Point
+    # seerr back at emby:8096 when Emby moves here.
+    extra_hosts:
+      - emby.mpdavis.com:10.0.1.56
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5055/api/v1/settings/public').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - proxy
+
   podfetch:
     image: samuel19982/podfetch:v5.2.3
     restart: unless-stopped
@@ -18,10 +270,27 @@ services:
       - proxy
 
 volumes:
+  qbittorrent-config:
+  mousehole-data:
+  prowlarr-config:
+  sonarr-config:
+  radarr-config:
+  unpackerr-config:
+  recyclarr-config:
+  listenarr-config:
+  seerr-config:
   # SQLite database and app config.
   podfetch-db:
+  # The library and the downloads directory the *arrs import from. The NAS
+  # offers NFSv3 only.
+  media:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=10.0.1.6,nfsvers=3,rw,hard,proto=tcp
+      device: ":/var/nfs/shared/data/media"
   # Downloaded episodes live on the media share so AudiobookShelf serves the
-  # same library. The NAS offers NFSv3 only.
+  # same library.
   podcasts:
     driver: local
     driver_opts:
