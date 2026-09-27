@@ -118,8 +118,9 @@ spec:
               resources:
                 requests:
                   storage: 2Gi
-      # Route alerts to self-hosted ntfy (ntfy.mpdavis.com, topic
-      # homelab-alerts). ntfy's tpl=1 templating turns the Alertmanager JSON
+      # Route alerts to self-hosted ntfy (topic homelab-alerts), reached at its
+      # port on the infra host rather than through the compose host's public
+      # Caddy, so these still arrive while the compose host is down. ntfy's tpl=1 templating turns the Alertmanager JSON
       # into a readable title/body — no bridge needed. critical → priority 5 +
       # rotating_light; everything else → priority 3 + warning. The token in
       # credentials_file grants write access to the (deny-all) topic.
@@ -146,14 +147,14 @@ spec:
           - name: "null"
           - name: ntfy-warning
             webhook_configs:
-              - url: "http://ntfy.ntfy.svc.cluster.local/homelab-alerts?tpl=1&title=%7B%7Bif%20eq%20.status%20%22resolved%22%7D%7D%E2%9C%85%20%7B%7Belse%7D%7D%F0%9F%94%A5%20%7B%7Bend%7D%7D%7B%7B.commonLabels.alertname%7D%7D&message=%7B%7Brange%20.alerts%7D%7D%7B%7B.annotations.description%7D%7D%0A%7B%7Bend%7D%7D&priority=3&tags=warning"
+              - url: "http://${INFRA_TAILNET_IP}:8080/homelab-alerts?tpl=1&title=%7B%7Bif%20eq%20.status%20%22resolved%22%7D%7D%E2%9C%85%20%7B%7Belse%7D%7D%F0%9F%94%A5%20%7B%7Bend%7D%7D%7B%7B.commonLabels.alertname%7D%7D&message=%7B%7Brange%20.alerts%7D%7D%7B%7B.annotations.description%7D%7D%0A%7B%7Bend%7D%7D&priority=3&tags=warning"
                 send_resolved: true
                 http_config:
                   authorization:
                     credentials_file: /etc/alertmanager/ntfy/token
           - name: ntfy-critical
             webhook_configs:
-              - url: "http://ntfy.ntfy.svc.cluster.local/homelab-alerts?tpl=1&title=%7B%7Bif%20eq%20.status%20%22resolved%22%7D%7D%E2%9C%85%20%7B%7Belse%7D%7D%F0%9F%94%A5%20%7B%7Bend%7D%7D%7B%7B.commonLabels.alertname%7D%7D&message=%7B%7Brange%20.alerts%7D%7D%7B%7B.annotations.description%7D%7D%0A%7B%7Bend%7D%7D&priority=5&tags=rotating_light"
+              - url: "http://${INFRA_TAILNET_IP}:8080/homelab-alerts?tpl=1&title=%7B%7Bif%20eq%20.status%20%22resolved%22%7D%7D%E2%9C%85%20%7B%7Belse%7D%7D%F0%9F%94%A5%20%7B%7Bend%7D%7D%7B%7B.commonLabels.alertname%7D%7D&message=%7B%7Brange%20.alerts%7D%7D%7B%7B.annotations.description%7D%7D%0A%7B%7Bend%7D%7D&priority=5&tags=rotating_light"
                 send_resolved: true
                 http_config:
                   authorization:
