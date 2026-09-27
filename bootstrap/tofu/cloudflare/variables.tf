@@ -24,6 +24,7 @@ variable "records" {
     sonarr         = "compose_tailnet"
     radarr         = "compose_tailnet"
     listenarr      = "compose_tailnet"
+    paperless      = "compose_tailnet"
     proxmox        = "infra_tailnet"
     birdnet        = "infra_tailnet"
   }
