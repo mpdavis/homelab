@@ -204,7 +204,6 @@ services:
     user: "1000:1000"
     environment:
       TZ: America/Chicago
-      # The image's own cron mode, replacing the k3s CronJob.
       CRON_SCHEDULE: "0 */6 * * *"
       SONARR_API_KEY: ${SONARR_API_KEY:?resolved by doco-cd from external_secrets}
       RADARR_API_KEY: ${RADARR_API_KEY:?resolved by doco-cd from external_secrets}
@@ -238,9 +237,9 @@ services:
       TZ: America/Chicago
     volumes:
       - seerr-config:/app/config
-    # Its Emby server setting is the public hostname, a leftover from when Emby
-    # ran in k3s; http://emby:8096 would now do. Pinning the hostname to the
-    # public Caddy avoids depending on NAT hairpin through the router.
+    # Its Emby server setting is the public hostname; http://emby:8096 would
+    # also do. Pinning the hostname to the public Caddy avoids depending on NAT
+    # hairpin through the router.
     extra_hosts:
       - emby.mpdavis.com:10.0.1.56
     healthcheck:
@@ -255,8 +254,7 @@ services:
   podfetch:
     image: samuel19982/podfetch:v5.2.3
     restart: unless-stopped
-    # Matches the uid/gid the k3s pod ran as, so it keeps write access to the
-    # files it already owns on the NFS share.
+    # The owner of the files it already has on the NFS share.
     user: "1000:1000"
     environment:
       TZ: America/Chicago

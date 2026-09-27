@@ -74,8 +74,8 @@ services:
 volumes:
   # SQLite database, search index and classifier — local for IOPS.
   data:
-  # The NAS directories keep the names the k3s provisioner gave them: the
-  # consume folder is a drop target, and whatever writes to it knows it by
+  # The NAS directories keep their original generated names: the consume
+  # folder is a drop target, and whatever writes to it knows it by
   # that path. The NAS offers NFSv3 only.
   media:
     driver: local

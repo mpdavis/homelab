@@ -12,7 +12,7 @@
   ansible.builtin.import_tasks: nic-offloading.yml
 
 - name: Set panic and overcommit sysctls
-  ansible.builtin.import_tasks: k3s-sysctls.yml
+  ansible.builtin.import_tasks: sysctls.yml
 
 - name: Update system
   ansible.builtin.import_tasks: update.yml

@@ -236,21 +236,14 @@ what to move to NFS first.
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2025-05-16 | k3s over kubeadm/Talos | Lightweight, batteries-included, great for homelab scale |
 | 2025-05-16 | Separate repo from homelab-compose | Clean break, no legacy baggage |
-| 2025-05-16 | External Secrets Operator + BWSM | Continuity with existing secret management |
 | 2025-05-16 | NVIDIA GPU for inference | Local LLM serving via Ollama |
-| 2025-05-16 | Local-path for databases, NFS for media | SQLite/Postgres need low-latency I/O; media is bulk reads |
-| 2025-05-27 | FluxCD over ArgoCD | Declarative, no UI to maintain, HelmRelease per component |
-| 2025-05-27 | LXC containers over VMs | Lower overhead; VM only for GPU node (VFIO requires it) |
-| 2025-05-27 | Traefik as single ingress for all services | Routes to both k8s and external services via Service+Endpoints |
-| 2026-07-17 | Gatus for synthetic monitoring | One declarative tool for continuous health checks (→ Prometheus alerts) |
+| 2026-07-17 | Gatus for synthetic monitoring | One declarative tool for continuous health checks, alerting through Grafana Cloud |
 | 2026-09-15 | Removed the post-merge deploy canary | Too brittle to keep relying on; Gatus probes and `GatusEndpointDown` alerting remain |
-| 2026-09-01 | DuckDB (not Postgres) for gridiron, ingest inside the server pod | Every query is an analytical scan over ~10M plays, which an embedded columnar engine answers in the time a Postgres round trip would take — no second pod, no second PVC, backup is one file. The price is a single writer, which is why ingest is an in-process thread and the Deployment is `Recreate` on an RWO local-path PVC |
-| 2026-09-18 | Move from k3s to Docker Compose | Kubernetes taught what it was meant to; Compose is simpler to run and reason about day to day |
-| 2026-09-19 | doco-cd over GitHub Actions pushing deploys | Pull-based like Flux: the hosts need no inbound credentials, and a merge converges without a runner |
-| 2026-09-22 | Caddy replaces Traefik; two Docker VMs | Caddy's config is short and its per-instance exposure model is structural. pve2 hosts everything, pve1 the few things that must survive pve2 being down |
+| 2026-09-01 | DuckDB (not Postgres) for gridiron, ingest inside the server process | Every query is an analytical scan over ~10M plays, which an embedded columnar engine answers in the time a Postgres round trip would take — no second service, no second volume, backup is one file. The price is a single writer, which is why ingest is an in-process thread and the service must never run as two containers |
+| 2026-09-18 | Move from Kubernetes (k3s) to Docker Compose; finished 2026-09-27 | Kubernetes taught what it was meant to; Compose is simpler to run and reason about day to day |
+| 2026-09-19 | doco-cd over GitHub Actions pushing deploys | Pull-based: the hosts need no inbound credentials, and a merge converges without a runner |
+| 2026-09-22 | Caddy for ingress; two Docker VMs | Caddy's config is short and its per-instance exposure model is structural. pve2 hosts everything, pve1 the few things that must survive pve2 being down |
 | 2026-09-25 | Grafana Cloud for monitoring | Off-site alerting is the win: a dead homelab still pages. Self-hosting stays possible — the agent and rules are standard formats |
 | 2026-09-27 | Retired homeassistant, minecraft and holmes | Not in use; not worth migrating. Their data is archived on the NAS under `homelab/retired/` |
-| 2026-09-27 | GPU moved to the compose host | Emby and Ollama were the last reasons for a GPU node in k3s |
-| 2026-09-27 | k3s retired | Every service, Authentik, Gatus and ntfy run on the Docker hosts |
+| 2026-09-27 | GPU moved to the compose host | Emby and Ollama are its only consumers, and both run there |

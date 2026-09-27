@@ -1,0 +1,20 @@
+---
+- name: Deploy sysctl config
+  ansible.builtin.template:
+    src: 99-homelab.conf.j2
+    dest: /etc/sysctl.d/99-homelab.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: apply sysctls
+
+# Where these settings lived before the rename; drop once no host has it.
+- name: Remove the previous sysctl file
+  ansible.builtin.file:
+    path: /etc/sysctl.d/99-k3s.conf
+    state: absent
+  notify: apply sysctls
+
+- name: Ensure sysctls are active
+  ansible.builtin.command: sysctl -p /etc/sysctl.d/99-homelab.conf
+  changed_when: false

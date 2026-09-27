@@ -33,8 +33,8 @@ groups:
             {{ $labels.instance }} ({{ $labels.job }}) on {{ $labels.host }}
             has failed every scrape for 10 minutes.
 
-      # Same threshold as NodeFilesystemEarlyWarning in k3s: the bundled
-      # rules only fire at 95% full, which leaves no time to act.
+      # Earlier than the usual node-exporter rules, which only fire at 95% full
+      # and leave no time to act.
       - alert: HostFilesystemEarlyWarning
         expr: |
           (
