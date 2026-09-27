@@ -165,8 +165,9 @@ own.
   them — a selectorless Service with an EndpointSlice at a port the stack
   publishes on the host keeps the k3s name resolving, and a `<name>-lan`
   LoadBalancer plus `extra_hosts` in the stack keeps a compose app's name for a
-  k3s service. Each bridge retires with whichever side moves last; see
-  `kubernetes/apps/media/emby/`.
+  k3s service. Each bridge retires with whichever side moves last. Emby and the
+  iptv apps were bridged this way until Emby moved; the git history of
+  `kubernetes/apps/media/emby/dispatcharr-bridge.yaml` has the pattern.
 - **Does it share files with another service?** Two copies writing the same
   share is worse than downtime; stop one before starting the other.
 

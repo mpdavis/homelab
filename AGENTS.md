@@ -11,9 +11,9 @@ GitOps repository for a homelab k3s cluster managed by FluxCD (via FluxOperator)
 ## Architecture
 
 - **Proxmox VE** on two physical nodes (pve1 + pve2)
-- **k3s** for Kubernetes — control plane + general workloads in LXC containers, GPU workloads in a VM
+- **k3s** for Kubernetes — control plane + general workloads in LXC containers and a VM
 - **FluxCD** watches this repo on GitHub and reconciles cluster state
-- **GPU node** (pve2) with NVIDIA RTX 3050 passthrough for AI inference (Ollama, Open WebUI)
+- **Compose host** (VM `docker` on pve2) holds the NVIDIA RTX 3050 passthrough, for Emby transcoding and Ollama
 - **Unifi NAS** provides NFS storage for media and bulk data
 
 ## Repository Layout

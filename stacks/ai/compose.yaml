@@ -1,0 +1,65 @@
+name: ai
+
+services:
+  # Only Open WebUI talks to it, so it stays off the proxy network.
+  ollama:
+    image: ollama/ollama:0.34.4
+    restart: unless-stopped
+    environment:
+      TZ: America/Chicago
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: cdi
+              device_ids: [nvidia.com/gpu=all]
+              capabilities: [gpu]
+    volumes:
+      - type: volume
+        source: models
+        target: /root/.ollama
+        volume:
+          nocopy: true
+    # `ollama ls` goes through the server, so it fails when the API does.
+    healthcheck:
+      test: ["CMD", "ollama", "ls"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:v0.11.4
+    restart: unless-stopped
+    user: "1000:1000"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      TZ: America/Chicago
+      OLLAMA_BASE_URL: http://ollama:11434
+      # Authentik in front of Caddy is the login.
+      WEBUI_AUTH: "False"
+      WEBUI_SECRET_KEY_FILE: /app/backend/data/.webui_secret_key
+      STATIC_DIR: /app/backend/data/static
+    volumes:
+      - open-webui-data:/app/backend/data
+    networks:
+      - default
+      - proxy
+
+volumes:
+  # Models pulled so far (qwen3:4b, qwen2.5:7b). Pull more with
+  # `docker exec ai-ollama-1 ollama pull <model>`. The NAS offers NFSv3 only.
+  models:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=10.0.1.6,nfsvers=3,rw,hard,proto=tcp
+      device: ":/var/nfs/shared/homelab/ai-ollama-models-pvc-8554b653-17dd-4152-a5b4-a0dfc1df9fd8"
+  # Chats, settings and the session secret.
+  open-webui-data:
+
+networks:
+  proxy:
+    external: true

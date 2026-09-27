@@ -32,9 +32,11 @@
       - nvidia-container-toolkit
     state: present
 
-# Docker finds the toolkit's hook on its own for `--gpus` and compose device
-# reservations, so daemon.json (owned by the docker role) needs no runtime
-# entry.
+# Stacks request the GPU through CDI. The toolkit's nvidia-cdi-refresh unit
+# writes /var/run/cdi/nvidia.yaml and rewrites it when the driver changes, so
+# daemon.json (owned by the docker role) needs no runtime entry and Docker no
+# restart. `--gpus` and `driver: nvidia` would need one: Docker only looks for
+# the toolkit's hook when the daemon starts.
 
 # A freshly built DKMS module is not loaded until the next boot.
 - name: Check whether the driver is loaded

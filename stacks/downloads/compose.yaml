@@ -238,10 +238,9 @@ services:
       TZ: America/Chicago
     volumes:
       - seerr-config:/app/config
-    # Emby still runs in k3s, which the compose host cannot reach by service
-    # name, so seerr talks to it at its public hostname. Pinning that to the
-    # public Caddy avoids depending on NAT hairpin through the router. Point
-    # seerr back at emby:8096 when Emby moves here.
+    # Its Emby server setting is the public hostname, a leftover from when Emby
+    # ran in k3s; http://emby:8096 would now do. Pinning the hostname to the
+    # public Caddy avoids depending on NAT hairpin through the router.
     extra_hosts:
       - emby.mpdavis.com:10.0.1.56
     healthcheck:

@@ -25,13 +25,88 @@ services:
     networks:
       - proxy
 
+  emby:
+    image: emby/embyserver:4.11.0.4
+    restart: unless-stopped
+    # The image drops to uid/gid 2 itself, which owns the config volume.
+    environment:
+      TZ: America/Chicago
+    # NVENC/NVDEC for transcoding. The CDI spec injects every driver library,
+    # so no NVIDIA_DRIVER_CAPABILITIES is needed.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: cdi
+              device_ids: [nvidia.com/gpu=all]
+              capabilities: [gpu]
+    volumes:
+      - emby-config:/config
+      - type: volume
+        source: media
+        target: /media
+        volume:
+          nocopy: true
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8096/emby/System/Info/Public"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 2m
+    networks:
+      - proxy
+
+  # Emby writes its real logs to files under /config/logs, not stdout. This
+  # tails each one to stdout, prefixed with its file name, so they reach Loki
+  # with everything else. Transcode logs are followed by descriptor (-f) since
+  # each is written once and never rotated; the rest by name (-F) to survive
+  # rotation.
+  emby-logs:
+    image: busybox:1.38.0
+    restart: unless-stopped
+    user: "1000:1000"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        LOGDIR=/config/logs
+        tailed=""
+        while true; do
+          for f in "$$LOGDIR"/*.txt; do
+            [ -e "$$f" ] || continue
+            case " $$tailed " in
+              *" $$f "*) ;;
+              *)
+                tailed="$$tailed $$f"
+                if echo "$$f" | grep -q "ffmpeg-transcode"; then
+                  ( tail -n 0 -f "$$f" | sed "s|^|[$$(basename "$$f")] |" ) &
+                else
+                  ( tail -n 0 -F "$$f" | sed "s|^|[$$(basename "$$f")] |" ) &
+                fi
+                ;;
+            esac
+          done
+          sleep 15
+        done
+    volumes:
+      - emby-config:/config:ro
+
 volumes:
   # SQLite database.
   config:
   # Covers, cached images and backups.
   metadata:
-  # Libraries point at /media/audiobooks and /media/podcasts, where the
-  # downloads stack writes. The NAS offers NFSv3 only.
+  # Emby's database, metadata and logs.
+  emby-config:
+  # Emby's libraries and audiobookshelf's /media/audiobooks and
+  # /media/podcasts, where the downloads stack writes. The NAS offers NFSv3
+  # only.
   media:
     driver: local
     driver_opts:

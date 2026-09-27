@@ -23,8 +23,11 @@ gridiron.mpdavis.com {
 	}
 }
 
+# The version API is unauthenticated; served ahead of auth for Gatus, like
+# /ping on prowlarr below.
 dispatcharr.mpdavis.com {
 	route {
+		reverse_proxy /api/core/version/ dispatcharr:9191
 		import authentik
 		reverse_proxy dispatcharr:9191
 	}
@@ -98,4 +101,13 @@ listenarr.mpdavis.com {
 # its API clients use tokens they could not get past forward auth with.
 paperless.mpdavis.com {
 	reverse_proxy paperless:8000
+}
+
+# /health ahead of auth for Gatus, like /ping on prowlarr.
+ai.mpdavis.com {
+	route {
+		reverse_proxy /health open-webui:8080
+		import authentik
+		reverse_proxy open-webui:8080
+	}
 }
