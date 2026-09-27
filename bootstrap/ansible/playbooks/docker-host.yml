@@ -21,3 +21,9 @@
     - role: doco_cd
       vars:
         doco_cd_bws_access_token: "{{ bws_access_token }}"
+
+- name: GPU setup
+  hosts: docker_hosts:&gpu
+  become: true
+  roles:
+    - gpu

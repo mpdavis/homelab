@@ -26,6 +26,7 @@ a worktree, symlink the primary checkout's copy in first.
 | `pve` | pve1, pve2 | Proxmox VE hypervisors |
 | `k3s_cluster` | `k3s_server` + `k3s_agent` | k3s-server; k3s-agent-1, k3s-agent-gpu |
 | `docker_hosts` | docker, infra | Docker Compose hosts, deployed by doco-cd |
+| `gpu` | docker | Holds the passthrough GPU |
 | `tailscale_router` | tailscale-router | Tailscale subnet router for the LAN |
 | `development` | devbox | Always-on development host |
 | `lxc` / `vm` | every guest, by type | Sets `node_type`; target platform roles with e.g. `k3s_cluster:&vm` |
@@ -66,7 +67,7 @@ Every guest play starts with `common`; the rest are applied by group.
 | `common` | every guest | Cloud-init wait, `resolv.conf`, apt cache, base packages, k3s sysctls on VMs |
 | `lxc` | LXC guests | AppArmor removal, `/dev/kmsg` symlink, shared mount for k3s and Docker |
 | `vm` | VM guests | qemu-guest-agent |
-| `gpu` | k3s-agent-gpu | NVIDIA driver, container toolkit, containerd runtime |
+| `gpu` | `gpu` hosts | NVIDIA driver and container toolkit; reboots once to load a fresh driver |
 | `k3s_server` | k3s-server | k3s server install, kubeconfig fetch |
 | `k3s_agent` | k3s agents | k3s agent install and cluster join |
 | `docker` | docker hosts, devbox | Docker Engine, daemon config, shared networks |
