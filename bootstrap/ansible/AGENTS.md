@@ -12,7 +12,7 @@ Prefer `ansible.builtin.*` modules over shell/command whenever a built-in exists
 - `ansible.builtin.user` / `ansible.builtin.group` for user management
 - `ansible.builtin.uri` for HTTP requests / API calls
 
-Only use `ansible.builtin.shell` or `ansible.builtin.command` when no built-in module covers the operation (e.g., `nvidia-ctk runtime configure`, `cloud-init status`). When you must use shell/command, set `changed_when` and use `creates`/`removes` args where applicable to ensure idempotency.
+Only use `ansible.builtin.shell` or `ansible.builtin.command` when no built-in module covers the operation (e.g., `nvidia-smi`, `cloud-init status`). When you must use shell/command, set `changed_when` and use `creates`/`removes` args where applicable to ensure idempotency.
 
 ## Role Structure
 

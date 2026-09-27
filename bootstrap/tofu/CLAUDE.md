@@ -71,6 +71,21 @@ An existing record is adopted, not recreated:
 tofu -chdir=... import 'cloudflare_dns_record.service["<host>"]' '<zone_id>/<record_id>'
 ```
 
+## Moving the GPU between VMs
+
+The `gpu` PCI mapping can be attached to one running VM at a time, and pve2's
+RAM is fully committed because a passthrough VM locks all of its memory. So
+release first, then claim, in two applies:
+
+```sh
+tofu -chdir=... apply -target='proxmox_virtual_environment_vm.vm["<old holder>"]'
+tofu -chdir=... apply
+```
+
+Each apply reboots the VM it changes (`reboot_after_update` defaults to true, and
+neither memory nor `hostpci` hot-plugs here). A single apply can try to start the
+new holder while the old one still has the device and its RAM.
+
 ## Provider upgrades
 
 The lock file is git-ignored, so a Renovate bump to a `version` constraint needs
