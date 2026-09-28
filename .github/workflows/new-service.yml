@@ -41,8 +41,8 @@ jobs:
             A maintainer labeled this issue `new service`, requesting that the
             service it describes be added to the homelab as a Docker Compose stack
             (stacks/, deployed by doco-cd when the PR merges). The issue is
-            intentionally lightweight: it gives the service name, a target stack
-            (older issues may call it a namespace), and a documentation link — NOT
+            intentionally lightweight: it gives the service name, a target stack,
+            and a documentation link — NOT
             the full compose details. Your job is to do the investigation and
             propose a first path forward.
 

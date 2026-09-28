@@ -1,6 +1,6 @@
 name: ntfy
 
-# Push notifications: Grafana Cloud's alerts and Alertmanager publish here, the
+# Push notifications: Grafana Cloud's alerts publish here, the
 # phone subscribes. On this host so an alert about the compose host can still
 # be stored and fetched.
 services:
