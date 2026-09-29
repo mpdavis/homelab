@@ -3,7 +3,7 @@ name: ai
 services:
   # Only Open WebUI talks to it, so it stays off the proxy network.
   ollama:
-    image: ollama/ollama:0.34.4
+    image: ollama/ollama:0.35.0
     restart: unless-stopped
     environment:
       TZ: America/Chicago
