@@ -55,18 +55,20 @@
       - "*/bin/gh"
     creates: /usr/local/bin/gh
 
-- name: Install mise
+- name: Install mise  # noqa: command-instead-of-module
   ansible.builtin.shell:
-    cmd: "curl -fsSL {{ devbox_mise_install_url }} | sh"
+    cmd: "set -o pipefail && curl -fsSL {{ devbox_mise_install_url }} | sh"
     creates: "/home/{{ devbox_user }}/.local/bin/mise"
+    executable: /bin/bash
   become_user: "{{ devbox_user }}"
   environment:
     MISE_INSTALL_PATH: "/home/{{ devbox_user }}/.local/bin/mise"
 
-- name: Install herdr
+- name: Install herdr  # noqa: command-instead-of-module
   ansible.builtin.shell:
-    cmd: "curl -fsSL {{ devbox_herdr_install_url }} | sh"
+    cmd: "set -o pipefail && curl -fsSL {{ devbox_herdr_install_url }} | sh"
     creates: "/home/{{ devbox_user }}/.local/bin/herdr"
+    executable: /bin/bash
   become_user: "{{ devbox_user }}"
   environment:
     HERDR_INSTALL_DIR: "/home/{{ devbox_user }}/.local/bin"

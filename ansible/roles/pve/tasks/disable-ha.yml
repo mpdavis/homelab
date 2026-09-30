@@ -1,14 +1,16 @@
 ---
-- name: Disable pve-ha-lrm
+- name: Disable the HA services
   ansible.builtin.systemd:
-    name: pve-ha-lrm
+    name: "{{ pve_ha_service }}"
     enabled: false
     state: stopped
-  failed_when: false
-
-- name: Disable pve-ha-crm
-  ansible.builtin.systemd:
-    name: pve-ha-crm
-    enabled: false
-    state: stopped
-  failed_when: false
+  loop:
+    - pve-ha-lrm
+    - pve-ha-crm
+  loop_control:
+    loop_var: pve_ha_service
+  register: pve_ha_result
+  # A node without the HA stack has no units to stop; any other error is real.
+  failed_when: >-
+    pve_ha_result is failed
+    and 'Could not find the requested service' not in pve_ha_result.msg | default('')

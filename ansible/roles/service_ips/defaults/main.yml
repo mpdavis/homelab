@@ -5,4 +5,4 @@
 service_ips_interface: eth0
 
 # CIDR strings, e.g. ["192.0.2.10/24"].
-service_ips: []
+service_ips_addresses: []

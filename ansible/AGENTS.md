@@ -37,4 +37,6 @@ it through the `network` var, e.g. `network.hosts[inventory_hostname]`.
 - Always use fully qualified collection names (`ansible.builtin.apt`, not `apt`)
 - Use `become: true` at the play level, not per-task
 - Target inventory groups, not individual hostnames, when possible
-- Run `ansible-playbook --syntax-check` before committing
+- Run `ansible-lint` from `ansible/` before committing; CI runs it on every PR
+  that touches `ansible/`. Prefix registered vars with the role name, and give a
+  `# noqa: <rule>` a reason on the line above it
