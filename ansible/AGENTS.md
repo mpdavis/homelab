@@ -29,7 +29,7 @@ Never commit secrets or default passwords to the repository. Use `vars_prompt` i
 ## Addresses
 
 Never write an IP into a playbook, role, or the inventory. Add it to
-`bootstrap/network.yaml` (and its shape to `network.example.yaml`) and reference
+`network.yaml` (and its shape to `network.example.yaml`) and reference
 it through the `network` var, e.g. `network.hosts[inventory_hostname]`.
 
 ## Playbook Conventions

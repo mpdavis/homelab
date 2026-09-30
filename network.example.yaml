@@ -1,5 +1,5 @@
 # Copy to network.yaml (git-ignored) and fill in. It is the only place the
-# bootstrap tier keeps addresses: Tofu reads it with yamldecode(), and Ansible
+# provisioning tier keeps addresses: Tofu reads it with yamldecode(), and Ansible
 # loads it as group_vars through inventory/group_vars/all/network.yml.
 #
 # Like Tofu's state, the real file lives only in the primary checkout. Running
