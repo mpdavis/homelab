@@ -40,7 +40,7 @@ jobs:
 
             A maintainer labeled this issue `new service`, requesting that the
             service it describes be added to the homelab as a Docker Compose stack
-            (stacks/, deployed by doco-cd when the PR merges). The issue is
+            (docker/stacks/, deployed by doco-cd when the PR merges). The issue is
             intentionally lightweight: it gives the service name, a target stack,
             and a documentation link — NOT
             the full compose details. Your job is to do the investigation and
@@ -57,7 +57,7 @@ jobs:
                its own login, the image's own healthcheck, what persistent storage it
                needs, and whether it requires any secrets. Honor anything the
                maintainer specified in the notes over your own inference.
-            3. Read CLAUDE.md in the repo root and stacks/CLAUDE.md, then run the
+            3. Read CLAUDE.md in the repo root and docker/stacks/CLAUDE.md, then run the
                `add-service` skill (.claude/skills/add-service/SKILL.md) and follow
                it exactly, using the details you researched. Infer sensible defaults
                from the skill's conventions where the docs are silent — do NOT block

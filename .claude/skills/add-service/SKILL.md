@@ -14,9 +14,9 @@ argument-hint: "[service-name]"
 
 # Add a service
 
-A service is a compose stack under `stacks/` (compose host, 10.0.1.55) or `infra/`
+A service is a compose stack under `docker/stacks/` (compose host, 10.0.1.55) or `docker/infra/`
 (infra host, 10.0.1.58). doco-cd polls `main` every 60s and deploys whatever changed, so
-merging the PR is the deploy. Read `stacks/CLAUDE.md` first: it holds the authoring rules
+merging the PR is the deploy. Read `docker/stacks/CLAUDE.md` first: it holds the authoring rules
 this skill does not repeat. `docs/compose.md` is the host runbook.
 
 ## 1. Gather the facts
@@ -35,14 +35,14 @@ you cannot find):
 
 ## 2. Pick the stack
 
-Put it in the stack that matches what it does (grouping table in `stacks/CLAUDE.md`), or a
-new `stacks/<name>/` if nothing fits. Get this right first time: moving a service later
+Put it in the stack that matches what it does (grouping table in `docker/stacks/CLAUDE.md`), or a
+new `docker/stacks/<name>/` if nothing fits. Get this right first time: moving a service later
 renames its volumes. Anything that has to keep working while the compose host is down
-(monitoring, alerting) goes under `infra/` instead — see `infra/CLAUDE.md`.
+(monitoring, alerting) goes under `docker/infra/` instead — see `docker/infra/CLAUDE.md`.
 
 ## 3. Write the service
 
-In `stacks/<stack>/compose.yaml`, following `stacks/CLAUDE.md`:
+In `docker/stacks/<stack>/compose.yaml`, following `docker/stacks/CLAUDE.md`:
 
 - `restart: unless-stopped`, no `container_name`
 - `user: "1000:1000"` unless the image drops privileges itself (s6/gosu images)
@@ -68,9 +68,9 @@ Add a site block to exactly one Caddyfile:
 
 | Exposure | File |
 |---|---|
-| tailnet (default) | `stacks/proxy/Caddyfile.tailnet` |
-| public | `stacks/proxy/Caddyfile.public` |
-| tailnet, on the infra host | `infra/proxy/Caddyfile.tailnet` |
+| tailnet (default) | `docker/stacks/proxy/Caddyfile.tailnet` |
+| public | `docker/stacks/proxy/Caddyfile.public` |
+| tailnet, on the infra host | `docker/infra/proxy/Caddyfile.tailnet` |
 
 ```caddy
 app.mpdavis.com {
@@ -93,11 +93,11 @@ app.mpdavis.com {
 ```
 
 Apps with native OIDC (like Paperless) skip forward auth and get an Authentik provider
-instead — add a blueprint under `stacks/authentik/blueprints/`.
+instead — add a blueprint under `docker/stacks/authentik/blueprints/`.
 
 ## 5. Monitor it
 
-In `infra/gatus/`:
+In `docker/infra/gatus/`:
 
 - `config.yaml`: an endpoint in the right group — `external-open` (`*open-conditions`,
   expects 200) or `external-auth` (`*auth-client`, `*auth-headers`, `*auth-conditions`,
@@ -114,7 +114,7 @@ In `infra/gatus/`:
   (`public`, `compose_tailnet`, `infra_tailnet`). The apply is manual and runs from the
   primary checkout (`tofu -chdir=~/git/homelab/tofu/cloudflare apply`), after
   merge — see `tofu/CLAUDE.md`. Tell the user it is pending.
-- Add a tile to `stacks/homepage/config/services.yaml` unless it is machine-facing only.
+- Add a tile to `docker/stacks/homepage/config/services.yaml` unless it is machine-facing only.
 
 ## 7. Check before opening the PR
 
@@ -130,7 +130,7 @@ that its Gatus checks go green once the DNS record is applied.
 
 ## Checklist
 
-- [ ] Stack chosen per the grouping in `stacks/CLAUDE.md`; image pinned
+- [ ] Stack chosen per the grouping in `docker/stacks/CLAUDE.md`; image pinned
 - [ ] Healthcheck uses a binary in the image
 - [ ] NFS volumes use `nocopy: true`; GPU via CDI
 - [ ] Secrets only as Bitwarden UUIDs in `.doco-cd.yml`

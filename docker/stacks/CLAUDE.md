@@ -2,7 +2,7 @@
 
 One directory per compose project, discovered automatically by doco-cd — the
 project takes the directory's name, and nothing lists it anywhere else. This
-tree belongs to the compose host; `infra/` is the same shape for the infra host.
+tree belongs to the compose host; `docker/infra/` is the same shape for the infra host.
 
 Services are grouped by what they do, not one stack each:
 
@@ -29,9 +29,9 @@ it appears in:
 
 | File | Reachable from |
 |---|---|
-| `stacks/proxy/Caddyfile.tailnet` | LAN and tailnet |
-| `stacks/proxy/Caddyfile.public` | the internet |
-| `infra/proxy/Caddyfile.tailnet` | LAN and tailnet, for what is not on the compose host |
+| `docker/stacks/proxy/Caddyfile.tailnet` | LAN and tailnet |
+| `docker/stacks/proxy/Caddyfile.public` | the internet |
+| `docker/infra/proxy/Caddyfile.tailnet` | LAN and tailnet, for what is not on the compose host |
 
 Default to tailnet. A hostname in two files fails CI, on one host or across
 both.
@@ -82,7 +82,7 @@ its stacks reference.
   so Gatus can check the app itself (see `prowlarr` in `Caddyfile.tailnet`).
 - **Scheduled jobs** use the image's own scheduler if it has one (recyclarr's
   `CRON_SCHEDULE`), else a service looping `run; sleep` — sleeping after each
-  run means runs can never overlap (see `stacks/civic`).
+  run means runs can never overlap (see `docker/stacks/civic`).
 - **The GPU** is requested through CDI: a `deploy.resources.reservations.devices`
   entry with `driver: cdi` and `device_ids: [nvidia.com/gpu=all]`. Only the
   compose host has one.

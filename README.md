@@ -33,9 +33,10 @@ See [.github/workflows/README.md](.github/workflows/README.md) for CI.
 ## Repository Layout
 
 ```text
-stacks/               # the compose host's projects, one directory per stack
-infra/                # the infra host's projects
-doco-cd/              # doco-cd config per host + the doco-cd instance itself
+docker/
+  stacks/             # the compose host's projects, one directory per stack
+  infra/              # the infra host's projects
+  doco-cd/            # doco-cd config per host + the doco-cd instance itself
 images/               # container images built from this repo
 grafana-cloud/        # alert rules, synced to Grafana Cloud on merge
 tofu/                 # OpenTofu — Proxmox guests, Cloudflare DNS, alert routing

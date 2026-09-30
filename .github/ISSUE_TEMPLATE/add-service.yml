@@ -28,7 +28,7 @@ body:
     id: stack
     attributes:
       label: Stack
-      description: Which compose stack this belongs to (see stacks/CLAUDE.md). Pick an existing one or request a new one.
+      description: Which compose stack this belongs to (see docker/stacks/CLAUDE.md). Pick an existing one or request a new one.
       options:
         - downloads (arr apps, download clients, request managers)
         - media (players and library servers)

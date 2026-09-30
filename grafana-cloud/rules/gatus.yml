@@ -1,5 +1,5 @@
 # Synthetic-check alerts, off the gatus_results_endpoint_success series the
-# infra host's Alloy ships (infra/gatus/). Synced like docker-hosts.yml.
+# infra host's Alloy ships (docker/infra/gatus/). Synced like docker-hosts.yml.
 namespace: gatus
 groups:
   - name: gatus

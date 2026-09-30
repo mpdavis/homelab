@@ -6,22 +6,23 @@ has to keep working while the compose host is down.
 
 This page is the runbook: how a change reaches a host, how to bring one up, and
 what adding a service touches. The rules for writing a stack — exposure,
-routing, secrets, pinning — live in `stacks/CLAUDE.md` and `infra/CLAUDE.md`.
+routing, secrets, pinning — live in `docker/stacks/CLAUDE.md` and `docker/infra/CLAUDE.md`.
 
 ## Layout
 
 ```text
-doco-cd/
-  .doco-cd.yaml           # what the compose host deploys: everything in stacks/
-  .doco-cd.infra.yaml     # what the infra host deploys: everything in infra/
-  compose.yaml            # the doco-cd instance itself, which deploys it too
-stacks/                   # the compose host's projects
-  <stack>/                # one compose project per stack, auto-discovered
-    compose.yaml
-    .doco-cd.yml          # optional: per-stack settings, e.g. external_secrets
-    ...                   # config files the stack bind-mounts
-infra/                    # the infra host's projects, same shape
-  <stack>/
+docker/
+  doco-cd/
+    .doco-cd.yaml         # what the compose host deploys: everything in docker/stacks/
+    .doco-cd.infra.yaml   # what the infra host deploys: everything in docker/infra/
+    compose.yaml          # the doco-cd instance itself, which deploys it too
+  stacks/                 # the compose host's projects
+    <stack>/              # one compose project per stack, auto-discovered
+      compose.yaml
+      .doco-cd.yml        # optional: per-stack settings, e.g. external_secrets
+      ...                 # config files the stack bind-mounts
+  infra/                  # the infra host's projects, same shape
+    <stack>/
 ```
 
 | Host     | Where                       | Runs                                             |
@@ -48,7 +49,7 @@ Deleting a stack's directory removes the project. Its volumes are kept.
 doco-cd also restarts containers that turn unhealthy.
 
 **doco-cd deploys itself.** Each host's deploy config lists a `doco-cd`
-deployment for `doco-cd/compose.yaml`, and `SELF_UPDATE_ENABLED` lets it
+deployment for `docker/doco-cd/compose.yaml`, and `SELF_UPDATE_ENABLED` lets it
 replace its own container
 ([Self-Updating](https://doco.cd/latest/Advanced/Self-Updating/)), so a
 Renovate bump is a merge like any other. It starts the new container beside
@@ -79,7 +80,7 @@ host, a dead pve1 or a dead homelab still alerts, which nothing on the LAN can
 do about itself.
 
 Every Docker host runs the same agent — Alloy, node-exporter and cAdvisor, in
-`infra/monitoring/` and `stacks/monitoring/` — which pushes:
+`docker/infra/monitoring/` and `docker/stacks/monitoring/` — which pushes:
 
 - every container's logs, labelled `host`, `stack`, `service`, `container`;
 - host metrics (`job="node"`), per-container metrics (`job="cadvisor"`) and
@@ -160,10 +161,10 @@ before it mounts anything, or the mount fails with `permission denied`
 
 A new hostname touches four places besides its stack:
 
-1. A site block in the right Caddyfile — see `stacks/CLAUDE.md` for which one,
+1. A site block in the right Caddyfile — see `docker/stacks/CLAUDE.md` for which one,
    and `import authentik` inside a `route` block to put it behind login.
-2. A Gatus endpoint in `infra/gatus/config.yaml`, plus an `extra_hosts` line in
-   `infra/gatus/compose.yaml` pointing the hostname at the Caddy that serves it.
+2. A Gatus endpoint in `docker/infra/gatus/config.yaml`, plus an `extra_hosts` line in
+   `docker/infra/gatus/compose.yaml` pointing the hostname at the Caddy that serves it.
 3. A DNS record: the hostname in `records` in `tofu/cloudflare`, then
    `tofu apply` from the primary checkout.
 4. A matching `dns-<host>` Gatus check — the HTTP probe resolves through

@@ -25,7 +25,7 @@
       No Bitwarden access token on the host yet. Re-run and enter one at the
       prompt; doco-cd resolves every external_secret with it.
 
-# doco-cd deploys its own stack (doco-cd/compose.yaml) once it is running, so
+# doco-cd deploys its own stack (docker/doco-cd/compose.yaml) once it is running, so
 # this role only starts the first instance: on a new host, or to hand over an
 # instance that predates self-update. After that, a compose change is a merge,
 # and re-running the playbook must not roll back what doco-cd deployed.
@@ -59,7 +59,7 @@
 
     - name: Copy the doco-cd compose file
       ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../../doco-cd/compose.yaml"
+        src: "{{ playbook_dir }}/../../docker/doco-cd/compose.yaml"
         dest: "{{ doco_cd_dir }}/compose.yaml"
         mode: "0644"
 

@@ -43,7 +43,7 @@ export TF_VAR_ntfy_token="$(bws secret get 47079c89-adab-4d19-8173-b48d01492747 
 `cloudflare/` owns every record in the zone that points at a homelab service.
 Adding a service means adding its hostname to `records` and applying.
 
-Add a matching `dns-<host>` check to `infra/gatus/config.yaml` alongside the
+Add a matching `dns-<host>` check to `docker/infra/gatus/config.yaml` alongside the
 record. Gatus's HTTP probes resolve through `extra_hosts`, so without it a missing or wrong
 record goes unnoticed.
 
