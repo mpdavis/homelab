@@ -28,11 +28,11 @@ doco-cd on each host polls `main` and deploys what changed. The design is in
 ansible/            # Host configuration, applied by hand: Docker, doco-cd, GPU driver, devbox, Proxmox
 tofu/               # OpenTofu, applied by hand — Proxmox guests, Cloudflare DNS, Grafana Cloud routing (see tofu/CLAUDE.md)
 network.yaml        # git-ignored; the addresses Tofu and Ansible share (see network.example.yaml)
-docker/             # Everything doco-cd deploys
+docker/             # Everything doco-cd deploys, plus the images it runs
   stacks/           # Compose stacks for the compose host (see docker/stacks/CLAUDE.md)
   infra/            # Compose stacks for the infra host (see docker/infra/CLAUDE.md)
   doco-cd/          # doco-cd deploy configs (one per host) + the doco-cd instance itself
-images/             # Container images built from this repo (see images/CLAUDE.md)
+  images/           # Container images built from this repo (see docker/images/CLAUDE.md)
 grafana-cloud/      # Alert rules synced into Grafana Cloud by CI
 docs/               # Design (design.md), host runbook (compose.md), devbox runbook (devbox.md)
 ```
@@ -40,7 +40,7 @@ docs/               # Design (design.md), host runbook (compose.md), devbox runb
 Custom images (gridiron, ames-council-digest) live in their own repos —
 `mpdavis/<name>` — which publish `ghcr.io/mpdavis/<name>` from main; Renovate bumps
 the pinned tag here like any third-party image. Images with no source of their own
-are built from `images/` instead — see `images/CLAUDE.md`.
+are built from `docker/images/` instead — see `docker/images/CLAUDE.md`.
 
 The `add-service` skill walks through everything a new service needs.
 

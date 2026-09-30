@@ -2,7 +2,7 @@
 
 Container images built from this repo, one directory per image, published to
 `ghcr.io/mpdavis/<name>` by `.github/workflows/publish-images.yml` on every push
-to `main` that touches `images/`.
+to `main` that touches `docker/images/`.
 
 ## When an image belongs here
 
