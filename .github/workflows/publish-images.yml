@@ -1,11 +1,11 @@
 name: Publish · Images
 
-# Publishes images/<name>/ to ghcr.io/mpdavis/<name>. See images/CLAUDE.md.
+# Publishes docker/images/<name>/ to ghcr.io/mpdavis/<name>. See docker/images/CLAUDE.md.
 on:
   push:
     branches: [main]
     paths:
-      - 'images/**'
+      - 'docker/images/**'
       - '.github/workflows/publish-images.yml'
   workflow_dispatch: {}
 
@@ -32,7 +32,7 @@ jobs:
       - name: Build and push
         run: |
           ref="ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}"
-          docker build --tag "$ref:latest" "images/${{ matrix.image }}"
+          docker build --tag "$ref:latest" "docker/images/${{ matrix.image }}"
           docker push "$ref:latest"
           digest=$(docker image inspect "$ref:latest" --format '{{index .RepoDigests 0}}')
           {

@@ -60,8 +60,8 @@ its stacks reference.
 ## Conventions
 
 - **Pin images**, by tag or digest; `image-pin-check` resolves every added
-  reference against its registry. First-party images come from `images/` and are
-  pinned by digest — see `images/CLAUDE.md`.
+  reference against its registry. First-party images come from `docker/images/`
+  and are pinned by digest — see `docker/images/CLAUDE.md`.
 - **Don't set `container_name`.** Compose's default names let doco-cd recreate
   a container in place; a fixed name collides during a recreate.
 - **Config files are bind-mounted from the stack directory.** doco-cd recreates

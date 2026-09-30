@@ -10,7 +10,7 @@ This page is the why. The how lives next to the code:
 | Deploy path, host runbook, monitoring, adding a service | `docs/compose.md` |
 | Writing a stack: exposure, routing, secrets, pinning | `docker/stacks/CLAUDE.md`, `docker/infra/CLAUDE.md` |
 | Proxmox guests, DNS records, alert routing | `tofu/CLAUDE.md` |
-| Images built from this repo | `images/CLAUDE.md` |
+| Images built from this repo | `docker/images/CLAUDE.md` |
 | The development host | `docs/devbox.md` |
 
 ## Goals
@@ -123,7 +123,7 @@ proxied there from its LAN ports; their backends survive a compose-host
 outage, their public route does not.
 
 TLS is a Let's Encrypt certificate per Caddy, issued by DNS-01 through the
-Cloudflare plugin built into `images/caddy-cloudflare`.
+Cloudflare plugin built into `docker/images/caddy-cloudflare`.
 
 ### Authentication
 
