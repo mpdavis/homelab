@@ -116,7 +116,7 @@ to — the only case of one host's Caddy reaching another's service.
 
 ## Bringing up a host
 
-1. Create the VM: add its address to `bootstrap/network.yaml`, then
+1. Create the VM: add its address to `network.yaml`, then
    `tofu -chdir=tofu/proxmox apply`. Note the state, `terraform.tfvars`
    and `network.yaml` live only in the primary checkout, not in worktrees.
 2. Give the host a Bitwarden access token **(manual)**. Machine accounts are

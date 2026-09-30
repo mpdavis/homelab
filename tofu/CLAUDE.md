@@ -19,10 +19,10 @@ tofu -chdir=~/git/homelab/tofu/cloudflare plan
 
 Pull that checkout first, or you plan against stale config.
 
-## Addresses come from `bootstrap/network.yaml`
+## Addresses come from `network.yaml`
 
 `proxmox/` and `cloudflare/` read every IP — guests, Proxmox nodes, gateway,
-DNS, the public IP, the Caddy service IPs — from `bootstrap/network.yaml`, which
+DNS, the public IP, the Caddy service IPs — from `network.yaml`, which
 Ansible reads too. It is git-ignored and lives beside the state in the primary
 checkout; `network.example.yaml` documents its shape. A new guest needs an entry
 under `hosts`, keyed by the same name as in `containers`/`vms`, before `plan`.

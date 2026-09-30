@@ -40,7 +40,7 @@ images/               # container images built from this repo
 grafana-cloud/        # alert rules, synced to Grafana Cloud on merge
 tofu/                 # OpenTofu — Proxmox guests, Cloudflare DNS, alert routing
 ansible/              # Ansible — Proxmox and guest configuration, doco-cd
-bootstrap/            # network.yaml — the addresses Tofu and Ansible share
+network.yaml          # git-ignored; the addresses Tofu and Ansible share
 docs/                 # design, compose runbook, devbox runbook
 ```
 
@@ -51,7 +51,7 @@ docs/                 # design, compose runbook, devbox runbook
 - [OpenTofu](https://opentofu.org/docs/intro/install/) — guests and DNS
 - [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/) — host configuration
 - SSH access to the Proxmox hosts (pve1, pve2)
-- `bootstrap/network.yaml` (git-ignored; `network.example.yaml` shows its shape)
+- `network.yaml` (git-ignored; `network.example.yaml` shows its shape)
 
 ### Configure Proxmox Hosts
 

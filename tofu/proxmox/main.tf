@@ -1,5 +1,5 @@
 locals {
-  net = yamldecode(file("${path.module}/../../bootstrap/network.yaml")).network
+  net = yamldecode(file("${path.module}/../../network.yaml")).network
 
   container_nodes = toset([for c in var.containers : c.node])
   vm_nodes        = toset([for v in var.vms : v.node])

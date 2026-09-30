@@ -27,7 +27,7 @@ doco-cd on each host polls `main` and deploys what changed. The design is in
 ```text
 ansible/            # Host configuration, applied by hand: Docker, doco-cd, GPU driver, devbox, Proxmox
 tofu/               # OpenTofu, applied by hand — Proxmox guests, Cloudflare DNS, Grafana Cloud routing (see tofu/CLAUDE.md)
-bootstrap/          # network.yaml (git-ignored) — the addresses Tofu and Ansible share
+network.yaml        # git-ignored; the addresses Tofu and Ansible share (see network.example.yaml)
 stacks/             # Compose stacks for the compose host (see stacks/CLAUDE.md)
 infra/              # Compose stacks for the infra host (see infra/CLAUDE.md)
 doco-cd/            # doco-cd deploy configs (one per host) + the doco-cd instance itself
