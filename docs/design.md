@@ -48,29 +48,63 @@ of client IPs.
 
 ## Architecture
 
-```text
-          ┌──────────────────────┐    ┌──────────────────────────┐
-          │  pve1                │    │  pve2                    │
-          │                      │    │  RTX 3050                │
-          │  ┌────────────────┐  │    │  ┌────────────────────┐  │
-          │  │ infra     VM   │  │    │  │ docker        VM   │  │
-          │  │ Gatus, ntfy,   │  │    │  │ every service,     │  │
-          │  │ Caddy for LAN  │  │    │  │ public + tailnet   │  │
-          │  │ hosts          │  │    │  │ Caddy, Authentik,  │  │
-          │  └────────────────┘  │    │  │ GPU passthrough    │  │
-          │  ┌────────────────┐  │    │  └────────────────────┘  │
-          │  │ devbox    LXC  │  │    │                          │
-          │  └────────────────┘  │    │                          │
-          │  ┌────────────────┐  │    │                          │
-          │  │ tailscale-     │  │    │                          │
-          │  │ router    LXC  │  │    │                          │
-          │  └────────────────┘  │    │                          │
-          └──────────┬───────────┘    └────────────┬─────────────┘
-                     └──────────────┬──────────────┘
-                                    │ NFS
-                          ┌─────────▼─────────┐
-                          │   Unifi NAS        │
-                          └───────────────────┘
+```mermaid
+flowchart LR
+  internet(["Internet"])
+  client(["LAN / tailnet client"])
+  router["Router<br/>forwards 443"]
+  gh[("GitHub · main")]
+  bws["Bitwarden<br/>Secrets Manager"]
+  gc["Grafana Cloud<br/>metrics · logs · alerts"]
+  phone(["Phone"])
+  nas[("Unifi NAS · 10.0.1.6<br/>NFSv3")]
+
+  subgraph pve2["pve2 · RTX 3050"]
+    subgraph docker["docker VM · 10.0.1.55 · stacks/"]
+      cpub["caddy-public<br/>10.0.1.56"]
+      ctail["caddy-tailnet<br/>10.0.1.57"]
+      auth["Authentik"]
+      apps["media · downloads · iptv · ai<br/>docs · civic · gridiron · homepage"]
+      gpu[["RTX 3050 via CDI"]]
+      ddoco["doco-cd"]
+    end
+  end
+
+  subgraph pve1["pve1"]
+    ts["tailscale-router LXC<br/>10.0.1.53"]
+    devbox["devbox LXC<br/>10.0.1.54"]
+    subgraph infra["infra VM · 10.0.1.58 · infra/"]
+      icaddy["caddy-tailnet"]
+      gatus["Gatus"]
+      ntfy["ntfy"]
+      idoco["doco-cd"]
+    end
+  end
+
+  internet --> router --> cpub
+  client -- "remote via subnet route" --> ts
+  ts --> ctail
+  ts --> icaddy
+  cpub --> apps
+  ctail --> apps
+  cpub -. "forward auth" .-> auth
+  ctail -. "forward auth" .-> auth
+  cpub -- "ntfy, status page" --> icaddy
+  icaddy --> gatus
+  icaddy --> ntfy
+  apps --- gpu
+  apps -- "NFS" --> nas
+
+  gh -- "poll" --> ddoco
+  gh -- "poll" --> idoco
+  bws -- "secrets" --> ddoco
+  bws -- "secrets" --> idoco
+
+  gatus -. "probe every 60s" .-> docker
+  docker -- "Alloy" --> gc
+  infra -- "Alloy" --> gc
+  gc -- "alerts" --> ntfy
+  ntfy --> phone
 ```
 
 Both Docker hosts are VMs rather than LXCs: Docker in an LXC fights runc and
