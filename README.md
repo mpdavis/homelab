@@ -38,9 +38,9 @@ infra/                # the infra host's projects
 doco-cd/              # doco-cd config per host + the doco-cd instance itself
 images/               # container images built from this repo
 grafana-cloud/        # alert rules, synced to Grafana Cloud on merge
-bootstrap/
-  tofu/               # OpenTofu — Proxmox guests, Cloudflare DNS, alert routing
-  ansible/            # Ansible — Proxmox and guest configuration, doco-cd
+tofu/                 # OpenTofu — Proxmox guests, Cloudflare DNS, alert routing
+ansible/              # Ansible — Proxmox and guest configuration, doco-cd
+bootstrap/            # network.yaml — the addresses Tofu and Ansible share
 docs/                 # design, compose runbook, devbox runbook
 ```
 
@@ -58,7 +58,7 @@ docs/                 # design, compose runbook, devbox runbook
 After a fresh Proxmox VE install on each node:
 
 ```bash
-cd bootstrap/ansible
+cd ansible
 ansible-playbook playbooks/setup-pve.yml          # repos, subscription nag, NIC fix, updates
 ansible-playbook playbooks/setup-pve-cluster.yml  # form/join the Proxmox cluster
 ```
@@ -66,7 +66,7 @@ ansible-playbook playbooks/setup-pve-cluster.yml  # form/join the Proxmox cluste
 ### Provision the Guests
 
 ```bash
-cd bootstrap/tofu/proxmox
+cd tofu/proxmox
 cp terraform.tfvars.example terraform.tfvars      # SSH keys, Proxmox password
 tofu init && tofu apply
 ```
@@ -74,13 +74,13 @@ tofu init && tofu apply
 ### Configure the Docker Hosts
 
 ```bash
-cd bootstrap/ansible
+cd ansible
 ansible-playbook playbooks/docker-host.yml        # Docker, networks, GPU driver, doco-cd
 ```
 
 The playbook prompts for each host's Bitwarden access token. Once doco-cd is
 running it deploys every stack from `main` on its own; DNS records are applied
-from `bootstrap/tofu/cloudflare`.
+from `tofu/cloudflare`.
 
 ### Provision the Development Host
 

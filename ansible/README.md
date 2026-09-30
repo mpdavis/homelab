@@ -1,7 +1,7 @@
 # Ansible
 
 Configures the Proxmox hosts and everything inside the guests Tofu creates.
-Tofu (`bootstrap/tofu/proxmox`) makes the LXCs and VMs; Ansible does the rest.
+Tofu (`tofu/proxmox`) makes the LXCs and VMs; Ansible does the rest.
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ a worktree, symlink the primary checkout's copy in first.
 
 ## Playbooks
 
-Run from `bootstrap/ansible/`: `ansible-playbook playbooks/<playbook>.yml`.
+Run from `ansible/`: `ansible-playbook playbooks/<playbook>.yml`.
 
 | Playbook | Target | What it does |
 | --- | --- | --- |

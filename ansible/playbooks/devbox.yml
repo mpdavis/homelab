@@ -2,7 +2,7 @@
 # Provisions the always-on development host (LXC 204). See
 # docs/devbox.md for the runbook.
 #
-#   tofu -chdir=bootstrap/tofu/proxmox apply
+#   tofu -chdir=tofu/proxmox apply
 #   ansible-playbook playbooks/devbox.yml
 
 - name: Configure the development host

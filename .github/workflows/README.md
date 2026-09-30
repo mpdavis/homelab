@@ -12,7 +12,7 @@ Automated PR checks for this repo. The Claude-powered ones use the official
 | `new-service.yml` | Issue labeled `new service` | Runs the `add-service` skill against the issue and **opens a PR** scaffolding the stack, Caddy site, Gatus checks and DNS record (`Closes #<issue>`). Never merges. |
 | `claude.yml` | `@claude` mention in an issue/PR comment | On-demand assistant — explain, review, or make changes when asked. |
 | `publish-images.yml` | Pushes to `main` touching `images/**` | Builds and publishes the images under `images/` to `ghcr.io/mpdavis/`. See `images/CLAUDE.md`. |
-| `grafana-cloud.yml` | PRs + push to `main` touching `grafana-cloud/**` (advisory) | Validates the Grafana Cloud alert rules with `mimirtool` on PRs; on `main`, syncs them into the stack's Grafana as Grafana-managed rules. Their notification routing is `bootstrap/tofu/grafana`, not this workflow. |
+| `grafana-cloud.yml` | PRs + push to `main` touching `grafana-cloud/**` (advisory) | Validates the Grafana Cloud alert rules with `mimirtool` on PRs; on `main`, syncs them into the stack's Grafana as Grafana-managed rules. Their notification routing is `tofu/grafana`, not this workflow. |
 | `lint-shell.yml` | PRs touching `**/*.sh` (advisory) | shellcheck over the changed shell scripts. Config `.shellcheckrc`. |
 | `lint-markdown.yml` | PRs touching `**/*.md` (advisory) | markdownlint-cli2 over the changed Markdown files. Config `.markdownlint-cli2.jsonc`. |
 | `lint-secrets.yml` | All PRs + push to `main` (advisory, no `paths` filter) | gitleaks over the commit range the PR/push adds. Config `.gitleaks.toml`. Backstop for a credential that bypasses the `.doco-cd.yml` pattern. |

@@ -89,7 +89,7 @@ Alert rules are Prometheus-format files in `grafana-cloud/rules/`.
 `grafana-cloud.yml` validates them on PRs and, on merge, syncs them into the
 stack as Grafana-managed rules, so change them here rather than in the UI.
 Where they notify — the `homelab-alerts` ntfy topic, routed on `severity` — is
-`bootstrap/tofu/grafana`, applied by hand like the Cloudflare records.
+`tofu/grafana`, applied by hand like the Cloudflare records.
 
 Going back to self-hosting is a change of the agent's endpoints plus an
 Alertmanager config: the agent and rules are standard Prometheus/Loki formats.
@@ -117,7 +117,7 @@ to — the only case of one host's Caddy reaching another's service.
 ## Bringing up a host
 
 1. Create the VM: add its address to `bootstrap/network.yaml`, then
-   `tofu -chdir=bootstrap/tofu/proxmox apply`. Note the state, `terraform.tfvars`
+   `tofu -chdir=tofu/proxmox apply`. Note the state, `terraform.tfvars`
    and `network.yaml` live only in the primary checkout, not in worktrees.
 2. Give the host a Bitwarden access token **(manual)**. Machine accounts are
    granted per project, and every secret lives in the single `homelab` project,
@@ -150,7 +150,7 @@ A new hostname touches four places besides its stack:
    and `import authentik` inside a `route` block to put it behind login.
 2. A Gatus endpoint in `infra/gatus/config.yaml`, plus an `extra_hosts` line in
    `infra/gatus/compose.yaml` pointing the hostname at the Caddy that serves it.
-3. A DNS record: the hostname in `records` in `bootstrap/tofu/cloudflare`, then
+3. A DNS record: the hostname in `records` in `tofu/cloudflare`, then
    `tofu apply` from the primary checkout.
 4. A matching `dns-<host>` Gatus check — the HTTP probe resolves through
    `extra_hosts`, so without it a missing record goes unnoticed.

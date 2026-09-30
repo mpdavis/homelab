@@ -133,7 +133,7 @@ endpoints:
     client: *auth-client
     headers: *auth-headers
     conditions: *auth-conditions
-  # --- public DNS for records OpenTofu owns (bootstrap/tofu/cloudflare).
+  # --- public DNS for records OpenTofu owns (tofu/cloudflare).
   # Every probe above resolves through extra_hosts, so none of them can
   # see a record that is missing or wrong — three services ran without
   # DNS for hours on 2026-09-25 while everything stayed green. These ask

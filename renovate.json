@@ -18,7 +18,7 @@
       "description": "Bump tool versions pinned in Ansible role defaults — the devbox agent CLIs (claude-code, opencode) and its gh binary. Ansible vars are invisible to every built-in manager, so these rot silently otherwise; same problem, same fix as the workflows manager above.",
       "customType": "regex",
       "managerFilePatterns": [
-        "/^bootstrap/ansible/roles/.+/defaults/main\\.ya?ml$/"
+        "/^ansible/roles/.+/defaults/main\\.ya?ml$/"
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\n[a-z0-9_]+: \"(?<currentValue>[^\"]+)\""

@@ -36,7 +36,7 @@ containers, and querying APIs is fine.
   A hostname is served by exactly one Caddyfile. Forward auth: `import authentik`
   (`stacks/proxy/authentik.caddy`) against `authentik-server:9000`; Authentik serves
   `iam.mpdavis.com`.
-- **DNS**: Cloudflare records in `bootstrap/tofu/cloudflare` (`records`), applied by hand
+- **DNS**: Cloudflare records in `tofu/cloudflare` (`records`), applied by hand
   from the primary checkout — a merged record may not be applied yet.
 - **Monitoring**: Gatus (`infra/gatus/`) probes every service; alerts and host metrics live
   in Grafana Cloud (`grafana-cloud/rules/`), delivered to ntfy.
