@@ -1,4 +1,7 @@
 ---
+# Required on first bring-up only; playbooks prompt for it.
+tailscale_auth_key: ~
+
 tailscale_hostname: unnamed-tailscale-node
 
 # Opt-in: empty means an ordinary tailnet node, with no --advertise-routes and

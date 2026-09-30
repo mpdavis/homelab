@@ -1,0 +1,5 @@
+---
+pve_cluster_name: homelab
+# The first node creates the cluster; the rest join it.
+pve_seed_host: "{{ groups['pve'][0] }}"
+pve_seed_ip: "{{ hostvars[pve_seed_host].ansible_host }}"
