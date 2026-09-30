@@ -1,5 +1,5 @@
 locals {
-  net = yamldecode(file("${path.module}/../../network.yaml")).network
+  net = yamldecode(file("${path.module}/../../bootstrap/network.yaml")).network
 
   # Where a record can point. Public names resolve to the router, which
   # forwards 443 to the compose host's public Caddy; tailnet names resolve to a

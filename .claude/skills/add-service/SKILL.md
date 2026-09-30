@@ -110,10 +110,10 @@ In `infra/gatus/`:
 
 ## 6. DNS and the homepage
 
-- Add the hostname to `records` in `bootstrap/tofu/cloudflare/variables.tf` with its target
+- Add the hostname to `records` in `tofu/cloudflare/variables.tf` with its target
   (`public`, `compose_tailnet`, `infra_tailnet`). The apply is manual and runs from the
-  primary checkout (`tofu -chdir=~/git/homelab/bootstrap/tofu/cloudflare apply`), after
-  merge — see `bootstrap/tofu/CLAUDE.md`. Tell the user it is pending.
+  primary checkout (`tofu -chdir=~/git/homelab/tofu/cloudflare apply`), after
+  merge — see `tofu/CLAUDE.md`. Tell the user it is pending.
 - Add a tile to `stacks/homepage/config/services.yaml` unless it is machine-facing only.
 
 ## 7. Check before opening the PR
@@ -137,5 +137,5 @@ that its Gatus checks go green once the DNS record is applied.
 - [ ] Site in exactly one Caddyfile, tailnet unless public is needed; forward auth unless
       the app has its own login or OIDC
 - [ ] Gatus endpoint, `dns-<host>` check, and `extra_hosts` line
-- [ ] `records` entry in `bootstrap/tofu/cloudflare`, apply flagged as pending
+- [ ] `records` entry in `tofu/cloudflare`, apply flagged as pending
 - [ ] Homepage tile

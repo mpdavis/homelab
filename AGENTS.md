@@ -25,9 +25,9 @@ doco-cd on each host polls `main` and deploys what changed. The design is in
 ## Repository Layout
 
 ```text
-bootstrap/          # Provisioning, applied by hand
-  ansible/          # Host configuration: Docker, doco-cd, GPU driver, devbox, Proxmox
-  tofu/             # OpenTofu — Proxmox guests, Cloudflare DNS, Grafana Cloud routing (see bootstrap/tofu/CLAUDE.md)
+ansible/            # Host configuration, applied by hand: Docker, doco-cd, GPU driver, devbox, Proxmox
+tofu/               # OpenTofu, applied by hand — Proxmox guests, Cloudflare DNS, Grafana Cloud routing (see tofu/CLAUDE.md)
+bootstrap/          # network.yaml (git-ignored) — the addresses Tofu and Ansible share
 stacks/             # Compose stacks for the compose host (see stacks/CLAUDE.md)
 infra/              # Compose stacks for the infra host (see infra/CLAUDE.md)
 doco-cd/            # doco-cd deploy configs (one per host) + the doco-cd instance itself
@@ -95,7 +95,7 @@ line in `infra/gatus/compose.yaml`.
   (`stacks/CLAUDE.md`). Default new services to tailnet unless people off the tailnet
   need them. Remote access is via the Tailscale subnet router advertising `10.0.1.0/24`
 - Certificates: each Caddy gets its own from Let's Encrypt over DNS-01 (Cloudflare)
-- DNS records: `bootstrap/tofu/cloudflare`, applied by hand from the primary checkout.
+- DNS records: `tofu/cloudflare`, applied by hand from the primary checkout.
   Public hostnames point at the router; tailnet ones at a Caddy's LAN address
 - Auth: Authentik (`stacks/authentik/`) behind `iam.mpdavis.com`. Caddy sites opt into
   forward auth with `import authentik` (`stacks/proxy/authentik.caddy`, a domain-level
@@ -107,5 +107,5 @@ line in `infra/gatus/compose.yaml`.
 
 - `ssh root@10.0.1.55` / `root@10.0.1.58`, then `docker` and `docker compose` for the hosts
 - `docker logs doco-cd-doco-cd-1` for what doco-cd deployed or why it failed
-- `tofu` and `ansible-playbook` for `bootstrap/`, run from the primary checkout
+- `tofu` and `ansible-playbook` for `tofu/` and `ansible/`, run from the primary checkout
 - `bws` for Bitwarden secrets (pass `--color no` when piping its JSON)

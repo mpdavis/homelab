@@ -24,8 +24,8 @@ nothing back to this repo.
 Then:
 
 ```bash
-tofu -chdir=bootstrap/tofu/proxmox apply
-cd bootstrap/ansible
+tofu -chdir=tofu/proxmox apply
+cd ansible
 ansible-playbook playbooks/devbox.yml
 ```
 
@@ -179,7 +179,7 @@ Two things about the daemon worth knowing, because both are silent when wrong:
 ## Adding a repo
 
 The clone list is `devbox_repos` in
-`bootstrap/ansible/roles/devbox/defaults/main.yml`. Add the HTTPS URL and re-run
+`ansible/roles/devbox/defaults/main.yml`. Add the HTTPS URL and re-run
 the playbook; the clone step never touches a repo that already exists, so it
 will not move HEAD or discard uncommitted work on a box you have been using.
 

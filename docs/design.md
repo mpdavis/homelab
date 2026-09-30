@@ -9,7 +9,7 @@ This page is the why. The how lives next to the code:
 |---|---|
 | Deploy path, host runbook, monitoring, adding a service | `docs/compose.md` |
 | Writing a stack: exposure, routing, secrets, pinning | `stacks/CLAUDE.md`, `infra/CLAUDE.md` |
-| Proxmox guests, DNS records, alert routing | `bootstrap/tofu/CLAUDE.md` |
+| Proxmox guests, DNS records, alert routing | `tofu/CLAUDE.md` |
 | Images built from this repo | `images/CLAUDE.md` |
 | The development host | `docs/devbox.md` |
 
@@ -140,7 +140,7 @@ worker on startup.
 ### DNS
 
 Cloudflare is authoritative for `mpdavis.com`. Every record is managed in
-`bootstrap/tofu/cloudflare` as a hostname mapped to a named target (`public`,
+`tofu/cloudflare` as a hostname mapped to a named target (`public`,
 `compose_tailnet`, `infra_tailnet`), applied by hand. There is no wildcard
 record: per-service records resolve only hostnames that exist.
 
@@ -209,8 +209,8 @@ is the correction.
 
 ### Shape
 
-- **Provisioning:** `bootstrap/tofu/proxmox` (container `devbox`), then
-  `bootstrap/ansible/playbooks/devbox.yml`.
+- **Provisioning:** `tofu/proxmox` (container `devbox`), then
+  `ansible/playbooks/devbox.yml`.
 - **Privileged LXC with nesting**, for two reasons: tailscaled needs
   `/dev/net/tun` — passed through by Tofu's `device_passthrough`, exactly as
   for `tailscale-router` — and Docker will not start in a container without

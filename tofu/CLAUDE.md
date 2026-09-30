@@ -14,7 +14,7 @@ State and `terraform.tfvars` are local files, git-ignored, and exist **only** in
 `~/git/homelab` — never in a worktree. Run against that path:
 
 ```sh
-tofu -chdir=~/git/homelab/bootstrap/tofu/cloudflare plan
+tofu -chdir=~/git/homelab/tofu/cloudflare plan
 ```
 
 Pull that checkout first, or you plan against stale config.

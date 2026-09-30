@@ -2,7 +2,7 @@
 # Provisions the Docker Compose host and starts doco-cd, which then deploys
 # stacks/ from this repo. See docs/compose.md for the runbook.
 #
-#   tofu -chdir=bootstrap/tofu/proxmox apply
+#   tofu -chdir=tofu/proxmox apply
 #   ansible-playbook playbooks/docker-host.yml
 
 - name: Configure Docker hosts

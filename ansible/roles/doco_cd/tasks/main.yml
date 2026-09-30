@@ -37,7 +37,7 @@
 
 - name: Copy the doco-cd compose file
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../../../doco-cd/compose.yaml"
+    src: "{{ playbook_dir }}/../../doco-cd/compose.yaml"
     dest: "{{ doco_cd_dir }}/compose.yaml"
     mode: "0644"
 
