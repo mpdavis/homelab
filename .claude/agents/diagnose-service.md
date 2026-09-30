@@ -24,21 +24,21 @@ containers, and querying APIs is fine.
 
 | Host | Address | Runs |
 |---|---|---|
-| `docker` VM (pve2) | 10.0.1.55 | everything in `stacks/`; holds the RTX 3050 |
-| `infra` VM (pve1) | 10.0.1.58 | everything in `infra/`: its Caddy, Gatus, ntfy |
+| `docker` VM (pve2) | 10.0.1.55 | everything in `docker/stacks/`; holds the RTX 3050 |
+| `infra` VM (pve1) | 10.0.1.58 | everything in `docker/infra/`: its Caddy, Gatus, ntfy |
 | Unifi NAS | 10.0.1.6 | NFS (v3 only) for media and bulk data |
 
 - **Deploys**: doco-cd on each host polls `main` every 60s and deploys changed stacks
-  (`stacks/<stack>/compose.yaml`, secrets from Bitwarden UUIDs in `.doco-cd.yml`). A failed
-  deploy is retried on every poll. Stack rules: `stacks/CLAUDE.md`; runbook: `docs/compose.md`.
+  (`docker/stacks/<stack>/compose.yaml`, secrets from Bitwarden UUIDs in `.doco-cd.yml`). A failed
+  deploy is retried on every poll. Stack rules: `docker/stacks/CLAUDE.md`; runbook: `docs/compose.md`.
 - **Ingress**: Caddy. On the compose host, `caddy-public` binds 10.0.1.56 (the router forwards
   443 there) and `caddy-tailnet` binds 10.0.1.57; the infra host's Caddy binds 10.0.1.58.
   A hostname is served by exactly one Caddyfile. Forward auth: `import authentik`
-  (`stacks/proxy/authentik.caddy`) against `authentik-server:9000`; Authentik serves
+  (`docker/stacks/proxy/authentik.caddy`) against `authentik-server:9000`; Authentik serves
   `iam.mpdavis.com`.
 - **DNS**: Cloudflare records in `tofu/cloudflare` (`records`), applied by hand
   from the primary checkout — a merged record may not be applied yet.
-- **Monitoring**: Gatus (`infra/gatus/`) probes every service; alerts and host metrics live
+- **Monitoring**: Gatus (`docker/infra/gatus/`) probes every service; alerts and host metrics live
   in Grafana Cloud (`grafana-cloud/rules/`), delivered to ntfy.
 
 ## Where to look
@@ -52,7 +52,7 @@ Start broad, then narrow to the failing service.
      '.[] | select(.results[-1].success == false) | "\(.group)/\(.name): \(.results[-1].errors)"'
    ```
 
-   Gatus reaches every `*.mpdavis.com` through `extra_hosts` in `infra/gatus/compose.yaml`, so
+   Gatus reaches every `*.mpdavis.com` through `extra_hosts` in `docker/infra/gatus/compose.yaml`, so
    an HTTP check can pass while public DNS is wrong; the `dns-*` checks cover the records.
 
 2. **Containers** on the host that runs the stack:

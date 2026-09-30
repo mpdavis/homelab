@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Offline checks for the compose side of the repo — what doco-cd would
 # otherwise only discover on the host after merge:
-#   - every compose file under the stack trees and doco-cd/ renders
+#   - every compose file under the stack trees and docker/doco-cd/ renders
 #   - every external_secrets entry is shaped like a Bitwarden UUID
 #   - every stack tree has a doco-cd deploy config that discovers it
 #   - every Caddyfile parses with the Caddy build the host will run
@@ -10,9 +10,9 @@
 #   - every host runs the same monitoring agent config
 set -euo pipefail
 
-# One tree per host: stacks/ is the compose host, infra/ the infra host.
-trees=(stacks infra)
-doco="doco-cd"
+# One tree per host: docker/stacks/ is the compose host, docker/infra/ the infra host.
+trees=(docker/stacks docker/infra)
+doco="docker/doco-cd"
 status=0
 # The Cloudflare module rejects anything not shaped like a real token (40
 # chars of [A-Za-z0-9_-]) at provision time, so "placeholder" fails validate.
@@ -69,9 +69,9 @@ for compose in "$doco"/compose*.yaml; do
 done
 
 for tree in "${trees[@]}"; do
-  # stacks/ is the default deploy config; every other tree needs a target.
+  # docker/stacks/ is the default deploy config; every other tree needs a target.
   cfg="$doco/.doco-cd.yaml"
-  [ "$tree" = stacks ] || cfg="$doco/.doco-cd.$tree.yaml"
+  [ "$tree" = docker/stacks ] || cfg="$doco/.doco-cd.${tree##*/}.yaml"
   grep -q "^working_dir: $tree\$" "$cfg" 2>/dev/null ||
     fail "$cfg does not discover $tree/, so nothing would deploy it"
 done

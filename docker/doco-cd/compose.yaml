@@ -13,8 +13,8 @@ services:
     restart: unless-stopped
     environment:
       TZ: America/Chicago
-      # Keeps the deploy configs in doco-cd/ instead of the repo root.
-      DEPLOY_CONFIG_BASE_DIR: doco-cd
+      # Keeps the deploy configs in docker/doco-cd/ instead of the repo root.
+      DEPLOY_CONFIG_BASE_DIR: docker/doco-cd
       SELF_UPDATE_ENABLED: "true"
       POLL_CONFIG: |
         - url: https://github.com/mpdavis/homelab.git

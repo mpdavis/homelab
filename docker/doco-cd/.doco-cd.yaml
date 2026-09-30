@@ -1,13 +1,13 @@
 # doco-cd itself. name and the service must match the running container's
 # compose project and service, or it deploys a second doco-cd beside itself.
 name: doco-cd
-working_dir: doco-cd
+working_dir: docker/doco-cd
 compose_files: [compose.yaml]
 
 ---
-# Every directory under stacks/ is one compose project. A stack's own
+# Every directory under docker/stacks/ is one compose project. A stack's own
 # .doco-cd.yml (e.g. its external_secrets) is merged over this.
-working_dir: stacks
+working_dir: docker/stacks
 auto_discovery:
   enabled: true
   depth: 1
