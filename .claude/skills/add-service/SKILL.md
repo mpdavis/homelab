@@ -124,8 +124,8 @@ In `infra/gatus/`:
 - the image reference resolves (`image-pin-check` does this in CI)
 - the NAS export allowlist includes the host if it mounts NFS (`showmount -e 10.0.1.6`)
 
-After merge, confirm the deploy in doco-cd's log (`ssh root@10.0.1.55 docker logs
-doco-cd-doco-cd-1`), then `curl --resolve <host>:443:<caddy ip> https://<host>/`, and
+After merge, confirm the deploy in doco-cd's log (`ssh root@10.0.1.55 docker compose -p
+doco-cd logs doco-cd`), then `curl --resolve <host>:443:<caddy ip> https://<host>/`, and
 that its Gatus checks go green once the DNS record is applied.
 
 ## Checklist

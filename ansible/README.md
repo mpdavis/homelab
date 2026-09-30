@@ -64,6 +64,6 @@ Every guest play starts with `common`; the rest are applied by group.
 | `gpu` | `gpu` hosts | NVIDIA driver and container toolkit; reboots once to load a fresh driver |
 | `docker` | docker hosts, devbox | Docker Engine, daemon config, shared networks |
 | `service_ips` | docker hosts | Extra addresses on the primary interface (netplan drop-in) |
-| `doco_cd` | docker hosts | Bitwarden token and the doco-cd instance |
+| `doco_cd` | docker hosts | Bitwarden token and doco-cd's first start; doco-cd updates itself after that |
 | `tailscale` | tailscale-router, devbox | tailscaled and first `tailscale up` |
 | `devbox` | devbox | User, shell, tooling, repos for the development host |

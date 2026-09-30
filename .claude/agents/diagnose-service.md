@@ -70,7 +70,7 @@ Start broad, then narrow to the failing service.
 3. **doco-cd** — did the merge deploy, and did it fail:
 
    ```sh
-   ssh root@10.0.1.55 'docker logs --since 1h doco-cd-doco-cd-1 2>&1' | \
+   ssh root@10.0.1.55 'docker compose -p doco-cd logs --no-log-prefix --since 1h doco-cd 2>&1' | \
      jq -r 'select(.deploy.stack != null) | "\(.time) \(.level) \(.msg) \(.deploy.stack) \(.deploy.error // "")"'
    ```
 

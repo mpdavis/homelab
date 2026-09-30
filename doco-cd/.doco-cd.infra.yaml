@@ -1,5 +1,13 @@
-# The infra host's tree (poll target `infra`); .doco-cd.yaml is the compose
-# host's.
+# The infra host's deploy config (poll target `infra`); .doco-cd.yaml is the
+# compose host's.
+name: doco-cd
+working_dir: doco-cd
+compose_files: [compose.yaml]
+# Keeps this host polling its own target after doco-cd redeploys itself.
+environment:
+  DOCO_TARGET: infra
+
+---
 working_dir: infra
 auto_discovery:
   enabled: true
