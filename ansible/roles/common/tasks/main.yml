@@ -25,16 +25,22 @@
     state: present
 
 # Reboot rather than hang on a kernel panic, since nobody is at the console.
-# The file keeps its k3s-era name: a new name would leave the old one behind.
 - name: Set panic and overcommit sysctls
   ansible.builtin.sysctl:
     name: "{{ item.key }}"
     value: "{{ item.value }}"
-    sysctl_file: /etc/sysctl.d/99-k3s.conf
+    sysctl_file: /etc/sysctl.d/99-homelab.conf
     reload: true
   loop:
     - { key: kernel.panic, value: "10" }
     - { key: kernel.panic_on_oops, value: "1" }
     - { key: vm.overcommit_memory, value: "1" }
+  when: node_type == 'vm'
+
+# Where these settings lived before the rename; drop once no host has it.
+- name: Remove the previous sysctl file
+  ansible.builtin.file:
+    path: /etc/sysctl.d/99-k3s.conf
+    state: absent
   when: node_type == 'vm'
 

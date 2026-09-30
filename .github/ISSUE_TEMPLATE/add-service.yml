@@ -1,5 +1,5 @@
 name: Add a new service
-description: Request a new application/service be deployed to the homelab k3s cluster
+description: Request a new application/service be deployed to the homelab
 title: "Add service: <service-name>"
 # Issues from this form are auto-labeled `new service`, which triggers
 # .github/workflows/new-service.yml to research the service and open a PR.
