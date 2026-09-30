@@ -1,7 +1,10 @@
-# The doco-cd instance that deploys the stacks. Applied by the doco_cd Ansible
-# role, not by doco-cd itself — an instance can't safely recreate its own
-# container mid-deploy. Renovate bumps the image here like any other; applying
-# that bump is a playbook run today.
+# The doco-cd instance on each host. doco-cd deploys this stack itself (the
+# `doco-cd` deployment in each host's deploy config), so a Renovate bump is a
+# merge like any other. The doco_cd Ansible role only starts the first
+# instance on a host; see docs/compose.md.
+#
+# Self-update hands over to a second container (scale_out); container_name or
+# published ports would force it to stop-and-replace instead.
 name: doco-cd
 
 services:
@@ -12,6 +15,7 @@ services:
       TZ: America/Chicago
       # Keeps the deploy configs in doco-cd/ instead of the repo root.
       DEPLOY_CONFIG_BASE_DIR: doco-cd
+      SELF_UPDATE_ENABLED: "true"
       POLL_CONFIG: |
         - url: https://github.com/mpdavis/homelab.git
           reference: main
@@ -27,6 +31,18 @@ services:
       - data:/data
     cap_drop:
       - ALL
+    # Same check as the image's; self-update gates the handover on it, and
+    # falls back to a slower exec probe when the service declares none.
+    healthcheck:
+      test: ["CMD", "/doco-cd", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
 
 volumes:
+  # External so a self-update can never recreate it: it holds the clone and
+  # the handover journal. The Ansible role creates it.
   data:
+    name: doco-cd_data
+    external: true

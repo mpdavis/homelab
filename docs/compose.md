@@ -14,7 +14,7 @@ routing, secrets, pinning — live in `stacks/CLAUDE.md` and `infra/CLAUDE.md`.
 doco-cd/
   .doco-cd.yaml           # what the compose host deploys: everything in stacks/
   .doco-cd.infra.yaml     # what the infra host deploys: everything in infra/
-  compose.yaml            # the doco-cd instance itself (applied by Ansible)
+  compose.yaml            # the doco-cd instance itself, which deploys it too
 stacks/                   # the compose host's projects
   <stack>/                # one compose project per stack, auto-discovered
     compose.yaml
@@ -31,7 +31,8 @@ infra/                    # the infra host's projects, same shape
 
 Each host runs one doco-cd, told which tree to deploy by its poll target: the
 compose host uses the default config, the infra host sets `DOCO_TARGET=infra`
-(`doco_cd_target` in the inventory). A third host would add a tree and a
+(`doco_cd_target` in the inventory for the first start, `environment` in
+`.doco-cd.infra.yaml` after that). A third host would add a tree and a
 `.doco-cd.<target>.yaml`.
 
 ## How a change deploys
@@ -46,16 +47,29 @@ When a commit touches a stack, doco-cd:
 Deleting a stack's directory removes the project. Its volumes are kept.
 doco-cd also restarts containers that turn unhealthy.
 
-**doco-cd does not deploy itself.** Recreating its own container mid-deploy would
-kill the deploy, so the `doco_cd` Ansible role owns `doco-cd/compose.yaml`:
-re-running the playbook applies a version bump or any other change to it.
-Renovate bumps the pinned image there like any other. Handing that apply to a
-GitHub Action, or to a second doco-cd instance that only deploys the first, is
-open.
+**doco-cd deploys itself.** Each host's deploy config lists a `doco-cd`
+deployment for `doco-cd/compose.yaml`, and `SELF_UPDATE_ENABLED` lets it
+replace its own container
+([Self-Updating](https://doco.cd/latest/Advanced/Self-Updating/)), so a
+Renovate bump is a merge like any other. It starts the new container beside
+the old one and hands over only once the new one is healthy. A version that
+never turns healthy is discarded, and that commit is not retried; the next
+commit is. The container's number grows with each handover (`doco-cd-2`,
+`-3`, …), so reach it by project, not by name.
+
+Self-update refuses a change to the `doco-cd_data` volume, since a rollback
+could not restore it, so that needs doing by hand. Recreating doco-cd's
+project network falls back to a stop-and-replace handover, a short outage.
+
+The `doco_cd` Ansible role only starts the first instance, and skips a host
+where doco-cd already manages itself, so re-running the playbook never rolls
+back what doco-cd deployed. A bad release that doco-cd cannot replace on its
+own: `docker compose -p doco-cd down` on the host, then run the playbook
+from a checkout that pins a working version.
 
 A failed deploy raises `DocoCdDeploymentFailed` in ntfy, from doco-cd's
-metrics (see Monitoring below); `docker logs -f doco-cd-doco-cd-1` on the host
-has the reason.
+metrics (see Monitoring below); `docker compose -p doco-cd logs -f doco-cd` on
+the host has the reason.
 
 ## Monitoring
 

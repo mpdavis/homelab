@@ -77,7 +77,7 @@ groups:
           summary: "doco-cd failed to deploy {{ $labels.deployment }} on {{ $labels.host }}"
           description: >-
             A deploy of {{ $labels.deployment }} on {{ $labels.host }} errored.
-            `docker logs doco-cd-doco-cd-1` on the host has the reason.
+            `docker compose -p doco-cd logs doco-cd` on the host has the reason.
 
       # Polls every 60s; a few misses are a GitHub blip, 15 minutes of them
       # means nothing merged is reaching the host.

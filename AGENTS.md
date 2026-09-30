@@ -106,6 +106,6 @@ line in `infra/gatus/compose.yaml`.
 ## Key Tools
 
 - `ssh root@10.0.1.55` / `root@10.0.1.58`, then `docker` and `docker compose` for the hosts
-- `docker logs doco-cd-doco-cd-1` for what doco-cd deployed or why it failed
+- `docker compose -p doco-cd logs doco-cd` for what doco-cd deployed or why it failed
 - `tofu` and `ansible-playbook` for `tofu/` and `ansible/`, run from the primary checkout
 - `bws` for Bitwarden secrets (pass `--color no` when piping its JSON)

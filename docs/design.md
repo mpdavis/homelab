@@ -247,3 +247,5 @@ what to move to NFS first.
 | 2026-09-25 | Grafana Cloud for monitoring | Off-site alerting is the win: a dead homelab still pages. Self-hosting stays possible — the agent and rules are standard formats |
 | 2026-09-27 | Retired homeassistant, minecraft and holmes | Not in use; not worth migrating. Their data is archived on the NAS under `homelab/retired/` |
 | 2026-09-27 | GPU moved to the compose host | Emby and Ollama are its only consumers, and both run there |
+| 2026-09-30 | doco-cd deploys itself (self-update) | A Renovate bump used to wait for a playbook run, and hosts drifted behind the pinned version. doco-cd now hands over to a new container only once it is healthy |
+| 2026-09-30 | One doco-cd per host, not one instance using Docker contexts | A remote context cannot bind-mount files from doco-cd's clone, and most stacks mount their config that way. Inlining them as compose `configs` costs more than a second self-updating instance does |
