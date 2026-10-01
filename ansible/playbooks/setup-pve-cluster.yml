@@ -17,9 +17,15 @@
         src: /root/.ssh/id_ed25519.pub
       register: root_pub_key
 
-    - name: Store public key as fact
+    - name: Read SSH host key
+      ansible.builtin.slurp:
+        src: /etc/ssh/ssh_host_ed25519_key.pub
+      register: host_pub_key
+
+    - name: Store public keys as facts
       ansible.builtin.set_fact:
         pve_root_pub_key: "{{ root_pub_key.content | b64decode | trim }}"
+        pve_host_pub_key: "{{ (host_pub_key.content | b64decode).split()[:2] | join(' ') }}"
 
 - name: Distribute SSH keys across PVE nodes
   hosts: pve
@@ -29,19 +35,22 @@
     pve_seed_ip: "{{ hostvars[pve_seed_host].ansible_host }}"
   tasks:
     - name: Authorize all PVE nodes' root keys
-      ansible.builtin.authorized_key:
+      ansible.posix.authorized_key:
         user: root
         key: "{{ hostvars[item].pve_root_pub_key }}"
       loop: "{{ groups['pve'] }}"
       when: item != inventory_hostname
 
-    - name: Scan and trust host keys for all PVE nodes
-      ansible.builtin.shell: |
-        ssh-keyscan -H {{ hostvars[item].ansible_host }} >> /root/.ssh/known_hosts 2>/dev/null
-        sort -u /root/.ssh/known_hosts -o /root/.ssh/known_hosts
+    # Read from each node over the inventory connection rather than scanned
+    # over the network, so the trust is not first-use.
+    - name: Trust host keys for all PVE nodes
+      ansible.builtin.known_hosts:
+        path: /root/.ssh/known_hosts
+        name: "{{ hostvars[item].ansible_host }}"
+        key: "{{ hostvars[item].ansible_host }} {{ hostvars[item].pve_host_pub_key }}"
+        hash_host: true
       loop: "{{ groups['pve'] }}"
       when: item != inventory_hostname
-      changed_when: false
 
 - name: Create Proxmox cluster on seed node
   hosts: pve[0]
@@ -57,6 +66,7 @@
     - name: Create cluster
       ansible.builtin.command: pvecm create {{ pve_cluster_name }}
       when: cluster_status.rc != 0
+      changed_when: true
 
 - name: Join remaining nodes to cluster
   hosts: pve:!pve[0]
@@ -74,3 +84,4 @@
     - name: Join cluster
       ansible.builtin.command: pvecm add {{ pve_seed_ip }} --use_ssh
       when: cluster_status.rc != 0
+      changed_when: true

@@ -1,0 +1,5 @@
+---
+skip_list:
+  # AGENTS.md puts `become: true` on the play, so a task's become_user already
+  # has become in effect; repeating it per task is noise.
+  - partial-become

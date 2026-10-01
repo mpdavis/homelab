@@ -15,20 +15,23 @@ Automated PR checks for this repo. The Claude-powered ones use the official
 | `grafana-cloud.yml` | PRs + push to `main` touching `grafana-cloud/**` (advisory) | Validates the Grafana Cloud alert rules with `mimirtool` on PRs; on `main`, syncs them into the stack's Grafana as Grafana-managed rules. Their notification routing is `tofu/grafana`, not this workflow. |
 | `lint-shell.yml` | PRs touching `**/*.sh` (advisory) | shellcheck over the changed shell scripts. Config `.shellcheckrc`. |
 | `lint-markdown.yml` | PRs touching `**/*.md` (advisory) | markdownlint-cli2 over the changed Markdown files. Config `.markdownlint-cli2.jsonc`. |
+| `lint-ansible.yml` | PRs touching `ansible/**` (advisory) | ansible-lint over the whole `ansible/` tree. Config `ansible/.ansible-lint`. |
 | `lint-secrets.yml` | All PRs + push to `main` (advisory, no `paths` filter) | gitleaks over the commit range the PR/push adds. Config `.gitleaks.toml`. Backstop for a credential that bypasses the `.doco-cd.yml` pattern. |
 
 ## Lint checks
 
-The three linters are **advisory** — none is on main's ruleset — and the shell and
-Markdown ones are **`paths`-filtered** to the file type they own. On a pull request
-each lints only the files that PR changed, so an existing backlog does not wall off
-unrelated work; `workflow_dispatch` runs the same tool over the whole tree for a
-deliberate cleanup pass.
+The four linters are **advisory** — none is on main's ruleset — and the shell,
+Markdown and Ansible ones are **`paths`-filtered** to the files they own. On a pull
+request shellcheck and markdownlint lint only the files that PR changed, so an existing
+backlog does not wall off unrelated work; `workflow_dispatch` runs the same tool over
+the whole tree for a deliberate cleanup pass. ansible-lint always runs over the whole
+tree, which has no backlog.
 
 | Tool | Scope | Config | Notes |
 |---|---|---|---|
 | [shellcheck](https://github.com/koalaman/shellcheck) | tracked `*.sh` | `.shellcheckrc` | Scripts embedded in workflow `run:` blocks are **not** covered — that needs actionlint, which this repo does not run yet. |
 | [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) | `*.md` | `.markdownlint-cli2.jsonc` | `MD013`/`MD033`/`MD041` disabled; vendored trees (`.claude/`, `.venv`, caches) in `ignores`. |
+| [ansible-lint](https://github.com/ansible/ansible-lint) | whole `ansible/` tree | `ansible/.ansible-lint` | Lints the whole tree, which is clean at the `production` profile. CI copies `network.example.yaml` to `network.yaml` so the inventory parses. |
 | [gitleaks](https://github.com/gitleaks/gitleaks) | whole repo, commit range only | `.gitleaks.toml` | No `paths` filter — a leak can be anywhere. Allowlists lockfiles, test fixtures, Bitwarden UUIDs, and the git-ignored local files. |
 
 **Version pins** live as renovate-annotated `*_VERSION` env vars in each workflow,

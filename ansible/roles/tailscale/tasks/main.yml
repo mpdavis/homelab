@@ -12,18 +12,14 @@
     mode: "0644"
   register: tailscale_repo
 
-- name: Update apt cache
-  ansible.builtin.apt:
-    update_cache: true
-  when: tailscale_repo.changed
-
 - name: Install tailscale
   ansible.builtin.apt:
     name: tailscale
     state: present
+    update_cache: "{{ tailscale_repo is changed }}"
 
 - name: Enable IP forwarding for subnet routing
-  ansible.builtin.sysctl:
+  ansible.posix.sysctl:
     name: "{{ item }}"
     value: "1"
     sysctl_file: /etc/sysctl.d/99-tailscale.conf

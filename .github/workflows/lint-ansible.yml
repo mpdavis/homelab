@@ -1,0 +1,49 @@
+name: Lint · Ansible
+
+# ansible-lint over ansible/. Advisory: NOT on main's ruleset, and paths-filtered.
+# Unlike the shell and Markdown linters it runs over the whole tree, not just the
+# changed files: the tree is clean, and a rename in one role can break another.
+#
+# Config lives in ansible/.ansible-lint; collections in ansible/requirements.yml,
+# which ansible-lint installs itself.
+
+on:
+  pull_request:
+    paths:
+      - 'ansible/**'
+      - 'network.example.yaml'
+      - '.github/workflows/lint-ansible.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-ansible-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # renovate: datasource=pypi depName=ansible-lint
+  ANSIBLE_LINT_VERSION: "26.9.0"
+
+jobs:
+  ansible-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Install ansible-lint
+        run: pip install "ansible-lint==${ANSIBLE_LINT_VERSION}"
+
+      # The inventory reads network.yaml and ansible.cfg refuses to fall back
+      # when it cannot; the example has every host the inventory names.
+      - name: Provide network.yaml
+        run: cp network.example.yaml network.yaml
+
+      - name: Run ansible-lint
+        working-directory: ansible
+        run: ansible-lint
