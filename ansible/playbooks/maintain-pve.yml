@@ -1,0 +1,36 @@
+---
+# Patches the Proxmox nodes one at a time. A node reboots only onto a new
+# kernel, which restarts every guest on it, so expect the compose host (pve2)
+# or the infra host and LXCs (pve1) to go down with it. Run it from the Mac,
+# not devbox, which lives on pve1.
+#
+#   ansible-playbook playbooks/maintain-pve.yml
+
+- name: Start Proxmox maintenance
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Annotate Grafana
+      ansible.builtin.import_role:
+        name: grafana_annotation
+        tasks_from: start
+      vars:
+        grafana_annotation_tags: [maintenance, pve]
+        grafana_annotation_text: Proxmox patching (maintain-pve.yml)
+
+- name: Patch Proxmox nodes
+  hosts: pve
+  serial: 1
+  become: true
+  roles:
+    - apt_upgrade
+    - pve_reboot
+
+- name: Finish Proxmox maintenance
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Close the Grafana annotation
+      ansible.builtin.import_role:
+        name: grafana_annotation
+        tasks_from: finish

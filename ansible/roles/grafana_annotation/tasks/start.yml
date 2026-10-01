@@ -1,0 +1,37 @@
+---
+# A missing bws or access token only costs the annotation, not the run.
+- name: Fetch the Grafana token from Bitwarden
+  ansible.builtin.set_fact:
+    grafana_annotation_token: >-
+      {{ (lookup('ansible.builtin.pipe',
+                 'bws secret get ' ~ grafana_annotation_bws_secret ~ ' --color no',
+                 errors='warn')
+          | default('{}', true) | from_json).value | default('') }}
+  when: grafana_annotation_token | length == 0
+  no_log: true
+
+- name: Open the maintenance annotation
+  when: grafana_annotation_token | length > 0
+  block:
+    - name: Record when maintenance started
+      ansible.builtin.set_fact:
+        grafana_annotation_start: "{{ (now().timestamp() * 1000) | int }}"
+
+    - name: Create the annotation
+      ansible.builtin.uri:
+        url: "{{ grafana_annotation_url }}/api/annotations"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ grafana_annotation_token }}"
+        body_format: json
+        body:
+          time: "{{ grafana_annotation_start | int }}"
+          tags: "{{ grafana_annotation_tags }}"
+          text: "{{ grafana_annotation_text }}"
+      register: grafana_annotation_created
+
+    # Facts outlive the play, so finish.yml in the playbook's last play can
+    # still find the annotation.
+    - name: Remember the annotation
+      ansible.builtin.set_fact:
+        grafana_annotation_id: "{{ grafana_annotation_created.json.id }}"

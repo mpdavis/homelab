@@ -1,0 +1,51 @@
+---
+# Patches every guest one at a time, rebooting those an update asks for. Run
+# it from the Mac, not devbox: devbox reboots itself here.
+#
+#   ansible-playbook playbooks/maintain-guests.yml
+
+- name: Start guest maintenance
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Annotate Grafana
+      ansible.builtin.import_role:
+        name: grafana_annotation
+        tasks_from: start
+      vars:
+        grafana_annotation_tags: [maintenance, guests]
+        grafana_annotation_text: Guest patching (maintain-guests.yml)
+
+- name: Patch guests
+  hosts: all:!pve
+  serial: 1
+  become: true
+  roles:
+    - apt_upgrade
+    - reboot_required
+
+# Rebooting here too, as unattended-upgrades leaves the driver to this playbook
+# (see roles/gpu) and its upgrade doesn't always flag a reboot.
+- name: Load an upgraded NVIDIA driver
+  hosts: gpu
+  become: true
+  tasks:
+    - name: Reboot if the loaded driver no longer matches its libraries
+      ansible.builtin.import_role:
+        name: gpu
+        tasks_from: verify
+
+- name: Clean up Docker
+  hosts: docker_hosts:development
+  become: true
+  roles:
+    - docker_prune
+
+- name: Finish guest maintenance
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Close the Grafana annotation
+      ansible.builtin.import_role:
+        name: grafana_annotation
+        tasks_from: finish

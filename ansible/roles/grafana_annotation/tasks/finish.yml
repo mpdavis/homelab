@@ -1,0 +1,14 @@
+---
+# A failed run never gets here, which leaves a point annotation marking where
+# maintenance started.
+- name: Close the maintenance annotation
+  ansible.builtin.uri:
+    url: "{{ grafana_annotation_url }}/api/annotations/{{ grafana_annotation_id }}"
+    method: PATCH
+    headers:
+      Authorization: "Bearer {{ grafana_annotation_token }}"
+    body_format: json
+    body:
+      time: "{{ grafana_annotation_start | int }}"
+      timeEnd: "{{ (now().timestamp() * 1000) | int }}"
+  when: grafana_annotation_id is defined
