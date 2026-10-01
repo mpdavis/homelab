@@ -16,3 +16,7 @@ docker_apt_repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https:
 # stack, because doco-cd deploys stacks in parallel — no stack can be relied
 # on to create one before the others attach to it.
 docker_networks: []
+
+# Keeps a recently replaced image around, so rolling a stack back doesn't wait
+# on a pull.
+docker_prune_until: 168h

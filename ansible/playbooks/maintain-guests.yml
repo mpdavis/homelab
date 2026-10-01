@@ -38,8 +38,11 @@
 - name: Clean up Docker
   hosts: docker:development
   become: true
-  roles:
-    - docker_prune
+  tasks:
+    - name: Remove unused images and build cache
+      ansible.builtin.import_role:
+        name: docker
+        tasks_from: prune
 
 - name: Finish guest maintenance
   hosts: localhost
