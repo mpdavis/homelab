@@ -86,7 +86,7 @@ prometheus.relabel "cadvisor" {
 // ---- App metrics: containers that opt in ----
 // A container labelled homelab.metrics.port=<port> is scraped at its address
 // on the proxy network, which Alloy joins on every host. Only the series an
-// alert uses are kept (see the budget note at the top).
+// alert or dashboard uses are kept (see the budget note at the top).
 discovery.relabel "app_metrics" {
   targets = discovery.docker.containers.targets
 
@@ -122,7 +122,7 @@ prometheus.scrape "app" {
 prometheus.relabel "app" {
   rule {
     source_labels = ["__name__"]
-    regex         = "up|gatus_results_endpoint_success"
+    regex         = "up|gatus_results_endpoint_success|cs_(active_decisions|bucket_overflowed_total|parser_hits_(ok|ko)_total|filesource_hits_total|appsec_(reqs|block)_total|appsec_rule_hits|lapi_bouncer_requests_total)"
     action        = "keep"
   }
 
