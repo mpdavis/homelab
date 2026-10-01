@@ -31,14 +31,19 @@ services:
       DOT: "off"
       DNS_ADDRESS: 1.1.1.1
       TZ: America/Chicago
-    # The image's check covers the VPN; a failed NAT-PMP renewal instead
-    # empties the forwarded-port file and leaves the client unconnectable while
-    # the tunnel still looks healthy, so both have to hold.
+    volumes:
+      - ./gluetun-auth.toml:/gluetun/auth/config.toml:ro
+    # The image's check covers the VPN; a failed NAT-PMP forward instead leaves
+    # the client unconnectable while the tunnel still looks healthy, so both
+    # have to hold. Ask the control server rather than test the port file, which
+    # survives a container restart and so can hold a port that is gone. Five
+    # retries give pf-watchdog's in-place VPN cycle the first try; a restart
+    # strands qbittorrent and mousehole for a few minutes.
     healthcheck:
-      test: ["CMD-SHELL", "/gluetun-entrypoint healthcheck && test -s /tmp/gluetun/forwarded_port"]
+      test: ["CMD-SHELL", "/gluetun-entrypoint healthcheck && wget -qO- http://127.0.0.1:8000/v1/portforward | grep -q '\"port\":[1-9]'"]
       interval: 60s
       timeout: 10s
-      retries: 3
+      retries: 5
       start_period: 300s
       start_interval: 10s
     networks:
@@ -100,6 +105,29 @@ services:
     # qbittorrent.
     healthcheck:
       test: ["CMD-SHELL", "bun -e \"try { const h = await fetch('http://localhost:5010/health'); await fetch('http://localhost:8000/'); process.exit(h.ok ? 0 : 1) } catch { process.exit(1) }\""]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Retries a failed port forward without restarting gluetun, and re-pushes the
+  # port to qbittorrent when gluetun's one-shot up command missed it.
+  pf-watchdog:
+    image: curlimages/curl:8.22.0
+    restart: unless-stopped
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
+        restart: true
+    # A shell loop as PID 1 ignores SIGTERM; tini passes it on.
+    init: true
+    entrypoint: ["/bin/sh", "/pf-watchdog.sh"]
+    volumes:
+      - ./pf-watchdog.sh:/pf-watchdog.sh:ro
+    # The same stranded-namespace test as qbittorrent.
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "--max-time", "5", "http://127.0.0.1:8000/"]
       interval: 60s
       timeout: 10s
       retries: 3
