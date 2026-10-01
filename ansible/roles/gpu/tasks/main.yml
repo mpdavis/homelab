@@ -38,22 +38,14 @@
 # restart. `--gpus` and `driver: nvidia` would need one: Docker only looks for
 # the toolkit's hook when the daemon starts.
 
-# A freshly built DKMS module is not loaded until the next boot.
-- name: Check whether the driver is loaded
-  ansible.builtin.command: nvidia-smi
-  register: nvidia_smi_probe
-  changed_when: false
-  failed_when: false
+# Unattended-upgrades upgrades the driver's userspace under the loaded kernel
+# module, and every GPU call then fails "Driver/library version mismatch"
+# until a reboot. Leave the driver to maintain-guests.yml, which reboots after.
+- name: Keep unattended-upgrades away from the NVIDIA driver
+  ansible.builtin.template:
+    src: 51-nvidia-blacklist.j2
+    dest: /etc/apt/apt.conf.d/51-nvidia-blacklist
+    mode: "0644"
 
-- name: Reboot to load the driver
-  ansible.builtin.reboot:
-  when: nvidia_smi_probe.rc != 0
-
-- name: Verify GPU is visible
-  ansible.builtin.command: nvidia-smi
-  register: nvidia_smi
-  changed_when: false
-
-- name: Display GPU info
-  ansible.builtin.debug:
-    var: nvidia_smi.stdout_lines
+- name: Load and verify the driver
+  ansible.builtin.import_tasks: verify.yml

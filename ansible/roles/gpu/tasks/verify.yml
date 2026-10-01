@@ -1,0 +1,20 @@
+---
+# A freshly built or upgraded driver is not loaded until the next boot.
+- name: Check whether the driver is loaded
+  ansible.builtin.command: nvidia-smi
+  register: nvidia_smi_probe
+  changed_when: false
+  failed_when: false
+
+- name: Reboot to load the driver
+  ansible.builtin.reboot:
+  when: nvidia_smi_probe.rc != 0
+
+- name: Verify GPU is visible
+  ansible.builtin.command: nvidia-smi
+  register: nvidia_smi
+  changed_when: false
+
+- name: Display GPU info
+  ansible.builtin.debug:
+    var: nvidia_smi.stdout_lines
