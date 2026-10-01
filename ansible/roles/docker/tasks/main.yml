@@ -60,6 +60,7 @@
   ansible.builtin.command: docker network ls --format '{{ "{{" }} .Name {{ "}}" }}'
   register: docker_network_list
   changed_when: false
+  check_mode: false
   when: docker_networks | length > 0
 
 - name: Create shared Docker networks

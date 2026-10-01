@@ -12,3 +12,4 @@
       time: "{{ grafana_annotation_start | int }}"
       timeEnd: "{{ (now().timestamp() * 1000) | int }}"
   when: grafana_annotation_id is defined
+  no_log: true

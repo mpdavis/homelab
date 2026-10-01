@@ -1,6 +1,7 @@
 ---
 - name: Prepare SSH trust between PVE nodes
   hosts: pve
+  become: true
   tasks:
     - name: Ensure root SSH key exists
       ansible.builtin.user:
@@ -25,6 +26,7 @@
 
 - name: Distribute SSH keys across PVE nodes
   hosts: pve
+  become: true
   tasks:
     - name: Authorize all PVE nodes' root keys
       ansible.posix.authorized_key:
@@ -46,6 +48,7 @@
 
 - name: Create Proxmox cluster on seed node
   hosts: pve[0]
+  become: true
   tasks:
     - name: Check if cluster already exists
       ansible.builtin.command: pvecm status
@@ -60,6 +63,7 @@
 
 - name: Join remaining nodes to cluster
   hosts: pve:!pve[0]
+  become: true
   serial: 1
   tasks:
     - name: Check if already in cluster

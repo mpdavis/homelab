@@ -35,6 +35,7 @@
   ansible.builtin.command: npm list --global --depth=0 --json
   register: devbox_npm_global
   changed_when: false
+  check_mode: false
   # npm exits non-zero on an unmet peer dependency, which says nothing about
   # the versions installed.
   failed_when: false
@@ -47,8 +48,8 @@
   vars:
     # default('{}', true) covers empty stdout as well as undefined — from_json
     # on "" is a hard failure.
-    installed: "{{ ((devbox_npm_global.stdout | default('{}', true) | from_json).dependencies | default({})) }}"
-  when: (installed[item.name] | default({})).version | default('') != item.version
+    __devbox_npm_installed: "{{ ((devbox_npm_global.stdout | default('{}', true) | from_json).dependencies | default({})) }}"
+  when: (__devbox_npm_installed[item.name] | default({})).version | default('') != item.version
   changed_when: true
 
 - name: Read the installed gh version
@@ -99,6 +100,7 @@
   become_user: "{{ devbox_user }}"
   register: devbox_gh_auth
   changed_when: false
+  check_mode: false
   failed_when: false
 
 - name: Authenticate gh

@@ -19,6 +19,7 @@
     done
   register: pve_intel_nics
   changed_when: false
+  check_mode: false
 
 - name: Create NIC offloading disable service
   ansible.builtin.template:

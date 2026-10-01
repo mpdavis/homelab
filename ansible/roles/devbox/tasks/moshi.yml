@@ -34,6 +34,7 @@
   become_user: "{{ devbox_user }}"
   register: devbox_moshi_status
   changed_when: false
+  check_mode: false
   # Exits non-zero while unpaired, which is the normal first-run state.
   failed_when: false
 

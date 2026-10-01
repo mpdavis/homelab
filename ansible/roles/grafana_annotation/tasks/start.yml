@@ -29,6 +29,7 @@
           tags: "{{ grafana_annotation_tags }}"
           text: "{{ grafana_annotation_text }}"
       register: grafana_annotation_created
+      no_log: true
 
     # Facts outlive the play, so finish.yml in the playbook's last play can
     # still find the annotation.

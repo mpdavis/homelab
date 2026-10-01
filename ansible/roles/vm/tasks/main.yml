@@ -9,3 +9,21 @@
     name: qemu-guest-agent
     enabled: true
     state: started
+
+# Reboot rather than hang on a kernel panic, since nobody is at the console.
+- name: Set panic and overcommit sysctls
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-homelab.conf
+    reload: true
+  loop:
+    - { key: kernel.panic, value: "10" }
+    - { key: kernel.panic_on_oops, value: "1" }
+    - { key: vm.overcommit_memory, value: "1" }
+
+# Where these settings lived before the rename; drop once no host has it.
+- name: Remove the previous sysctl file
+  ansible.builtin.file:
+    path: /etc/sysctl.d/99-k3s.conf
+    state: absent

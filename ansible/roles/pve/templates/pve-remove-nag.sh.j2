@@ -5,6 +5,7 @@
 WEB_JS=/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
 if [ -s "$WEB_JS" ] && ! grep -q NoMoreNagging "$WEB_JS"; then
     sed -i -e "/data\.status/ s/!//" -e "/data\.status/ s/active/NoMoreNagging/" "$WEB_JS"
+    echo "patched $WEB_JS"
 fi
 
 MOBILE_TPL=/usr/share/pve-yew-mobile-gui/index.html.tpl
@@ -28,4 +29,5 @@ if [ -f "$MOBILE_TPL" ] && ! grep -q "$MARKER" "$MOBILE_TPL"; then
       "  setTimeout(function() { observer.disconnect(); }, 10000);" \
       "</script>" \
       "" >> "$MOBILE_TPL"
+    echo "patched $MOBILE_TPL"
 fi

@@ -3,7 +3,7 @@
   ansible.builtin.apt:
     name:
       - build-essential
-      - linux-headers-{{ ansible_kernel }}
+      - linux-headers-{{ ansible_facts['kernel'] }}
     state: present
 
 # Upstream publishes the list only as a file to sed, and the key armored for
@@ -26,14 +26,7 @@
   args:
     creates: /etc/apt/sources.list.d/nvidia-container-toolkit.list
     executable: /bin/bash
-
-- name: Update apt cache after adding NVIDIA repo
-  ansible.builtin.apt:
-    update_cache: true
-  register: gpu_apt_cache
-  until: gpu_apt_cache is success
-  retries: 3
-  delay: 5
+  register: gpu_repo
 
 - name: Install NVIDIA drivers and container toolkit
   ansible.builtin.apt:
@@ -41,6 +34,7 @@
       - nvidia-driver-580
       - nvidia-container-toolkit
     state: present
+    update_cache: "{{ gpu_repo is changed }}"
   register: gpu_install
   until: gpu_install is success
   retries: 3

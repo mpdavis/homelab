@@ -1,7 +1,7 @@
 ---
-- name: Create /etc/homelab
+- name: Create the Bitwarden token directory
   ansible.builtin.file:
-    path: /etc/homelab
+    path: "{{ doco_cd_bws_token_file | dirname }}"
     state: directory
     mode: "0700"
 
@@ -36,11 +36,13 @@
     --filter label=cd.doco.metadata.manager=doco-cd
   register: doco_cd_self_managed
   changed_when: false
+  check_mode: false
 
 - name: Check for the doco-cd data volume
   ansible.builtin.command: docker volume inspect doco-cd_data
   register: doco_cd_volume
   changed_when: false
+  check_mode: false
   failed_when: false
 
 # External in the compose file so a self-update can never recreate it.
@@ -60,7 +62,7 @@
 
     - name: Copy the doco-cd compose file
       ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../../docker/doco-cd/compose.yaml"
+        src: "{{ doco_cd_compose_src }}"
         dest: "{{ doco_cd_dir }}/compose.yaml"
         mode: "0644"
 

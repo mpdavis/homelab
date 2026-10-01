@@ -29,7 +29,7 @@ a worktree, symlink the primary checkout's copy in first.
 | `gpu` | docker | Holds the passthrough GPU |
 | `tailscale_router` | tailscale-router | Tailscale subnet router for the LAN |
 | `development` | devbox | Always-on development host |
-| `lxc` / `vm` | every guest, by type | Sets `node_type`; target platform roles with e.g. `docker_hosts:&vm` |
+| `lxc` / `vm` | every guest, by type | Target platform roles with e.g. `docker_hosts:&vm` |
 
 ## Playbooks
 
@@ -79,9 +79,9 @@ Every guest play starts with `common`; the rest are applied by group.
 | Role | Applied to | Purpose |
 | --- | --- | --- |
 | `pve` | Proxmox hosts | Repos, subscription nag, HA off, NIC offloading, panic/overcommit sysctls, update |
-| `common` | every guest | Cloud-init wait, `resolv.conf`, apt cache, base packages, panic/overcommit sysctls on VMs |
+| `common` | every guest | Cloud-init wait, `resolv.conf`, apt cache, base packages |
 | `lxc` | LXC guests | AppArmor removal, `/dev/kmsg` symlink, shared mount for Docker |
-| `vm` | VM guests | qemu-guest-agent |
+| `vm` | VM guests | qemu-guest-agent, panic/overcommit sysctls |
 | `gpu` | `gpu` hosts | NVIDIA driver and container toolkit, kept out of unattended-upgrades; reboots once to load a fresh driver |
 | `docker` | docker hosts, devbox | Docker Engine, daemon config, shared networks |
 | `service_ips` | docker hosts | Extra addresses (`service_ips_addresses`) on the primary interface (netplan drop-in) |
