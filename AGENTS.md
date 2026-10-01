@@ -13,7 +13,7 @@ doco-cd on each host polls `main` and deploys what changed. The design is in
 ## Architecture
 
 - **Proxmox VE** on two physical nodes (pve1 + pve2)
-- **Compose host** — VM `apps` on pve2 (10.0.1.55). Runs `docker/stacks/`, and holds the
+- **Compose host** — VM `apps` on pve2 (10.0.1.55). Runs `docker/apps/`, and holds the
   NVIDIA RTX 3050 passthrough for Emby transcoding and Ollama
 - **Infra host** — VM `infra` on pve1 (10.0.1.58). Runs `docker/infra/`: what must keep
   working while the compose host is down (Gatus, ntfy, ingress for LAN hosts)
@@ -29,7 +29,7 @@ ansible/            # Host configuration, applied by hand: Docker, doco-cd, GPU 
 tofu/               # OpenTofu, applied by hand — Proxmox guests, Cloudflare DNS, Grafana Cloud routing (see tofu/CLAUDE.md)
 network.yaml        # git-ignored; the addresses Tofu and Ansible share (see network.example.yaml)
 docker/             # Everything doco-cd deploys, plus the images it runs
-  stacks/           # Compose stacks for the compose host (see docker/stacks/CLAUDE.md)
+  apps/             # Compose stacks for the compose host (see docker/apps/CLAUDE.md)
   infra/            # Compose stacks for the infra host (see docker/infra/CLAUDE.md)
   doco-cd/          # doco-cd deploy configs (one per host) + the doco-cd instance itself
   images/           # Container images built from this repo (see docker/images/CLAUDE.md)
@@ -61,7 +61,7 @@ Explain *why* a setting, limit, or label is set the way it is, not *that* it is 
   Postgres). They are named `<stack>_<key>`, so a service's stack decides them.
 - NFS volumes on the NAS for media and bulk data, declared in the stack with
   `driver_opts` (`nfsvers=3`, `nocopy`). The NAS exports only to allowlisted IPs.
-  See `docker/stacks/CLAUDE.md`.
+  See `docker/apps/CLAUDE.md`.
 
 ## Secrets
 
@@ -93,13 +93,13 @@ line in `docker/infra/gatus/compose.yaml`.
 ## Networking
 
 - Exposure: a hostname is public or tailnet-only by which Caddyfile serves it
-  (`docker/stacks/CLAUDE.md`). Default new services to tailnet unless people off the tailnet
+  (`docker/apps/CLAUDE.md`). Default new services to tailnet unless people off the tailnet
   need them. Remote access is via the Tailscale subnet router advertising `10.0.1.0/24`
 - Certificates: each Caddy gets its own from Let's Encrypt over DNS-01 (Cloudflare)
 - DNS records: `tofu/cloudflare`, applied by hand from the primary checkout.
   Public hostnames point at the router; tailnet ones at a Caddy's LAN address
-- Auth: Authentik (`docker/stacks/authentik/`) behind `iam.mpdavis.com`. Caddy sites opt into
-  forward auth with `import authentik` (`docker/stacks/proxy/authentik.caddy`, a domain-level
+- Auth: Authentik (`docker/apps/authentik/`) behind `iam.mpdavis.com`. Caddy sites opt into
+  forward auth with `import authentik` (`docker/apps/proxy/authentik.caddy`, a domain-level
   provider on the embedded outpost); apps that support it use native OIDC (e.g. Paperless)
 - Service discovery: containers on the shared `proxy` network reach each other by
   service name

@@ -7,7 +7,7 @@ the registry does not publish (e.g. `teamarr:v2.6.0` when the published tag is
 
 Two modes:
 
-  # Check every `image:` introduced by a PR (added lines under docker/stacks/, docker/infra/ or docker/doco-cd/)
+  # Check every `image:` introduced by a PR (added lines under docker/apps/, docker/infra/ or docker/doco-cd/)
   verify-image-pins.py --changed <base_sha>
 
   # Check explicit references (handy for local testing)
@@ -135,9 +135,9 @@ def exists(registry, repo, reference):
 
 
 def refs_from_diff(base_sha):
-    """Image references on lines added under docker/stacks/, docker/infra/ or docker/doco-cd/ relative to base_sha."""
+    """Image references on lines added under docker/apps/, docker/infra/ or docker/doco-cd/ relative to base_sha."""
     diff = subprocess.run(
-        ["git", "diff", f"{base_sha}...HEAD", "--", "docker/stacks/**", "docker/infra/**", "docker/doco-cd/**"],
+        ["git", "diff", f"{base_sha}...HEAD", "--", "docker/apps/**", "docker/infra/**", "docker/doco-cd/**"],
         capture_output=True,
         text=True,
         check=True,

@@ -30,8 +30,8 @@ it appears in:
 
 | File | Reachable from |
 |---|---|
-| `docker/stacks/proxy/Caddyfile.tailnet` | LAN and tailnet |
-| `docker/stacks/proxy/Caddyfile.public` | the internet |
+| `docker/apps/proxy/Caddyfile.tailnet` | LAN and tailnet |
+| `docker/apps/proxy/Caddyfile.public` | the internet |
 | `docker/infra/proxy/Caddyfile.tailnet` | LAN and tailnet, for what is not on the compose host |
 
 Default to tailnet. A hostname in two files fails CI, on one host or across
@@ -83,7 +83,7 @@ its stacks reference.
   so Gatus can check the app itself (see `prowlarr` in `Caddyfile.tailnet`).
 - **Scheduled jobs** use the image's own scheduler if it has one (recyclarr's
   `CRON_SCHEDULE`), else a service looping `run; sleep` — sleeping after each
-  run means runs can never overlap (see `docker/stacks/civic`).
+  run means runs can never overlap (see `docker/apps/civic`).
 - **The GPU** is requested through CDI: a `deploy.resources.reservations.devices`
   entry with `driver: cdi` and `device_ids: [nvidia.com/gpu=all]`. Only the
   compose host has one.

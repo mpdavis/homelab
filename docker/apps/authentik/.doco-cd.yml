@@ -4,5 +4,5 @@ external_secrets:
   AUTHENTIK_POSTGRES_PASSWORD: 9cf4d002-7467-4b35-83d0-b475004339c3
   AUTHENTIK_BOOTSTRAP_PASSWORD: 2441a661-fe19-41c6-bb72-b475004339f3
   AUTHENTIK_BOOTSTRAP_TOKEN: 099a7283-dfd6-41ce-8241-b47500433a21
-  # The Paperless OIDC client secret; docker/stacks/docs sends the same one.
+  # The Paperless OIDC client secret; docker/apps/docs sends the same one.
   AUTHENTIK_PAPERLESS_OIDC_SECRET: 84cbee0e-fe48-4b8e-93dc-b475004d59c7
