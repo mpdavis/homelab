@@ -83,7 +83,7 @@ Every guest play starts with `common`; the rest are applied by group.
 | `lxc` | LXC guests | AppArmor removal, `/dev/kmsg` symlink, shared mount for Docker |
 | `vm` | VM guests | qemu-guest-agent, panic/overcommit sysctls |
 | `gpu` | `gpu` hosts | NVIDIA driver and container toolkit, kept out of unattended-upgrades; reboots once to load a fresh driver |
-| `docker` | docker hosts, devbox | Docker Engine, daemon config, shared networks |
+| `docker` | docker hosts, devbox | Docker Engine, daemon config, shared networks; `tasks_from: prune` removes unused images and build cache older than a week (maintenance) |
 | `service_ips` | docker hosts | Extra addresses (`service_ips_addresses`) on the primary interface (netplan drop-in) |
 | `doco_cd` | docker hosts | Bitwarden token and doco-cd's first start; doco-cd updates itself after that |
 | `tailscale` | tailscale-router, devbox | tailscaled and first `tailscale up` |
@@ -91,5 +91,4 @@ Every guest play starts with `common`; the rest are applied by group.
 | `apt_upgrade` | maintenance | dist-upgrade, autoremove, autoclean |
 | `reboot_required` | maintenance, guests | Reboots when `/var/run/reboot-required` exists |
 | `pve_reboot` | maintenance, `pve` | Reboots onto a newer kernel, gated on quorum, then waits for the node's guests |
-| `docker_prune` | maintenance | Removes unused images and build cache older than a week |
 | `grafana_annotation` | maintenance | Opens and closes a region annotation in Grafana Cloud |
