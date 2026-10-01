@@ -1,6 +1,10 @@
 ---
 grafana_annotation_url: https://luckyzeppelin876.grafana.net
-# A service account token with annotations:write. Empty skips the annotation.
+# "Grafana Cloud - Alerting Token", a stack service account token that can
+# write annotations. Fetched with bws on the controller, so BWS_ACCESS_TOKEN
+# must be set there.
+grafana_annotation_bws_secret: 0e847022-1d64-467a-9bf5-b4d000090360
+# Set to skip Bitwarden and use this token instead.
 grafana_annotation_token: ""
 grafana_annotation_tags:
   - maintenance

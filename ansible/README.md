@@ -68,8 +68,8 @@ Both work through their hosts one at a time and stop at the first failure.
 Run them from the Mac, not devbox: devbox lives on pve1 and reboots during
 `maintain-guests.yml`. A node reboot takes its guests with it: pve2 carries the
 compose host, and pve1 carries infra, devbox and the subnet router. Gatus will
-alert while they're down. Paste a Grafana service account token with
-`annotations:write` at the prompt to mark the window on dashboards.
+alert while they're down. Both mark the window with a Grafana annotation,
+using a token fetched with `bws`; without `BWS_ACCESS_TOKEN` they skip it.
 
 ## Roles
 
