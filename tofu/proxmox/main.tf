@@ -191,10 +191,3 @@ resource "proxmox_virtual_environment_vm" "vm" {
     }
   }
 }
-
-# The compose host was keyed `docker`. Without this, the rename destroys VM 205
-# and every named volume on its disk. Safe to drop once applied.
-moved {
-  from = proxmox_virtual_environment_vm.vm["docker"]
-  to   = proxmox_virtual_environment_vm.vm["apps"]
-}

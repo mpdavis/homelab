@@ -25,11 +25,11 @@ a worktree, symlink the primary checkout's copy in first.
 | Group | Hosts | Purpose |
 | --- | --- | --- |
 | `pve` | pve1, pve2 | Proxmox VE hypervisors |
-| `docker_hosts` | apps, infra | Docker Compose hosts, deployed by doco-cd |
+| `docker` | apps, infra | Docker Compose hosts, deployed by doco-cd |
 | `gpu` | apps | Holds the passthrough GPU |
 | `tailscale_router` | tailscale-router | Tailscale subnet router for the LAN |
 | `development` | devbox | Always-on development host |
-| `lxc` / `vm` | every guest, by type | Target platform roles with e.g. `docker_hosts:&vm` |
+| `lxc` / `vm` | every guest, by type | Target platform roles with e.g. `docker:&vm` |
 
 ## Playbooks
 
@@ -39,7 +39,7 @@ Run from `ansible/`: `ansible-playbook playbooks/<playbook>.yml`.
 | --- | --- | --- |
 | `setup-pve.yml` | `pve` | Post-install config: no-subscription repos, nag removal, NIC offload fix, sysctls, dist-upgrade |
 | `setup-pve-cluster.yml` | `pve` | Creates the Proxmox cluster on the first node and joins the rest; safe to re-run |
-| `docker-host.yml` | `docker_hosts` | Docker, service IPs, and the doco-cd instance; see `docs/compose.md` |
+| `docker-host.yml` | `docker` | Docker, service IPs, and the doco-cd instance; see `docs/compose.md` |
 | `tailscale-router.yml` | `tailscale_router` | The subnet router (prompts for an auth key) |
 | `devbox.yml` | `development` | The development host; see `docs/devbox.md` |
 | `maintain-guests.yml` | every guest | Patches one guest at a time, reboots where an update asks, prunes Docker images |

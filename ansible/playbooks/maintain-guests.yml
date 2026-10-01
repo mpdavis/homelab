@@ -36,7 +36,7 @@
         tasks_from: verify
 
 - name: Clean up Docker
-  hosts: docker_hosts:development
+  hosts: docker:development
   become: true
   roles:
     - docker_prune

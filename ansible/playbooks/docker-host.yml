@@ -6,19 +6,19 @@
 #   ansible-playbook playbooks/docker-host.yml
 
 - name: Prepare Docker hosts
-  hosts: docker_hosts
+  hosts: docker
   become: true
   roles:
     - common
 
 - name: Configure VM guests
-  hosts: docker_hosts:&vm
+  hosts: docker:&vm
   become: true
   roles:
     - vm
 
 - name: Configure Docker hosts
-  hosts: docker_hosts
+  hosts: docker
   become: true
   vars_prompt:
     - name: bws_access_token
@@ -33,7 +33,7 @@
         doco_cd_bws_access_token: "{{ bws_access_token }}"
 
 - name: GPU setup
-  hosts: docker_hosts:&gpu
+  hosts: docker:&gpu
   become: true
   roles:
     - gpu
