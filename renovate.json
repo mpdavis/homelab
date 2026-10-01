@@ -25,10 +25,10 @@
       ]
     },
     {
-      "description": "Bump build-time dependencies pinned as annotated ARGs in stack Dockerfiles — e.g. the caddy-dns/cloudflare module xcaddy compiles into the proxy image. The dockerfile manager only sees FROM lines.",
+      "description": "Bump build-time dependencies pinned as annotated ARGs in image Dockerfiles — e.g. the Caddy modules xcaddy compiles into caddy-cloudflare. The dockerfile manager only sees FROM lines.",
       "customType": "regex",
       "managerFilePatterns": [
-        "/^docker/stacks/.+/Dockerfile$/"
+        "/^docker/images/.+/Dockerfile$/"
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\nARG [A-Z_]+=(?<currentValue>[^\\s]+)"
