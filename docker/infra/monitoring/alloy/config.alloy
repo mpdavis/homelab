@@ -1,5 +1,5 @@
 // The agent every Docker host runs, shipping to Grafana Cloud.
-// {infra,stacks}/monitoring/alloy/config.alloy must stay identical
+// {infra,apps}/monitoring/alloy/config.alloy must stay identical
 // (validate-stacks checks). The compose file supplies the Grafana Cloud
 // endpoints and HOST_LABEL, the only per-host difference.
 //

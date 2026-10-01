@@ -1,6 +1,6 @@
 ---
 # Provisions the Docker Compose host and starts doco-cd, which then deploys
-# docker/stacks/ from this repo. See docs/compose.md for the runbook.
+# docker/apps/ from this repo. See docs/compose.md for the runbook.
 #
 #   tofu -chdir=tofu/proxmox apply
 #   ansible-playbook playbooks/docker-host.yml

@@ -6,17 +6,17 @@ has to keep working while the compose host is down.
 
 This page is the runbook: how a change reaches a host, how to bring one up, and
 what adding a service touches. The rules for writing a stack — exposure,
-routing, secrets, pinning — live in `docker/stacks/CLAUDE.md` and `docker/infra/CLAUDE.md`.
+routing, secrets, pinning — live in `docker/apps/CLAUDE.md` and `docker/infra/CLAUDE.md`.
 
 ## Layout
 
 ```text
 docker/
   doco-cd/
-    .doco-cd.yaml         # what the compose host deploys: everything in docker/stacks/
+    .doco-cd.yaml         # what the compose host deploys: everything in docker/apps/
     .doco-cd.infra.yaml   # what the infra host deploys: everything in docker/infra/
     compose.yaml          # the doco-cd instance itself, which deploys it too
-  stacks/                 # the compose host's projects
+  apps/                   # the compose host's projects
     <stack>/              # one compose project per stack, auto-discovered
       compose.yaml
       .doco-cd.yml        # optional: per-stack settings, e.g. external_secrets
@@ -80,7 +80,7 @@ host, a dead pve1 or a dead homelab still alerts, which nothing on the LAN can
 do about itself.
 
 Every Docker host runs the same agent — Alloy, node-exporter and cAdvisor, in
-`docker/infra/monitoring/` and `docker/stacks/monitoring/` — which pushes:
+`docker/infra/monitoring/` and `docker/apps/monitoring/` — which pushes:
 
 - every container's logs, labelled `host`, `stack`, `service`, `container`;
 - host metrics (`job="node"`), per-container metrics (`job="cadvisor"`) and
@@ -161,7 +161,7 @@ before it mounts anything, or the mount fails with `permission denied`
 
 A new hostname touches four places besides its stack:
 
-1. A site block in the right Caddyfile — see `docker/stacks/CLAUDE.md` for which one,
+1. A site block in the right Caddyfile — see `docker/apps/CLAUDE.md` for which one,
    and `import authentik` inside a `route` block to put it behind login.
 2. A Gatus endpoint in `docker/infra/gatus/config.yaml`, plus an `extra_hosts` line in
    `docker/infra/gatus/compose.yaml` pointing the hostname at the Caddy that serves it.

@@ -1,6 +1,6 @@
 # Internet-facing sites: the router forwards 443 here.
 #
-# A hostname listed here is public. See docker/stacks/CLAUDE.md.
+# A hostname listed here is public. See docker/apps/CLAUDE.md.
 {
 	email michael@mpdavis.com
 	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}

@@ -10,8 +10,8 @@
 #   - every host runs the same monitoring agent config
 set -euo pipefail
 
-# One tree per host: docker/stacks/ is the compose host, docker/infra/ the infra host.
-trees=(docker/stacks docker/infra)
+# One tree per host: docker/apps/ is the compose host, docker/infra/ the infra host.
+trees=(docker/apps docker/infra)
 doco="docker/doco-cd"
 status=0
 # The Cloudflare module rejects anything not shaped like a real token (40
@@ -69,9 +69,9 @@ for compose in "$doco"/compose*.yaml; do
 done
 
 for tree in "${trees[@]}"; do
-  # docker/stacks/ is the default deploy config; every other tree needs a target.
+  # docker/apps/ is the default deploy config; every other tree needs a target.
   cfg="$doco/.doco-cd.yaml"
-  [ "$tree" = docker/stacks ] || cfg="$doco/.doco-cd.${tree##*/}.yaml"
+  [ "$tree" = docker/apps ] || cfg="$doco/.doco-cd.${tree##*/}.yaml"
   grep -q "^working_dir: $tree\$" "$cfg" 2>/dev/null ||
     fail "$cfg does not discover $tree/, so nothing would deploy it"
 done

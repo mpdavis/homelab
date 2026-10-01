@@ -42,7 +42,7 @@ jobs:
           allowed_bots: "renovate[bot]"
           prompt: |
             You are reviewing a Renovate dependency-bump PR in a GitOps homelab repo.
-            Services run as Docker Compose stacks (docker/stacks/ on the compose host, docker/infra/
+            Services run as Docker Compose stacks (docker/apps/ on the compose host, docker/infra/
             on the infra host) with pinned images, and doco-cd deploys a stack within
             a minute of the merge — so merging IS deploying. Your job is to judge how
             safe this bump is to merge.

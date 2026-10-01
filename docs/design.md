@@ -8,7 +8,7 @@ This page is the why. The how lives next to the code:
 | Topic | Where |
 |---|---|
 | Deploy path, host runbook, monitoring, adding a service | `docs/compose.md` |
-| Writing a stack: exposure, routing, secrets, pinning | `docker/stacks/CLAUDE.md`, `docker/infra/CLAUDE.md` |
+| Writing a stack: exposure, routing, secrets, pinning | `docker/apps/CLAUDE.md`, `docker/infra/CLAUDE.md` |
 | Proxmox guests, DNS records, alert routing | `tofu/CLAUDE.md` |
 | Images built from this repo | `docker/images/CLAUDE.md` |
 | The development host | `docs/devbox.md` |
@@ -76,7 +76,7 @@ of client IPs.
 Both Docker hosts are VMs rather than LXCs: Docker in an LXC fights runc and
 AppArmor (see the devbox), and GPU passthrough needs a VM anyway.
 
-Each host runs one doco-cd, which polls `main` and deploys its tree: `docker/stacks/`
+Each host runs one doco-cd, which polls `main` and deploys its tree: `docker/apps/`
 on the compose host, `docker/infra/` on the infra host. A stack is one compose
 project; services are grouped by what they do (`media`, `downloads`, `iptv`,
 `ai`, …), not one per stack.
@@ -127,7 +127,7 @@ Cloudflare plugin built into `docker/images/caddy-cloudflare`.
 
 ### Intrusion prevention
 
-CrowdSec (`docker/stacks/proxy`) guards `caddy-public` only; tailnet traffic is
+CrowdSec (`docker/apps/proxy`) guards `caddy-public` only; tailnet traffic is
 already ours. It reads Caddy's access log to ban IPs that probe or exploit, and
 inspects each request inline as a WAF (virtual patches for known CVEs).
 Caddy enforces both through the bouncer compiled into `caddy-cloudflare`, and
@@ -138,7 +138,7 @@ real client address, which the router's port-forward must not rewrite.
 
 ### Authentication
 
-Authentik (`docker/stacks/authentik`, `iam.mpdavis.com`) is the identity provider.
+Authentik (`docker/apps/authentik`, `iam.mpdavis.com`) is the identity provider.
 Its providers and applications are blueprints in the stack, applied by the
 worker on startup.
 

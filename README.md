@@ -46,7 +46,7 @@ Service health is public at [status.mpdavis.com](https://status.mpdavis.com).
 
 ```text
 docker/
-  stacks/         # compose host stacks, one directory per stack
+  apps/           # compose host stacks, one directory per stack
   infra/          # infra host stacks
   doco-cd/        # doco-cd's deploy config for each host, and doco-cd itself
   images/         # container images built from this repo
