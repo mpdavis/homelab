@@ -4,14 +4,31 @@
 {
 	email michael@mpdavis.com
 	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+
+	# The module registers no directive order. Bans are checked first, as the
+	# cheaper lookup, then the WAF inspects what is left.
+	order crowdsec first
+	order appsec after crowdsec
+
+	crowdsec {
+		api_url http://crowdsec:8080
+		api_key {env.CROWDSEC_BOUNCER_KEY}
+		appsec_url http://crowdsec:7422
+		# Bans already fail open; without this a CrowdSec outage would take
+		# every public site down with it.
+		appsec_fail_open
+	}
 }
 
 # Defines (authentik). Shared with Caddyfile.tailnet.
 import /etc/caddy/authentik.caddy
 
 # Every site imports this. CrowdSec reads the access log from the shared
-# caddy-public-logs volume; a site without it is invisible to CrowdSec.
+# caddy-public-logs volume, and the handlers enforce its bans and WAF; a site
+# without it is neither watched nor protected.
 (crowdsec) {
+	crowdsec
+	appsec
 	log {
 		output file /var/log/caddy/access.log {
 			roll_size 20MiB

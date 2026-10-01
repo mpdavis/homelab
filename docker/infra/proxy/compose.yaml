@@ -2,7 +2,7 @@ name: proxy
 
 services:
   caddy-tailnet:
-    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:f2088aade48f63fd7dd2d49c883292be7a61bca5b1fbe56243152cf48e195855
+    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:5a226e04b7a2d423d7db6056b2c19e187ff6436009b4f94f73dab3720f8ff8c6
     restart: unless-stopped
     ports:
       - 10.0.1.58:80:80
