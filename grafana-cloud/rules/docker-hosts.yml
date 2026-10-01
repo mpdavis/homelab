@@ -10,7 +10,7 @@ groups:
       # just stop. One absent() per host keeps the host label on the alert.
       - alert: HostAgentAbsent
         expr: |
-          absent_over_time(up{job="node", host="docker"}[5m])
+          absent_over_time(up{job="node", host="apps"}[5m])
           or
           absent_over_time(up{job="node", host="infra"}[5m])
         for: 5m

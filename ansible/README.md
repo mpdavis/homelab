@@ -25,8 +25,8 @@ a worktree, symlink the primary checkout's copy in first.
 | Group | Hosts | Purpose |
 | --- | --- | --- |
 | `pve` | pve1, pve2 | Proxmox VE hypervisors |
-| `docker_hosts` | docker, infra | Docker Compose hosts, deployed by doco-cd |
-| `gpu` | docker | Holds the passthrough GPU |
+| `docker_hosts` | apps, infra | Docker Compose hosts, deployed by doco-cd |
+| `gpu` | apps | Holds the passthrough GPU |
 | `tailscale_router` | tailscale-router | Tailscale subnet router for the LAN |
 | `development` | devbox | Always-on development host |
 | `lxc` / `vm` | every guest, by type | Sets `node_type`; target platform roles with e.g. `docker_hosts:&vm` |
