@@ -116,9 +116,11 @@ services:
     image: curlimages/curl:8.22.0
     restart: unless-stopped
     network_mode: service:gluetun
+    # Started, not healthy: gluetun is only healthy once it holds a port, so
+    # waiting for that would keep the watchdog out of the one case it is for.
     depends_on:
       gluetun:
-        condition: service_healthy
+        condition: service_started
         restart: true
     # A shell loop as PID 1 ignores SIGTERM; tini passes it on.
     init: true
