@@ -1,0 +1,6 @@
+# The WAF endpoint caddy-public's appsec handler sends each request to.
+source: appsec
+listen_addr: 0.0.0.0:7422
+appsec_config: crowdsecurity/appsec-default
+labels:
+  type: appsec

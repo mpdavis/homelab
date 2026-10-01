@@ -125,6 +125,17 @@ outage, their public route does not.
 TLS is a Let's Encrypt certificate per Caddy, issued by DNS-01 through the
 Cloudflare plugin built into `docker/images/caddy-cloudflare`.
 
+### Intrusion prevention
+
+CrowdSec (`docker/stacks/proxy`) guards `caddy-public` only; tailnet traffic is
+already ours. It reads Caddy's access log to ban IPs that probe or exploit, and
+inspects each request inline as a WAF (virtual patches for known CVEs).
+Caddy enforces both through the bouncer compiled into `caddy-cloudflare`, and
+fails open: a CrowdSec outage costs protection, not the public sites.
+
+Private addresses are never banned. Bans therefore depend on Caddy seeing the
+real client address, which the router's port-forward must not rewrite.
+
 ### Authentication
 
 Authentik (`docker/stacks/authentik`, `iam.mpdavis.com`) is the identity provider.

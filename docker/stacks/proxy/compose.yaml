@@ -4,7 +4,7 @@ name: proxy
 # decided by which Caddyfile a site is in.
 services:
   caddy-tailnet:
-    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:f2088aade48f63fd7dd2d49c883292be7a61bca5b1fbe56243152cf48e195855
+    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:5a226e04b7a2d423d7db6056b2c19e187ff6436009b4f94f73dab3720f8ff8c6
     restart: unless-stopped
     ports:
       - 10.0.1.57:80:80
@@ -26,7 +26,7 @@ services:
       start_period: 10s
 
   caddy-public:
-    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:f2088aade48f63fd7dd2d49c883292be7a61bca5b1fbe56243152cf48e195855
+    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:5a226e04b7a2d423d7db6056b2c19e187ff6436009b4f94f73dab3720f8ff8c6
     restart: unless-stopped
     ports:
       - 10.0.1.56:80:80
@@ -34,6 +34,7 @@ services:
       - 10.0.1.56:443:443/udp
     environment:
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:?resolved by doco-cd from external_secrets}
+      CROWDSEC_BOUNCER_KEY: ${CROWDSEC_BOUNCER_KEY:?resolved by doco-cd from external_secrets}
     volumes:
       - ./Caddyfile.public:/etc/caddy/Caddyfile:ro
       - ./authentik.caddy:/etc/caddy/authentik.caddy:ro
@@ -55,7 +56,7 @@ services:
     image: crowdsecurity/crowdsec:v1.8.1
     restart: unless-stopped
     environment:
-      COLLECTIONS: crowdsecurity/caddy
+      COLLECTIONS: crowdsecurity/caddy crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules
       # Registers the key under the name "caddy" on every start, so the
       # bouncer survives a lost crowdsec-config volume.
       BOUNCER_KEY_caddy: ${CROWDSEC_BOUNCER_KEY:?resolved by doco-cd from external_secrets}
@@ -63,6 +64,7 @@ services:
       # A file, not the acquis.d directory: on first start the entrypoint
       # chowns /etc/crowdsec, and a read-only directory mount there aborts it.
       - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.d/caddy.yaml:ro
+      - ./crowdsec/appsec.yaml:/etc/crowdsec/acquis.d/appsec.yaml:ro
       # Credentials, CAPI registration and installed hub items.
       - crowdsec-config:/etc/crowdsec
       # The SQLite database of alerts and decisions.
