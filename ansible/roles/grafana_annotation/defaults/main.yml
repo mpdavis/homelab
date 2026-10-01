@@ -1,0 +1,7 @@
+---
+grafana_annotation_url: https://luckyzeppelin876.grafana.net
+# A service account token with annotations:write. Empty skips the annotation.
+grafana_annotation_token: ""
+grafana_annotation_tags:
+  - maintenance
+grafana_annotation_text: Host maintenance

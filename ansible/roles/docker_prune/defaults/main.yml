@@ -1,0 +1,4 @@
+---
+# Keeps a recently replaced image around, so rolling a stack back doesn't wait
+# on a pull.
+docker_prune_until: 168h

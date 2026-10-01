@@ -1,0 +1,62 @@
+---
+# Proxmox has no reboot-required flag; a node is stale when it isn't running
+# the newest kernel it has installed.
+- name: Find the newest installed kernel
+  ansible.builtin.shell: set -o pipefail && ls /boot/vmlinuz-* | sort -V | tail -n 1
+  args:
+    executable: /bin/bash
+  register: pve_reboot_newest_kernel
+  changed_when: false
+
+- name: Reboot onto the new kernel
+  when: >-
+    pve_reboot_newest_kernel.stdout | basename | regex_replace('^vmlinuz-', '')
+    != ansible_facts.kernel
+  block:
+    # Two nodes, one vote each: while one reboots the other has no quorum. Only
+    # take a node down once its peer is back, or both lose /etc/pve at once.
+    - name: Wait for the cluster to be quorate
+      ansible.builtin.command: pvecm status
+      register: pve_reboot_quorum
+      changed_when: false
+      until: pve_reboot_quorum.stdout is search('Quorate:\s+Yes')
+      retries: 30
+      delay: 10
+
+    - name: List guests on this node
+      ansible.builtin.command: pvesh get /cluster/resources --type vm --output-format json
+      register: pve_reboot_guests_before
+      changed_when: false
+
+    - name: Remember which guests were running
+      ansible.builtin.set_fact:
+        pve_reboot_running: >-
+          {{ pve_reboot_guests_before.stdout | from_json
+             | selectattr('node', 'eq', ansible_facts.hostname)
+             | selectattr('status', 'eq', 'running')
+             | map(attribute='vmid') | list }}
+
+    # Proxmox shuts its guests down gracefully first, which takes a while.
+    - name: Reboot
+      ansible.builtin.reboot:
+        reboot_timeout: 1800
+
+    - name: Wait for the cluster to regain quorum
+      ansible.builtin.command: pvecm status
+      register: pve_reboot_quorum
+      changed_when: false
+      until: pve_reboot_quorum.stdout is search('Quorate:\s+Yes')
+      retries: 30
+      delay: 10
+
+    - name: Wait for those guests to start again
+      ansible.builtin.command: pvesh get /cluster/resources --type vm --output-format json
+      register: pve_reboot_guests_after
+      changed_when: false
+      until: >-
+        pve_reboot_guests_after.stdout | from_json
+        | selectattr('vmid', 'in', pve_reboot_running)
+        | selectattr('status', 'eq', 'running')
+        | list | length == pve_reboot_running | length
+      retries: 60
+      delay: 10

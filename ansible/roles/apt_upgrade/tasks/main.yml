@@ -1,0 +1,10 @@
+---
+- name: Upgrade every package
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: dist
+
+- name: Remove unneeded packages and old kernels
+  ansible.builtin.apt:
+    autoremove: true
+    autoclean: true

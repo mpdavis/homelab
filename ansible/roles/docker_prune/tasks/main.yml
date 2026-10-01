@@ -1,0 +1,12 @@
+---
+- name: Remove images no container uses
+  ansible.builtin.command: >-
+    docker image prune --all --force --filter until={{ docker_prune_until }}
+  register: docker_prune_images
+  changed_when: docker_prune_images.stdout is not search('Total reclaimed space:\s+0B')
+
+- name: Remove the build cache
+  ansible.builtin.command: >-
+    docker builder prune --all --force --filter until={{ docker_prune_until }}
+  register: docker_prune_builder
+  changed_when: docker_prune_builder.stdout is not search('Total:\s+0B')
