@@ -10,6 +10,10 @@
     url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
     dest: /etc/apt/keyrings/nodesource.asc
     mode: "0644"
+  register: devbox_nodesource_key
+  until: devbox_nodesource_key is success
+  retries: 3
+  delay: 5
 
 - name: Add NodeSource apt repository
   ansible.builtin.apt_repository:
@@ -22,6 +26,10 @@
     name: nodejs
     state: present
     update_cache: true
+  register: devbox_node_install
+  until: devbox_node_install is success
+  retries: 3
+  delay: 5
 
 - name: Read globally installed npm packages
   ansible.builtin.command: npm list --global --depth=0 --json
@@ -54,6 +62,10 @@
       - --wildcards
       - "*/bin/gh"
     creates: /usr/local/bin/gh
+  register: devbox_gh_install
+  until: devbox_gh_install is success
+  retries: 3
+  delay: 5
 
 - name: Install mise  # noqa: command-instead-of-module
   ansible.builtin.shell:

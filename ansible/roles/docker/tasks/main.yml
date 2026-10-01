@@ -10,6 +10,10 @@
     url: "{{ docker_apt_keyring_url }}"
     dest: /etc/apt/keyrings/docker.asc
     mode: "0644"
+  register: docker_key
+  until: docker_key is success
+  retries: 3
+  delay: 5
 
 - name: Add Docker apt repository
   ansible.builtin.apt_repository:
@@ -27,6 +31,10 @@
       - docker-compose-plugin
     state: present
     update_cache: true
+  register: docker_install
+  until: docker_install is success
+  retries: 3
+  delay: 5
 
 - name: Configure the Docker daemon
   ansible.builtin.template:

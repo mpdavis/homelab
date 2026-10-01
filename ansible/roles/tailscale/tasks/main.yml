@@ -4,6 +4,10 @@
     url: "{{ tailscale_apt_keyring_url }}"
     dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
     mode: "0644"
+  register: tailscale_key
+  until: tailscale_key is success
+  retries: 3
+  delay: 5
 
 - name: Add Tailscale apt repository
   ansible.builtin.get_url:
@@ -11,12 +15,19 @@
     dest: /etc/apt/sources.list.d/tailscale.list
     mode: "0644"
   register: tailscale_repo
+  until: tailscale_repo is success
+  retries: 3
+  delay: 5
 
 - name: Install tailscale
   ansible.builtin.apt:
     name: tailscale
     state: present
     update_cache: "{{ tailscale_repo is changed }}"
+  register: tailscale_install
+  until: tailscale_install is success
+  retries: 3
+  delay: 5
 
 - name: Enable IP forwarding for subnet routing
   ansible.posix.sysctl:
@@ -46,19 +57,26 @@
 # first bring-up. Route/hostname/SSH changes after that are applied manually
 # with `tailscale set`, which is idempotent.
 - name: Bring up tailscale
-  ansible.builtin.command:
-    argv: >-
-      {{
-        ['tailscale', 'up',
-         '--auth-key=' ~ tailscale_auth_key,
-         '--accept-dns=' ~ (tailscale_accept_dns | bool | lower),
-         '--hostname=' ~ tailscale_hostname]
-        + (['--advertise-routes=' ~ tailscale_advertise_routes]
-           if tailscale_advertise_routes | length > 0 else [])
-        + (['--advertise-tags=' ~ tailscale_advertise_tags]
-           if tailscale_advertise_tags | length > 0 else [])
-        + (['--ssh'] if tailscale_ssh | bool else [])
-      }}
   when: "'\"BackendState\":\"Running\"' not in tailscale_status_raw.stdout"
-  changed_when: true
-  no_log: true
+  block:
+    - name: Require an auth key
+      ansible.builtin.assert:
+        that: tailscale_auth_key is not none and tailscale_auth_key | length > 0
+        fail_msg: tailscale is not logged in yet, so this run needs tailscale_auth_key.
+
+    - name: Run tailscale up
+      ansible.builtin.command:
+        argv: >-
+          {{
+            ['tailscale', 'up',
+             '--auth-key=' ~ tailscale_auth_key,
+             '--accept-dns=' ~ (tailscale_accept_dns | bool | lower),
+             '--hostname=' ~ tailscale_hostname]
+            + (['--advertise-routes=' ~ tailscale_advertise_routes]
+               if tailscale_advertise_routes | length > 0 else [])
+            + (['--advertise-tags=' ~ tailscale_advertise_tags]
+               if tailscale_advertise_tags | length > 0 else [])
+            + (['--ssh'] if tailscale_ssh | bool else [])
+          }}
+      changed_when: true
+      no_log: true

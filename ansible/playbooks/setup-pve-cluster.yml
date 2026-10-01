@@ -1,10 +1,6 @@
 ---
 - name: Prepare SSH trust between PVE nodes
   hosts: pve
-  vars:
-    pve_cluster_name: homelab
-    pve_seed_host: "{{ groups['pve'][0] }}"
-    pve_seed_ip: "{{ hostvars[pve_seed_host].ansible_host }}"
   tasks:
     - name: Ensure root SSH key exists
       ansible.builtin.user:
@@ -29,10 +25,6 @@
 
 - name: Distribute SSH keys across PVE nodes
   hosts: pve
-  vars:
-    pve_cluster_name: homelab
-    pve_seed_host: "{{ groups['pve'][0] }}"
-    pve_seed_ip: "{{ hostvars[pve_seed_host].ansible_host }}"
   tasks:
     - name: Authorize all PVE nodes' root keys
       ansible.posix.authorized_key:
@@ -54,8 +46,6 @@
 
 - name: Create Proxmox cluster on seed node
   hosts: pve[0]
-  vars:
-    pve_cluster_name: homelab
   tasks:
     - name: Check if cluster already exists
       ansible.builtin.command: pvecm status
@@ -71,9 +61,6 @@
 - name: Join remaining nodes to cluster
   hosts: pve:!pve[0]
   serial: 1
-  vars:
-    pve_seed_host: "{{ groups['pve'][0] }}"
-    pve_seed_ip: "{{ hostvars[pve_seed_host].ansible_host }}"
   tasks:
     - name: Check if already in cluster
       ansible.builtin.command: pvecm status

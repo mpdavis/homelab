@@ -30,6 +30,10 @@
 - name: Update apt cache after adding NVIDIA repo
   ansible.builtin.apt:
     update_cache: true
+  register: gpu_apt_cache
+  until: gpu_apt_cache is success
+  retries: 3
+  delay: 5
 
 - name: Install NVIDIA drivers and container toolkit
   ansible.builtin.apt:
@@ -37,6 +41,10 @@
       - nvidia-driver-580
       - nvidia-container-toolkit
     state: present
+  register: gpu_install
+  until: gpu_install is success
+  retries: 3
+  delay: 5
 
 # Stacks request the GPU through CDI. The toolkit's nvidia-cdi-refresh unit
 # writes /var/run/cdi/nvidia.yaml and rewrites it when the driver changes, so
