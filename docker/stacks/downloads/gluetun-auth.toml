@@ -1,0 +1,7 @@
+# gluetun control server roles. :8000 is not in FIREWALL_INPUT_PORTS, so only
+# processes in gluetun's own network namespace reach it.
+
+[[roles]]
+name = "pf-watchdog"
+routes = ["GET /v1/portforward", "PUT /v1/vpn/status"]
+auth = "none"
