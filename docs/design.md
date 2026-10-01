@@ -53,7 +53,7 @@ of client IPs.
           │  pve1                │    │  pve2                    │
           │                      │    │  RTX 3050                │
           │  ┌────────────────┐  │    │  ┌────────────────────┐  │
-          │  │ infra     VM   │  │    │  │ docker        VM   │  │
+          │  │ infra     VM   │  │    │  │ apps          VM   │  │
           │  │ Gatus, ntfy,   │  │    │  │ every service,     │  │
           │  │ Caddy for LAN  │  │    │  │ public + tailnet   │  │
           │  │ hosts          │  │    │  │ Caddy, Authentik,  │  │
@@ -164,9 +164,9 @@ record: per-service records resolve only hostnames that exist.
 | 10.0.1.6 | NAS | NFS |
 | 10.0.1.53 | tailscale-router (LXC, pve1) | Tailscale subnet router |
 | 10.0.1.54 | devbox (LXC, pve1) | development host |
-| 10.0.1.55 | docker (VM 205, pve2) | compose host |
-| 10.0.1.56 | docker | public Caddy — the router's 443 target |
-| 10.0.1.57 | docker | tailnet Caddy |
+| 10.0.1.55 | apps (VM 205, pve2) | compose host |
+| 10.0.1.56 | apps | public Caddy — the router's 443 target |
+| 10.0.1.57 | apps | tailnet Caddy |
 | 10.0.1.58 | infra (VM 206, pve1) | infra host and its Caddy |
 
 Addresses come from `network.yaml` (git-ignored), which Tofu and

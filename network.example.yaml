@@ -21,10 +21,10 @@ network:
     pve2: 192.168.1.2
     tailscale-router: 192.168.1.53
     devbox: 192.168.1.54
-    docker: 192.168.1.55
+    apps: 192.168.1.55
     infra: 192.168.1.58
 
-  # Extra addresses on the docker host, one per Caddy instance. They must stay
+  # Extra addresses on the apps host, one per Caddy instance. They must stay
   # clear of any address the router or a guest might be handed.
   service_ips:
     compose_public: 192.168.1.56

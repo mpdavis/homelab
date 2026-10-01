@@ -13,7 +13,7 @@ doco-cd on each host polls `main` and deploys what changed. The design is in
 ## Architecture
 
 - **Proxmox VE** on two physical nodes (pve1 + pve2)
-- **Compose host** — VM `docker` on pve2 (10.0.1.55). Runs `docker/stacks/`, and holds the
+- **Compose host** — VM `apps` on pve2 (10.0.1.55). Runs `docker/stacks/`, and holds the
   NVIDIA RTX 3050 passthrough for Emby transcoding and Ollama
 - **Infra host** — VM `infra` on pve1 (10.0.1.58). Runs `docker/infra/`: what must keep
   working while the compose host is down (Gatus, ntfy, ingress for LAN hosts)
