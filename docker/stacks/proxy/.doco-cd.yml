@@ -1,3 +1,5 @@
 external_secrets:
   # Cloudflare API token (Zone:Read + DNS:Edit) for DNS-01.
   CLOUDFLARE_API_TOKEN: 67c9d80b-ca8e-47b5-a2eb-b442005fab6a
+  # Key caddy-public's bouncer presents to CrowdSec's local API.
+  CROWDSEC_BOUNCER_KEY: b6163f35-3de5-4a66-9bef-b4d600ef916b
