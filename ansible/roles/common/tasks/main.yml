@@ -2,8 +2,8 @@
 - name: Wait for cloud-init to finish
   ansible.builtin.command: cloud-init status --wait
   changed_when: false
-  failed_when: cloud_init_result.rc not in [0, 2]
-  register: cloud_init_result
+  failed_when: common_cloud_init_result.rc not in [0, 2]
+  register: common_cloud_init_result
 
 - name: Write resolv.conf without search domain
   ansible.builtin.copy:
@@ -26,7 +26,7 @@
 
 # Reboot rather than hang on a kernel panic, since nobody is at the console.
 - name: Set panic and overcommit sysctls
-  ansible.builtin.sysctl:
+  ansible.posix.sysctl:
     name: "{{ item.key }}"
     value: "{{ item.value }}"
     sysctl_file: /etc/sysctl.d/99-homelab.conf
@@ -43,4 +43,3 @@
     path: /etc/sysctl.d/99-k3s.conf
     state: absent
   when: node_type == 'vm'
-

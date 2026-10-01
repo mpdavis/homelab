@@ -1,0 +1,5 @@
+source: file
+filenames:
+  - /var/log/caddy/access.log
+labels:
+  type: caddy

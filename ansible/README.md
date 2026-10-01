@@ -7,6 +7,7 @@ Tofu (`tofu/proxmox`) makes the LXCs and VMs; Ansible does the rest.
 
 - [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/) on your machine
 - Root SSH access to every host with `~/.ssh/id_ed25519`
+- The collections in `requirements.yml`: `ansible-galaxy collection install -r requirements.yml`
 - `network.yaml` (see below)
 
 ## Inventory
@@ -83,7 +84,7 @@ Every guest play starts with `common`; the rest are applied by group.
 | `vm` | VM guests | qemu-guest-agent |
 | `gpu` | `gpu` hosts | NVIDIA driver and container toolkit, kept out of unattended-upgrades; reboots once to load a fresh driver |
 | `docker` | docker hosts, devbox | Docker Engine, daemon config, shared networks |
-| `service_ips` | docker hosts | Extra addresses on the primary interface (netplan drop-in) |
+| `service_ips` | docker hosts | Extra addresses (`service_ips_addresses`) on the primary interface (netplan drop-in) |
 | `doco_cd` | docker hosts | Bitwarden token and doco-cd's first start; doco-cd updates itself after that |
 | `tailscale` | tailscale-router, devbox | tailscaled and first `tailscale up` |
 | `devbox` | devbox | User, shell, tooling, repos for the development host |

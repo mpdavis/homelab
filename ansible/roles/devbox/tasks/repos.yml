@@ -1,7 +1,7 @@
 ---
 # update: false clones what is missing and never touches an existing checkout —
 # this box has real work on it, and a replay must not move HEAD or discard it.
-- name: Clone repositories
+- name: Clone repositories  # noqa: latest[git]
   ansible.builtin.git:
     repo: "{{ item }}"
     dest: "{{ devbox_repo_root }}/{{ item | basename | regex_replace('\\.git$', '') }}"

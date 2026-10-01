@@ -10,10 +10,11 @@
     database: passwd
     key: "{{ devbox_user }}"
 
-- name: Install moshi-hook
+- name: Install moshi-hook  # noqa: command-instead-of-module
   ansible.builtin.shell:
-    cmd: "curl -fsSL {{ devbox_moshi_install_url }} | sh"
+    cmd: "set -o pipefail && curl -fsSL {{ devbox_moshi_install_url }} | sh"
     creates: "{{ devbox_moshi_bin }}"
+    executable: /bin/bash
   become_user: "{{ devbox_user }}"
   environment:
     # The installer otherwise opens /dev/tty for a first-run multi-select.

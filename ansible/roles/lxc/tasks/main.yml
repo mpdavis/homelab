@@ -22,6 +22,7 @@
       mount --make-rshared /
       exit 0
 
-- name: Make mount shared
+# ansible.posix.mount manages fstab entries; it cannot change propagation.
+- name: Make mount shared  # noqa: command-instead-of-module
   ansible.builtin.command: mount --make-rshared /
   changed_when: false

@@ -4,7 +4,7 @@ name: proxy
 # decided by which Caddyfile a site is in.
 services:
   caddy-tailnet:
-    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:97a22bc99237513cd5d653e0a533903bbc1c20ba47430253d49e9a5eef16f284
+    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:f2088aade48f63fd7dd2d49c883292be7a61bca5b1fbe56243152cf48e195855
     restart: unless-stopped
     ports:
       - 10.0.1.57:80:80
@@ -26,7 +26,7 @@ services:
       start_period: 10s
 
   caddy-public:
-    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:97a22bc99237513cd5d653e0a533903bbc1c20ba47430253d49e9a5eef16f284
+    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:f2088aade48f63fd7dd2d49c883292be7a61bca5b1fbe56243152cf48e195855
     restart: unless-stopped
     ports:
       - 10.0.1.56:80:80
@@ -38,6 +38,7 @@ services:
       - ./Caddyfile.public:/etc/caddy/Caddyfile:ro
       - ./authentik.caddy:/etc/caddy/authentik.caddy:ro
       - caddy-public-data:/data
+      - caddy-public-logs:/var/log/caddy
     networks:
       - proxy
     healthcheck:
@@ -47,11 +48,43 @@ services:
       retries: 3
       start_period: 10s
 
+  # Reads caddy-public's access log and bans IPs that trip its scenarios;
+  # caddy-public enforces the bans. Only the public Caddy is watched: everything
+  # reaching the tailnet one is already ours.
+  crowdsec:
+    image: crowdsecurity/crowdsec:v1.8.1
+    restart: unless-stopped
+    environment:
+      COLLECTIONS: crowdsecurity/caddy
+      # Registers the key under the name "caddy" on every start, so the
+      # bouncer survives a lost crowdsec-config volume.
+      BOUNCER_KEY_caddy: ${CROWDSEC_BOUNCER_KEY:?resolved by doco-cd from external_secrets}
+    volumes:
+      # A file, not the acquis.d directory: on first start the entrypoint
+      # chowns /etc/crowdsec, and a read-only directory mount there aborts it.
+      - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.d/caddy.yaml:ro
+      # Credentials, CAPI registration and installed hub items.
+      - crowdsec-config:/etc/crowdsec
+      # The SQLite database of alerts and decisions.
+      - crowdsec-data:/var/lib/crowdsec/data
+      - caddy-public-logs:/var/log/caddy:ro
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
 volumes:
   # Holds issued certificates and the ACME account. Losing it only costs a
   # re-issue, but repeated loss runs into Let's Encrypt rate limits.
   caddy-tailnet-data:
   caddy-public-data:
+  caddy-public-logs:
+  crowdsec-config:
+  crowdsec-data:
 
 networks:
   proxy:

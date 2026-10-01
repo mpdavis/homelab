@@ -47,6 +47,7 @@
 - name: Create the doco-cd data volume
   ansible.builtin.command: docker volume create doco-cd_data
   when: doco_cd_volume.rc != 0
+  changed_when: true
 
 - name: Start doco-cd
   when: doco_cd_self_managed.stdout | length == 0

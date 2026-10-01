@@ -4,6 +4,6 @@ network:
   ethernets:
     {{ service_ips_interface }}:
       addresses:
-{% for ip in service_ips %}
+{% for ip in service_ips_addresses %}
         - "{{ ip }}"
 {% endfor %}

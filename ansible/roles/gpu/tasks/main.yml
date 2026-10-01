@@ -6,20 +6,26 @@
       - linux-headers-{{ ansible_kernel }}
     state: present
 
-- name: Add NVIDIA container toolkit GPG key
+# Upstream publishes the list only as a file to sed, and the key armored for
+# gpg --dearmor; get_url alone can do neither.
+- name: Add NVIDIA container toolkit GPG key  # noqa: command-instead-of-module
   ansible.builtin.shell: |
+    set -o pipefail
     curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
       | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
   args:
     creates: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+    executable: /bin/bash
 
-- name: Add NVIDIA container toolkit repository
+- name: Add NVIDIA container toolkit repository  # noqa: command-instead-of-module
   ansible.builtin.shell: |
+    set -o pipefail
     curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
       | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
       > /etc/apt/sources.list.d/nvidia-container-toolkit.list
   args:
     creates: /etc/apt/sources.list.d/nvidia-container-toolkit.list
+    executable: /bin/bash
 
 - name: Update apt cache after adding NVIDIA repo
   ansible.builtin.apt:
