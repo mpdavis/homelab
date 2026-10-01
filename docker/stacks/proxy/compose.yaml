@@ -54,6 +54,10 @@ services:
   crowdsec:
     image: crowdsecurity/crowdsec:v1.8.1
     restart: unless-stopped
+    labels:
+      # For the CrowdSec dashboard in tofu/grafana; Alloy keeps only the
+      # cs_* series it plots.
+      homelab.metrics.port: "6060"
     environment:
       COLLECTIONS: crowdsecurity/caddy
       # Registers the key under the name "caddy" on every start, so the

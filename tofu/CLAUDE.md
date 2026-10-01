@@ -6,7 +6,7 @@ Three root modules, each with its own local state:
 |---|---|
 | `proxmox/` | LXC containers and VMs on pve1/pve2 |
 | `cloudflare/` | DNS records for services the compose hosts serve |
-| `grafana/` | where the Grafana Cloud stack's alerts go: ntfy contact points and the notification policy |
+| `grafana/` | where the Grafana Cloud stack's alerts go (ntfy contact points, the notification policy), and its dashboards (`dashboards/*.json`) |
 
 ## State lives in the primary checkout
 
