@@ -24,7 +24,7 @@ containers, and querying APIs is fine.
 
 | Host | Address | Runs |
 |---|---|---|
-| `docker` VM (pve2) | 10.0.1.55 | everything in `docker/stacks/`; holds the RTX 3050 |
+| `apps` VM (pve2) | 10.0.1.55 | everything in `docker/stacks/`; holds the RTX 3050 |
 | `infra` VM (pve1) | 10.0.1.58 | everything in `docker/infra/`: its Caddy, Gatus, ntfy |
 | Unifi NAS | 10.0.1.6 | NFS (v3 only) for media and bulk data |
 
@@ -113,7 +113,7 @@ Start broad, then narrow to the failing service.
   `nocopy: true`, so Docker tries to seed it from the image and the NAS refuses the chown.
 - **GPU containers fail with `Driver/library version mismatch`** — unattended-upgrades bumped
   the NVIDIA libraries while the old kernel module is loaded. Compare
-  `cat /proc/driver/nvidia/version` with `nvidia-smi` on 10.0.1.55. Fix: reboot the docker VM.
+  `cat /proc/driver/nvidia/version` with `nvidia-smi` on 10.0.1.55. Fix: reboot the apps VM.
   Containers get the GPU through CDI (`/var/run/cdi/nvidia.yaml`).
 - **qbittorrent unreachable, VPN up** — gluetun's forwarded-port file is empty; its
   healthcheck restarts it. The `setPreferences [0/0]` ERROR line is benign.

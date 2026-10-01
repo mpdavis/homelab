@@ -13,7 +13,7 @@ services:
       - --storage.path=/var/lib/alloy/data
       - /etc/alloy/config.alloy
     environment:
-      HOST_LABEL: docker
+      HOST_LABEL: apps
       # Not secret: the stack's endpoints and instance ids, from the stack's
       # details page on grafana.com.
       GRAFANA_CLOUD_PROMETHEUS_URL: https://prometheus-prod-56-prod-us-east-2.grafana.net/api/prom/push

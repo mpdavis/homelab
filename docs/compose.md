@@ -27,7 +27,7 @@ docker/
 
 | Host     | Where                       | Runs                                             |
 | -------- | --------------------------- | ------------------------------------------------ |
-| `docker` | VM 205 on pve2, `10.0.1.55` | every service, its two Caddies, the GPU          |
+| `apps`   | VM 205 on pve2, `10.0.1.55` | every service, its two Caddies, the GPU          |
 | `infra`  | VM 206 on pve1, `10.0.1.58` | Gatus, ntfy, Caddy for LAN hosts (Proxmox, BirdNET) |
 
 Each host runs one doco-cd, told which tree to deploy by its poll target: the
@@ -116,8 +116,8 @@ Caddyfile and the IP differ.
 
 | Instance              | Host   | IP           | Serves                                             |
 | --------------------- | ------ | ------------ | -------------------------------------------------- |
-| `proxy/caddy-tailnet` | docker | `10.0.1.57`  | tailnet services, by container name                |
-| `proxy/caddy-public`  | docker | `10.0.1.56`  | public services, by container name                 |
+| `proxy/caddy-tailnet` | apps   | `10.0.1.57`  | tailnet services, by container name                |
+| `proxy/caddy-public`  | apps   | `10.0.1.56`  | public services, by container name                 |
 | `proxy/caddy-tailnet` | infra  | `10.0.1.58`  | Proxmox, BirdNET — LAN endpoints, reached directly |
 
 Each hostname's DNS record points at the IP that serves it. `validate-stacks` rejects a hostname that appears in two
