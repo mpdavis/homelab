@@ -9,13 +9,26 @@
 # Defines (authentik). Shared with Caddyfile.tailnet.
 import /etc/caddy/authentik.caddy
 
+# Every site imports this. CrowdSec reads the access log from the shared
+# caddy-public-logs volume; a site without it is invisible to CrowdSec.
+(crowdsec) {
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 20MiB
+			roll_keep 3
+		}
+	}
+}
+
 audiobookshelf.mpdavis.com {
+	import crowdsec
 	reverse_proxy audiobookshelf:3000
 }
 
 # /healthz answers only "ok". Serving it ahead of the auth check lets Gatus test
 # the app itself, which the Authentik redirect on every other path cannot.
 council.mpdavis.com {
+	import crowdsec
 	route {
 		reverse_proxy /healthz council:8080
 		import authentik
@@ -24,27 +37,33 @@ council.mpdavis.com {
 }
 
 emby.mpdavis.com {
+	import crowdsec
 	reverse_proxy emby:8096
 }
 
 iam.mpdavis.com {
+	import crowdsec
 	reverse_proxy authentik-server:9000
 }
 
 # ntfy and the status page run on the infra host, so they keep working while
 # this host is down; only the public route passes through here.
 ntfy.mpdavis.com {
+	import crowdsec
 	reverse_proxy 10.0.1.58:8080
 }
 
 seerr.mpdavis.com {
+	import crowdsec
 	reverse_proxy seerr:5055
 }
 
 status.mpdavis.com {
+	import crowdsec
 	reverse_proxy 10.0.1.58:8081
 }
 
 thumbs.mpdavis.com {
+	import crowdsec
 	reverse_proxy game-thumbs:3000
 }

@@ -14,7 +14,8 @@ Services are grouped by what they do, not one stack each:
 | `ai` | ollama, open-webui |
 | `authentik` | the identity provider every forward-auth site and OIDC app uses |
 | `docs`, `civic`, `gridiron`, `homepage` | one app each |
-| `proxy`, `monitoring` | the host's Caddy instances and its Grafana Cloud agent |
+| `proxy` | the host's Caddy instances, and CrowdSec watching the public one |
+| `monitoring` | the host's Grafana Cloud agent |
 
 Put a service in the right stack the first time. Moving it later renames the
 compose project, which renames its volumes — so the data has to be copied
