@@ -7,11 +7,11 @@
 
 - name: Run nag removal script
   ansible.builtin.command: /usr/local/bin/pve-remove-nag.sh
-  changed_when: false
+  register: pve_nag_removal
+  changed_when: "'patched' in pve_nag_removal.stdout"
 
 - name: Install apt hook to re-apply nag removal after updates
-  ansible.builtin.copy:
+  ansible.builtin.template:
+    src: no-nag-script.j2
     dest: /etc/apt/apt.conf.d/no-nag-script
     mode: "0644"
-    content: |
-      DPkg::Post-Invoke { "/usr/local/bin/pve-remove-nag.sh"; };

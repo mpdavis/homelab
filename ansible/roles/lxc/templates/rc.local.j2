@@ -1,0 +1,4 @@
+#!/bin/sh
+[ ! -e /dev/kmsg ] && ln -s /dev/console /dev/kmsg
+mount --make-rshared /
+exit 0

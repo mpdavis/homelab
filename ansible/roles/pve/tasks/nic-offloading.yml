@@ -19,6 +19,7 @@
     done
   register: pve_intel_nics
   changed_when: false
+  check_mode: false
 
 - name: Create NIC offloading disable service
   ansible.builtin.template:
@@ -27,7 +28,7 @@
     mode: "0644"
   loop: "{{ pve_intel_nics.stdout_lines }}"
   when: pve_intel_nics.stdout_lines | length > 0
-  notify: reload systemd
+  notify: Reload systemd
 
 - name: Enable and start NIC offloading services
   ansible.builtin.systemd:

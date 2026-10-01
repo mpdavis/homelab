@@ -7,6 +7,7 @@
     executable: /bin/bash
   register: pve_reboot_newest_kernel
   changed_when: false
+  check_mode: false
 
 - name: Reboot onto the new kernel
   when: >-

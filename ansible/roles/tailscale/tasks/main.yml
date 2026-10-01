@@ -49,6 +49,7 @@
 - name: Check current tailscale backend state
   ansible.builtin.command: tailscale status --json
   changed_when: false
+  check_mode: false
   failed_when: false
   register: tailscale_status_raw
 
@@ -57,7 +58,7 @@
 # first bring-up. Route/hostname/SSH changes after that are applied manually
 # with `tailscale set`, which is idempotent.
 - name: Bring up tailscale
-  when: "'\"BackendState\":\"Running\"' not in tailscale_status_raw.stdout"
+  when: tailscale_status_raw.stdout is not search('"BackendState":\\s*"Running"')
   block:
     - name: Require an auth key
       ansible.builtin.assert:

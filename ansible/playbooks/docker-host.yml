@@ -5,6 +5,18 @@
 #   tofu -chdir=tofu/proxmox apply
 #   ansible-playbook playbooks/docker-host.yml
 
+- name: Prepare Docker hosts
+  hosts: docker_hosts
+  become: true
+  roles:
+    - common
+
+- name: Configure VM guests
+  hosts: docker_hosts:&vm
+  become: true
+  roles:
+    - vm
+
 - name: Configure Docker hosts
   hosts: docker_hosts
   become: true
@@ -14,8 +26,6 @@
       private: true
       default: ""
   roles:
-    - common
-    - vm
     - docker
     - service_ips
     - role: doco_cd
