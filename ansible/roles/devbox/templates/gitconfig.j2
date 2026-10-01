@@ -10,3 +10,11 @@
 	autoSetupRemote = true
 [safe]
 	directory = {{ devbox_repo_root }}/*
+# gh authenticates the HTTPS clones in repos.yml and every later push. This is
+# what `gh auth setup-git` writes; the empty helper drops any inherited one.
+[credential "https://github.com"]
+	helper =
+	helper = !/usr/local/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper =
+	helper = !/usr/local/bin/gh auth git-credential

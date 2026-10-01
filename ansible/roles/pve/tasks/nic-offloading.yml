@@ -27,7 +27,7 @@
     mode: "0644"
   loop: "{{ pve_intel_nics.stdout_lines }}"
   when: pve_intel_nics.stdout_lines | length > 0
-  notify: reload systemd
+  notify: Reload systemd
 
 - name: Enable and start NIC offloading services
   ansible.builtin.systemd:

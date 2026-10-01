@@ -51,6 +51,13 @@
   when: (installed[item.name] | default({})).version | default('') != item.version
   changed_when: true
 
+- name: Read the installed gh version
+  ansible.builtin.command: /usr/local/bin/gh --version
+  register: devbox_gh_current
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
 - name: Install gh
   ansible.builtin.unarchive:
     src: "https://github.com/cli/cli/releases/download/{{ devbox_gh_version }}/gh_{{ devbox_gh_version | regex_replace('^v', '') }}_linux_amd64.tar.gz"
@@ -61,7 +68,9 @@
       - --strip-components=2
       - --wildcards
       - "*/bin/gh"
-    creates: /usr/local/bin/gh
+  when: >-
+    devbox_gh_current.stdout | default('') is not search(
+      'gh version ' ~ (devbox_gh_version | regex_replace('^v', '') | regex_escape) ~ ' ')
   register: devbox_gh_install
   until: devbox_gh_install is success
   retries: 3
@@ -100,13 +109,6 @@
   when: devbox_gh_auth.rc != 0
   changed_when: true
   no_log: true
-
-# Makes gh the credential helper, which is what authenticates the HTTPS clones
-# in repos.yml and every later push. Rewrites the same keys each run.
-- name: Configure git to authenticate through gh
-  ansible.builtin.command: gh auth setup-git
-  become_user: "{{ devbox_user }}"
-  changed_when: false
 
 - name: Create the private config directory
   ansible.builtin.file:
