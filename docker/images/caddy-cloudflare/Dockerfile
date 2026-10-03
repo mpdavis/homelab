@@ -1,4 +1,4 @@
-FROM caddy:2.11.4-builder AS builder
+FROM caddy:2.11.6-builder AS builder
 
 # renovate: datasource=go depName=github.com/caddy-dns/cloudflare
 ARG CADDY_DNS_CLOUDFLARE_VERSION=v0.2.4
@@ -9,5 +9,5 @@ RUN xcaddy build \
 	--with github.com/hslatman/caddy-crowdsec-bouncer/http@${CADDY_CROWDSEC_BOUNCER_VERSION} \
 	--with github.com/hslatman/caddy-crowdsec-bouncer/appsec@${CADDY_CROWDSEC_BOUNCER_VERSION}
 
-FROM caddy:2.11.4
+FROM caddy:2.11.6
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
