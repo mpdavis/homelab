@@ -33,7 +33,7 @@ services:
       - proxy
 
   teamarr:
-    image: ghcr.io/pharaoh-labs/teamarr:2.21.0
+    image: ghcr.io/pharaoh-labs/teamarr:2.21.1
     restart: unless-stopped
     user: "1000:1000"
     environment:
