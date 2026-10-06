@@ -4,7 +4,7 @@ name: proxy
 # decided by which Caddyfile a site is in.
 services:
   caddy-tailnet:
-    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:9af4262483b1a716ce832ed0e6c9327d31915010dd0240ce1bbe08345f1c76e8
+    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:c0a9120ecd3c5c2beead44729b1c1c6c33b76c73cf46ee5911020518e13f5114
     restart: unless-stopped
     ports:
       - 10.0.1.57:80:80
@@ -26,7 +26,7 @@ services:
       start_period: 10s
 
   caddy-public:
-    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:9af4262483b1a716ce832ed0e6c9327d31915010dd0240ce1bbe08345f1c76e8
+    image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:c0a9120ecd3c5c2beead44729b1c1c6c33b76c73cf46ee5911020518e13f5114
     restart: unless-stopped
     ports:
       - 10.0.1.56:80:80
