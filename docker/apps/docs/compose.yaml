@@ -4,7 +4,7 @@ services:
   # One image runs the web server, consumer and scheduler. It starts as root
   # for s6 init and drops to uid 1000 itself, so no `user:` here.
   paperless:
-    image: ghcr.io/paperless-ngx/paperless-ngx:3.2.1
+    image: ghcr.io/paperless-ngx/paperless-ngx:3.3.0
     restart: unless-stopped
     depends_on:
       redis:
