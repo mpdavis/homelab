@@ -26,7 +26,7 @@ services:
       - proxy
 
   emby:
-    image: emby/embyserver:4.11.0.5
+    image: emby/embyserver:4.11.0.6
     restart: unless-stopped
     # The image drops to uid/gid 2 itself, which owns the config volume.
     environment:
