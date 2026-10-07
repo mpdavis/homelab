@@ -29,7 +29,7 @@ concurrency:
 
 env:
   # renovate: datasource=docker depName=grafana/mimirtool
-  MIMIRTOOL_VERSION: "3.2.1"
+  MIMIRTOOL_VERSION: "3.2.2"
   # Grafana's Prometheus-rules conversion API. It ignores the tenant, but
   # mimirtool insists on one and Grafana documents 1.
   MIMIR_ADDRESS: https://luckyzeppelin876.grafana.net/api/convert/
