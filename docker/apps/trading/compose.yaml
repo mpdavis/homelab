@@ -353,7 +353,7 @@ services:
   # nginx serving the Vue app and proxying /api/ to quantdinger-api. Kept in
   # lockstep with the backend tag, as upstream's IMAGE_TAG does.
   quantdinger:
-    image: ghcr.io/openbyteinc/quantdinger-frontend:5.5.4
+    image: ghcr.io/openbyteinc/quantdinger-frontend:v5.5.5
     restart: unless-stopped
     environment:
       BACKEND_URL: http://quantdinger-api:5000
