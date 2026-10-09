@@ -59,6 +59,14 @@
         "ghcr.io/listenarrs/listenarr"
       ],
       "versioning": "regex:^(?:v)?(?:(?<prerelease>canary)-)?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
+    },
+    {
+      "description": "Upstream deploys QuantDinger's frontend and backend on one IMAGE_TAG, so bump them in one PR rather than letting either side run ahead of the other's API.",
+      "matchPackageNames": [
+        "ghcr.io/openbyteinc/quantdinger-backend",
+        "ghcr.io/openbyteinc/quantdinger-frontend"
+      ],
+      "groupName": "quantdinger"
     }
   ]
 }

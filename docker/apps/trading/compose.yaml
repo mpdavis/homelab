@@ -1,0 +1,381 @@
+name: trading
+
+# QuantDinger: upstream's docker-compose.ghcr.yml, minus the env-sync and mobile
+# services. Alpaca and exchange credentials are entered in the UI and stored in
+# Postgres, encrypted with CREDENTIAL_ENCRYPTION_KEY.
+#
+# Every backend role runs the same image through an entrypoint that starts as
+# root and drops to uid 10001 with gosu, so no `user:` on them.
+x-quantdinger-backend: &quantdinger-backend
+  image: ghcr.io/openbyteinc/quantdinger-backend:5.5.4
+  init: true
+  stop_grace_period: 45s
+  volumes:
+    - logs:/app/logs
+    - data:/app/data
+    # Without a file here the entrypoint copies env.example to /app/.env, and
+    # the app's settings page would later load those defaults over this
+    # environment. Read-only, so settings saved in the UI cannot persist; this
+    # file stays the place for configuration.
+    - ./quantdinger.env:/app/.env:ro
+
+# The workers health-check that the two keys are set, and every role decrypts
+# broker credentials, so all of them get the full set.
+x-quantdinger-env: &quantdinger-env
+  TZ: America/Chicago
+  SECRET_KEY: ${QUANTDINGER_SECRET_KEY:?resolved by doco-cd from external_secrets}
+  CREDENTIAL_ENCRYPTION_KEY: ${QUANTDINGER_CREDENTIAL_ENCRYPTION_KEY:?resolved by doco-cd from external_secrets}
+  ADMIN_USER: ${QUANTDINGER_ADMIN_USER:?resolved by doco-cd from external_secrets}
+  ADMIN_PASSWORD: ${QUANTDINGER_ADMIN_PASSWORD:?resolved by doco-cd from external_secrets}
+  ENABLE_REGISTRATION: "false"
+  FRONTEND_URL: https://trading.mpdavis.com
+  DATABASE_URL: postgresql://quantdinger:${QUANTDINGER_POSTGRES_PASSWORD:?resolved by doco-cd from external_secrets}@postgres:5432/quantdinger
+  DB_TYPE: postgresql
+  # The migration service applies the schema before anything else starts.
+  SKIP_AUTO_MIGRATE: "true"
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  CACHE_ENABLED: "true"
+  CELERY_REDIS_HOST: redis-jobs
+  CELERY_REDIS_PORT: "6379"
+  CELERY_BROKER_DB: "0"
+  CELERY_RESULT_DB: "1"
+  # Upstream leaves the API and scheduler on the .env default, localhost:29092,
+  # which only resolves from the docker host; every role publishes events.
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  LOG_FORMAT: json
+
+services:
+  postgres:
+    image: postgres:18.3-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: quantdinger
+      POSTGRES_USER: quantdinger
+      POSTGRES_PASSWORD: ${QUANTDINGER_POSTGRES_PASSWORD:?resolved by doco-cd from external_secrets}
+      TZ: America/Chicago
+    volumes:
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "quantdinger", "-d", "quantdinger"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # The cache; allkeys-lru, so it keeps no volume.
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Celery's broker and results. noeviction and AOF, unlike the cache: a lost
+  # key here is a lost job.
+  redis-jobs:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--save", "60", "1000", "--maxmemory", "512mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis-jobs:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: apache/kafka:4.3.1
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: CONTROLLER://:9093,PLAINTEXT://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      # KRaft refuses to start on a data dir formatted for another cluster id,
+      # so this must never change once the volume exists.
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  # One-shots. doco-cd treats a service that others wait on with
+  # service_completed_successfully as expected to exit, so restart stays "no".
+  kafka-init:
+    <<: *quantdinger-backend
+    restart: "no"
+    command: ["python", "-m", "app.commands.kafka_topics"]
+    environment:
+      <<: *quantdinger-env
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  migration:
+    <<: *quantdinger-backend
+    restart: "no"
+    command: ["python", "-m", "app.commands.migrate"]
+    environment:
+      <<: *quantdinger-env
+      DB_POOL_MIN: "1"
+      DB_POOL_MAX: "2"
+      DB_APPLICATION_NAME: quantdinger-migration
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Prefixed: the frontend's nginx resolves it by name, and the frontend is
+  # also on the proxy network.
+  quantdinger-api:
+    <<: *quantdinger-backend
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    environment:
+      <<: *quantdinger-env
+      QD_PROCESS_ROLE: api
+      PYTHON_API_HOST: 0.0.0.0
+      PYTHON_API_PORT: "5000"
+      PROMETHEUS_MULTIPROC_DIR: /tmp/quantdinger-prometheus
+      STRATEGY_COMMANDS_ENABLED: "true"
+      CELERY_TASKS_ENABLED: "true"
+      DB_POOL_MIN: "2"
+      DB_POOL_MAX: "12"
+      DB_APPLICATION_NAME: quantdinger-api
+      GUNICORN_WORKERS: "2"
+      GUNICORN_THREADS: "4"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      redis-jobs:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  trading-worker:
+    <<: *quantdinger-backend
+    restart: unless-stopped
+    command: ["python", "-m", "app.commands.trading_worker"]
+    environment:
+      <<: *quantdinger-env
+      QD_PROCESS_ROLE: trading
+      STRATEGY_COMMANDS_ENABLED: "false"
+      DB_POOL_MIN: "4"
+      DB_POOL_MAX: "32"
+      DB_APPLICATION_NAME: quantdinger-trading
+      KAFKA_CLIENT_ID: quantdinger-trading
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.commands.worker_health", "trading"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  kafka-audit-worker:
+    <<: *quantdinger-backend
+    restart: unless-stopped
+    command: ["python", "-m", "app.commands.kafka_audit_worker"]
+    environment:
+      <<: *quantdinger-env
+      QD_PROCESS_ROLE: kafka-audit
+      DB_POOL_MIN: "1"
+      DB_POOL_MAX: "3"
+      DB_APPLICATION_NAME: quantdinger-kafka-audit
+      KAFKA_AUDIT_GROUP_ID: quantdinger-runtime-audit-v1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.commands.worker_health", "kafka-audit"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  strategy-dispatcher-worker:
+    <<: *quantdinger-backend
+    restart: unless-stopped
+    command: ["python", "-m", "app.commands.strategy_dispatcher_worker"]
+    environment:
+      <<: *quantdinger-env
+      QD_PROCESS_ROLE: strategy-dispatcher
+      DB_POOL_MIN: "1"
+      DB_POOL_MAX: "4"
+      DB_APPLICATION_NAME: quantdinger-strategy-dispatcher
+      KAFKA_CLIENT_ID: quantdinger-strategy-dispatcher
+      KAFKA_STRATEGY_DISPATCH_GROUP_ID: quantdinger-strategy-dispatch-v1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.commands.worker_health", "strategy-dispatcher"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  strategy-evaluator-worker:
+    <<: *quantdinger-backend
+    restart: unless-stopped
+    command: ["python", "-m", "app.commands.strategy_evaluator_worker"]
+    environment:
+      <<: *quantdinger-env
+      QD_PROCESS_ROLE: strategy-evaluator
+      DB_POOL_MIN: "1"
+      DB_POOL_MAX: "4"
+      DB_APPLICATION_NAME: quantdinger-strategy-evaluator
+      KAFKA_CLIENT_ID: quantdinger-strategy-evaluator
+      KAFKA_STRATEGY_EVALUATOR_GROUP_ID: quantdinger-strategy-evaluator-active-v1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.commands.worker_health", "strategy-evaluator"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  scheduler-worker:
+    <<: *quantdinger-backend
+    restart: unless-stopped
+    command: ["python", "-m", "app.commands.scheduler"]
+    environment:
+      <<: *quantdinger-env
+      QD_PROCESS_ROLE: scheduler
+      DB_POOL_MIN: "2"
+      DB_POOL_MAX: "12"
+      DB_APPLICATION_NAME: quantdinger-scheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.commands.worker_health", "scheduler"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  celery-worker:
+    <<: *quantdinger-backend
+    restart: unless-stopped
+    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=INFO", "-Q", "jobs,ai,maintenance", "--concurrency=2"]
+    environment:
+      <<: *quantdinger-env
+      QD_PROCESS_ROLE: celery
+      CELERY_TASKS_ENABLED: "true"
+      DB_POOL_MIN: "2"
+      DB_POOL_MAX: "12"
+      DB_APPLICATION_NAME: quantdinger-celery-worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-jobs:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.commands.worker_health", "celery"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+
+  # Upstream's check here is `kill -0 1`, which under init only proves
+  # docker-init is alive; beat has no health command of its own, so it has none.
+  celery-beat:
+    <<: *quantdinger-backend
+    restart: unless-stopped
+    command: ["celery", "-A", "app.celery_app:celery_app", "beat", "--loglevel=INFO", "--schedule=/app/data/celerybeat-schedule"]
+    environment:
+      <<: *quantdinger-env
+      QD_PROCESS_ROLE: celery
+      DB_POOL_MIN: "2"
+      DB_POOL_MAX: "12"
+      DB_APPLICATION_NAME: quantdinger-celery-beat
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-jobs:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+
+  # nginx serving the Vue app and proxying /api/ to quantdinger-api. Kept in
+  # lockstep with the backend tag, as upstream's IMAGE_TAG does.
+  quantdinger:
+    image: ghcr.io/openbyteinc/quantdinger-frontend:5.5.4
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://quantdinger-api:5000
+    depends_on:
+      - quantdinger-api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - default
+      - proxy
+
+volumes:
+  postgres:
+  redis-jobs:
+  kafka:
+  # Backtest data and celery-beat's schedule.
+  data:
+  logs:
+
+networks:
+  proxy:
+    external: true
