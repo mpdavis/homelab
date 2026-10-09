@@ -137,6 +137,9 @@ services:
       DB_POOL_MIN: "1"
       DB_POOL_MAX: "2"
       DB_APPLICATION_NAME: quantdinger-migration
+      # The one role that applies the schema; init_database() honours the
+      # shared "true" here too, and would exit 0 having created nothing.
+      SKIP_AUTO_MIGRATE: "false"
     depends_on:
       postgres:
         condition: service_healthy
