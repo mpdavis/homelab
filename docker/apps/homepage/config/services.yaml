@@ -70,10 +70,6 @@
         icon: mdi-football
         href: https://gridiron.mpdavis.com
         description: College football model vs. betting lines
-    - QuantDinger:
-        icon: mdi-chart-line
-        href: https://trading.mpdavis.com
-        description: Strategy research & trading (Alpaca, crypto)
 - Infrastructure:
     - Authentik:
         icon: authentik.png

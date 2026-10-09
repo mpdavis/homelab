@@ -12,7 +12,7 @@ Services are grouped by what they do, not one stack each:
 | `downloads` | what acquires: qbittorrent (with gluetun, mousehole and pf-watchdog), prowlarr, sonarr, radarr, unpackerr, recyclarr, podfetch, listenarr, seerr |
 | `iptv` | dispatcharr, teamarr, ecm, game-thumbs |
 | `ai` | ollama, open-webui |
-| `trading` | QuantDinger: its API, workers, frontend, and their Postgres, Redis and Kafka |
+| `trading` | pairs-trader: LumiBot strategies on the Alpaca paper account |
 | `authentik` | the identity provider every forward-auth site and OIDC app uses |
 | `docs`, `civic`, `gridiron`, `homepage` | one app each |
 | `proxy` | the host's Caddy instances, and CrowdSec watching the public one |

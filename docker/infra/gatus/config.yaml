@@ -33,12 +33,6 @@ endpoints:
     group: external-open
     url: https://podfetch.mpdavis.com/
     conditions: *open-conditions
-  - name: quantdinger
-    group: external-open
-    # The frontend's nginx proxies /api/ to the backend, so this proves both;
-    # the root page is static and would pass with the backend down.
-    url: https://trading.mpdavis.com/api/health
-    conditions: *open-conditions
   - name: ecm
     group: external-open
     url: https://ecm.mpdavis.com/
@@ -243,11 +237,6 @@ endpoints:
     group: dns
     url: "1.1.1.1"
     dns: {query-type: A, query-name: ai.mpdavis.com}
-    conditions: *compose-tailnet-dns
-  - name: dns-trading
-    group: dns
-    url: "1.1.1.1"
-    dns: {query-type: A, query-name: trading.mpdavis.com}
     conditions: *compose-tailnet-dns
   - name: dns-proxmox
     group: dns

@@ -1,9 +1,4 @@
-# First start runs the schema migration and creates the Kafka topics before
-# the workers come up.
-timeout: 600
 external_secrets:
-  QUANTDINGER_SECRET_KEY: c520d1fe-19a0-4b03-b1cd-b4de0003c29e
-  QUANTDINGER_CREDENTIAL_ENCRYPTION_KEY: cbb67f03-9019-4a11-9d26-b4de0003c2d3
-  QUANTDINGER_POSTGRES_PASSWORD: bcf411d9-53e4-492a-a817-b4de0003c362
-  QUANTDINGER_ADMIN_USER: 665a41b6-1f3e-41dc-b46d-b4de0003c399
-  QUANTDINGER_ADMIN_PASSWORD: 825a550d-eeaa-4947-a8e3-b4de0003c3da
+  # Alpaca paper account.
+  ALPACA_PAPER_API_KEY: 411504cb-bb1d-44c2-9c15-b4de0139a13c
+  ALPACA_PAPER_API_SECRET: d4f6a545-8a9d-4037-a085-b4de0139a179
