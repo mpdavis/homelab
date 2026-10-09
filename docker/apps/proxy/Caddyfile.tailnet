@@ -103,6 +103,11 @@ paperless.mpdavis.com {
 	reverse_proxy paperless:8000
 }
 
+# No forward auth: QuantDinger has its own login, with registration disabled.
+trading.mpdavis.com {
+	reverse_proxy quantdinger:80
+}
+
 # /health ahead of auth for Gatus, like /ping on prowlarr.
 ai.mpdavis.com {
 	route {
