@@ -1,47 +1,85 @@
 name: trading
 
+# Both services run ghcr.io/mpdavis/algo-trading (source in mpdavis/algo-trading),
+# against the Alpaca paper account. Strategies keep their state in the shared
+# volume, one directory each; the dashboard only reads it.
+x-alpaca: &alpaca
+  TZ: America/Chicago
+  ALPACA_API_KEY: ${ALPACA_PAPER_API_KEY:?resolved by doco-cd from external_secrets}
+  ALPACA_API_SECRET: ${ALPACA_PAPER_API_SECRET:?resolved by doco-cd from external_secrets}
+  ALPACA_IS_PAPER: "true"
+  STRATEGIES: pairs
+
+x-hardening: &hardening
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
 services:
-  # Market-neutral pairs trading on the Alpaca paper account, run by LumiBot:
-  # long the cheap leg, short the rich one. Source and rules are in
-  # mpdavis/pairs-trader. It trades once a day at the open and serves nothing,
-  # so there is no Caddy site or Gatus check; the heartbeat healthcheck is the
-  # signal that it is still iterating.
-  pairs-trader:
-    image: ghcr.io/mpdavis/pairs-trader:1.0.5
+  # Runs every strategy in STRATEGIES under one LumiBot trader. They share the
+  # account, so no two may trade the same symbol.
+  trader:
+    <<: *hardening
+    image: ghcr.io/mpdavis/algo-trading:1.0.9
     restart: unless-stopped
     init: true
+    command: ["live"]
     environment:
-      TZ: America/Chicago
-      ALPACA_API_KEY: ${ALPACA_PAPER_API_KEY:?resolved by doco-cd from external_secrets}
-      ALPACA_API_SECRET: ${ALPACA_PAPER_API_SECRET:?resolved by doco-cd from external_secrets}
-      ALPACA_IS_PAPER: "true"
+      <<: *alpaca
       # The two pairs that passed Engle-Granger on Oct 2025 – Oct 2026 closes.
-      # A symbol must not also be traded by anything else in this account.
-      PAIRS: JBHT/KNX,UPS/ODFL
+      PAIRS_PAIRS: JBHT/KNX,UPS/ODFL
     volumes:
       - state:/data
-    read_only: true
     # LumiBot's logs and market-data cache. Bounded, so a runaway cache fails
     # the container instead of eating host memory.
     tmpfs:
       - /tmp:size=512m
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
     cpus: 1
     mem_limit: 2g
     healthcheck:
-      # Touched on every iteration, which only happens in market hours; four
-      # days covers a holiday weekend.
-      test: ["CMD-SHELL", "find /tmp/heartbeat -mmin -5760 | grep -q ."]
+      # Each strategy's heartbeat advances on every completed iteration, which
+      # only happens in market hours; the default 96h covers a holiday weekend.
+      test: ["CMD", "algo-trading", "healthcheck"]
       interval: 15m
-      timeout: 10s
+      timeout: 30s
       retries: 1
-      start_period: 96h
+      start_period: 2m
+
+  # Read-only view of the account and each strategy's state, behind Authentik
+  # at trading.mpdavis.com.
+  trading-dashboard:
+    <<: *hardening
+    image: ghcr.io/mpdavis/algo-trading:1.0.9
+    restart: unless-stopped
+    init: true
+    command: ["dashboard"]
+    environment:
+      <<: *alpaca
+    volumes:
+      - state:/data:ro
+    tmpfs:
+      - /tmp:size=64m
+    cpus: 0.5
+    mem_limit: 512m
+    healthcheck:
+      # The slim image has no curl or wget.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=5)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - default
+      - proxy
 
 volumes:
-  # Each pair's entry day and cooldown, and the last session traded. Losing it
-  # is recoverable: open pairs are re-adopted from the account's positions.
+  # One directory per strategy (state and heartbeat). Losing it is recoverable:
+  # pairs re-adopts open positions from the account.
   # Not `data`: QuantDinger's old trading_data volume still holds its files.
   state:
+
+networks:
+  proxy:
+    external: true

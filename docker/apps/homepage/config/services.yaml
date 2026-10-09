@@ -70,6 +70,10 @@
         icon: mdi-football
         href: https://gridiron.mpdavis.com
         description: College football model vs. betting lines
+    - Algo Trading:
+        icon: mdi-chart-line
+        href: https://trading.mpdavis.com
+        description: LumiBot strategies on the Alpaca paper account
 - Infrastructure:
     - Authentik:
         icon: authentik.png
