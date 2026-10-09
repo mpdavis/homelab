@@ -50,6 +50,7 @@ services:
       - radarr.mpdavis.com:10.0.1.57
       - sonarr.mpdavis.com:10.0.1.57
       - teamarr.mpdavis.com:10.0.1.57
+      - trading.mpdavis.com:10.0.1.57
       - birdnet.mpdavis.com:10.0.1.58
       - proxmox.mpdavis.com:10.0.1.58
     networks:

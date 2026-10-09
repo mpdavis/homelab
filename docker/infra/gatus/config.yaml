@@ -79,6 +79,12 @@ endpoints:
     conditions: &auth-conditions
       - "[STATUS] == 302"
       - "[CERTIFICATE_EXPIRATION] > 48h"
+  - name: trading-dashboard
+    group: external-auth
+    url: https://trading.mpdavis.com/
+    client: *auth-client
+    headers: *auth-headers
+    conditions: *auth-conditions
   - name: dispatcharr
     group: external-auth
     url: https://dispatcharr.mpdavis.com/
@@ -238,6 +244,11 @@ endpoints:
     url: "1.1.1.1"
     dns: {query-type: A, query-name: ai.mpdavis.com}
     conditions: *compose-tailnet-dns
+  - name: dns-trading
+    group: dns
+    url: "1.1.1.1"
+    dns: {query-type: A, query-name: trading.mpdavis.com}
+    conditions: *compose-tailnet-dns
   - name: dns-proxmox
     group: dns
     url: "1.1.1.1"
@@ -257,6 +268,10 @@ endpoints:
     url: https://ai.mpdavis.com/health
     conditions: &internal-conditions
       - "[STATUS] == 200"
+  - name: trading-dashboard-app
+    group: internal
+    url: https://trading.mpdavis.com/healthz
+    conditions: *internal-conditions
   - name: dispatcharr-app
     group: internal
     # No dedicated health route; the version API is unauthenticated and

@@ -103,6 +103,16 @@ paperless.mpdavis.com {
 	reverse_proxy paperless:8000
 }
 
+# /healthz ahead of auth for Gatus. The dashboard shows the trading account,
+# so everything else is behind Authentik.
+trading.mpdavis.com {
+	route {
+		reverse_proxy /healthz trading-dashboard:8080
+		import authentik
+		reverse_proxy trading-dashboard:8080
+	}
+}
+
 # /health ahead of auth for Gatus, like /ping on prowlarr.
 ai.mpdavis.com {
 	route {
