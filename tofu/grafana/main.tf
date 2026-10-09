@@ -1,6 +1,7 @@
-# Where the Grafana Cloud stack's alerts go. The rules themselves are in
-# grafana-cloud/rules/ and are synced by CI; they reach these contact points
-# through the notification policy below, by their severity label.
+# Where the Grafana Cloud stack's alerts go. Metric rules are in
+# grafana-cloud/rules/ and are synced by CI, log rules in log-alerts.tf; both
+# reach these contact points through the notification policy below, by their
+# severity label.
 
 locals {
   # ntfy's tpl=1 renders the webhook body into the title and message: Grafana's
