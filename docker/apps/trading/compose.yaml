@@ -7,7 +7,7 @@ services:
   # so there is no Caddy site or Gatus check; the heartbeat healthcheck is the
   # signal that it is still iterating.
   pairs-trader:
-    image: ghcr.io/mpdavis/pairs-trader:1.0.3
+    image: ghcr.io/mpdavis/pairs-trader:1.0.5
     restart: unless-stopped
     init: true
     environment:
