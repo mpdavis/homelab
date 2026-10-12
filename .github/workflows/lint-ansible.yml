@@ -24,7 +24,7 @@ concurrency:
 
 env:
   # renovate: datasource=pypi depName=ansible-lint
-  ANSIBLE_LINT_VERSION: "26.9.0"
+  ANSIBLE_LINT_VERSION: "26.10.0"
 
 jobs:
   ansible-lint:
