@@ -388,8 +388,8 @@
     },
     {
       "type": "stat",
-      "title": "Containers",
-      "description": "Containers running across both hosts. A dip in the sparkline is a container that stopped or restarted.",
+      "title": "Internet reachable",
+      "description": "Share of Grafana Cloud probes (Ohio, N. Virginia, Oregon) that loaded status.mpdavis.com in the last 6 minutes: the WAN, router and caddy-public path that Gatus never crosses. Under 50% fires PublicIngressUnreachable.",
       "datasource": {
         "type": "prometheus",
         "uid": "grafanacloud-prom"
@@ -407,20 +407,30 @@
             "type": "prometheus",
             "uid": "grafanacloud-prom"
           },
-          "expr": "count(container_memory_working_set_bytes{name!=\"\"})"
+          "expr": "avg(avg_over_time(probe_success{job=\"public-ingress\"}[6m]))",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "percentunit",
           "decimals": 0,
           "noValue": "0",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "blue",
+                "color": "red",
                 "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.5
+              },
+              {
+                "color": "green",
+                "value": 1
               }
             ]
           },
@@ -439,8 +449,8 @@
           "fields": "",
           "values": false
         },
-        "colorMode": "value",
-        "graphMode": "area",
+        "colorMode": "background",
+        "graphMode": "none",
         "textMode": "value",
         "justifyMode": "center"
       },

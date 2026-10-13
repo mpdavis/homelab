@@ -6,7 +6,7 @@ Three root modules, each with its own local state:
 |---|---|
 | `proxmox/` | LXC containers and VMs on pve1/pve2 |
 | `cloudflare/` | DNS records for services the compose hosts serve |
-| `grafana/` | where the Grafana Cloud stack's alerts go (ntfy contact points, the notification policy), Loki alert rules (`log-alerts.tf`; Prometheus rules are in `grafana-cloud/rules/`), and its dashboards (`dashboards/*.json`) |
+| `grafana/` | where the Grafana Cloud stack's alerts go (ntfy contact points, the notification policy), Loki alert rules (`log-alerts.tf`; Prometheus rules are in `grafana-cloud/rules/`), its dashboards (`dashboards/*.json`), and the Synthetic Monitoring check that probes from the internet (`synthetic-monitoring.tf`) |
 
 ## State lives in the primary checkout
 
@@ -36,6 +36,7 @@ export PROXMOX_VE_PASSWORD=...                                   # proxmox/
 export CLOUDFLARE_API_TOKEN="$(bws secret get 67c9d80b-ca8e-47b5-a2eb-b442005fab6a -o json --color no | jq -r .value)"  # cloudflare/
 export GRAFANA_AUTH="$(bws secret get 0e847022-1d64-467a-9bf5-b4d000090360 -o json --color no | jq -r .value)"  # grafana/: stack service account token
 export TF_VAR_ntfy_token="$(bws secret get 47079c89-adab-4d19-8173-b48d01492747 -o json --color no | jq -r .value)"  # grafana/
+export TF_VAR_sm_access_token="$(bws secret get 7f40344d-a062-443b-95b2-b4e201086f88 -o json --color no | jq -r .value)"  # grafana/: Synthetic Monitoring
 ```
 
 ## DNS records
