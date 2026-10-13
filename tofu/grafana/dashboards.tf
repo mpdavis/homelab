@@ -9,3 +9,8 @@ resource "grafana_dashboard" "crowdsec" {
   folder      = grafana_folder.homelab.uid
   config_json = file("${path.module}/dashboards/crowdsec.json")
 }
+
+resource "grafana_dashboard" "overview" {
+  folder      = grafana_folder.homelab.uid
+  config_json = file("${path.module}/dashboards/overview.json")
+}
