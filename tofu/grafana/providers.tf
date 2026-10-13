@@ -12,5 +12,7 @@ terraform {
 # Reads GRAFANA_AUTH (a service account token) from the environment; see
 # CLAUDE.md.
 provider "grafana" {
-  url = "https://luckyzeppelin876.grafana.net"
+  url             = "https://luckyzeppelin876.grafana.net"
+  sm_url          = "https://synthetic-monitoring-api-us-east-0.grafana.net"
+  sm_access_token = var.sm_access_token
 }
