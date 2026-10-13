@@ -42,6 +42,7 @@ resource "grafana_rule_group" "mousehole" {
     data {
       ref_id         = "A"
       datasource_uid = "grafanacloud-logs"
+      query_type     = "instant"
 
       relative_time_range {
         from = 900

@@ -12,6 +12,9 @@ resource "grafana_synthetic_monitoring_check" "public_ingress" {
   job     = "public-ingress"
   target  = "https://status.mpdavis.com"
   enabled = true
+  # Where Synthetic Monitoring files every check; left unset, each plan
+  # tries to clear it.
+  folder_uid = "grafana-synthetic-monitoring-app"
   # Three probes, so one probe's own network trouble is outvoted. Every two
   # minutes keeps 3 probes inside the free tier's 100k executions a month.
   probes = [
