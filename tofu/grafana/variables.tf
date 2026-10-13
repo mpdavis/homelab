@@ -3,3 +3,9 @@ variable "ntfy_token" {
   type        = string
   sensitive   = true
 }
+
+variable "sm_access_token" {
+  description = "Synthetic Monitoring API token; set TF_VAR_sm_access_token, see CLAUDE.md."
+  type        = string
+  sensitive   = true
+}

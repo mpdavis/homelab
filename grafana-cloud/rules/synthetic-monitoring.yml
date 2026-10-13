@@ -1,0 +1,21 @@
+# Alerts on the Grafana Synthetic Monitoring check in
+# tofu/grafana/synthetic-monitoring.tf. Synced like docker-hosts.yml.
+namespace: synthetic-monitoring
+groups:
+  - name: synthetic-monitoring
+    rules:
+      # Probes run every 2 minutes, so 6m is three runs from each of three
+      # probes. Under half passing means the homelab, not one probe, is at
+      # fault.
+      - alert: PublicIngressUnreachable
+        expr: avg by (job, instance) (avg_over_time(probe_success{job="public-ingress"}[6m])) < 0.5
+        for: 4m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The homelab is unreachable from the internet"
+          description: >-
+            Most Grafana Cloud probes have failed to load {{ $labels.instance }}
+            for 10 minutes, so public hostnames are down for everyone off the
+            LAN. Suspects in order: the WAN or public IP, the router's 443
+            forward, caddy-public on the compose host, Gatus on the infra host.
