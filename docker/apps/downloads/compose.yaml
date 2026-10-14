@@ -229,7 +229,7 @@ services:
       - proxy
 
   recyclarr:
-    image: ghcr.io/recyclarr/recyclarr:8.7.3
+    image: ghcr.io/recyclarr/recyclarr:8.8.0
     restart: unless-stopped
     user: "1000:1000"
     environment:
