@@ -40,6 +40,10 @@ services:
   node-exporter:
     image: prom/node-exporter:v1.12.1
     restart: unless-stopped
+    # The image's nobody user can't traverse /var/lib/docker (0710), so statfs
+    # on the NFS volume mounts fails with "permission denied". The host's root
+    # filesystem is still mounted read-only.
+    user: root
     command:
       - --path.rootfs=/host
       # Every container adds a veth; at ~20 series each they would eat the
