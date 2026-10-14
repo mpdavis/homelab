@@ -113,7 +113,7 @@ services:
   # Retries a failed port forward without restarting gluetun, and re-pushes the
   # port to qbittorrent when gluetun's one-shot up command missed it.
   pf-watchdog:
-    image: curlimages/curl:8.22.0
+    image: curlimages/curl:8.23.0
     restart: unless-stopped
     network_mode: service:gluetun
     # Started, not healthy: gluetun is only healthy once it holds a port, so
