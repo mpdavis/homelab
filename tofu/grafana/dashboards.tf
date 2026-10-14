@@ -14,3 +14,12 @@ resource "grafana_dashboard" "overview" {
   folder      = grafana_folder.homelab.uid
   config_json = file("${path.module}/dashboards/overview.json")
 }
+
+resource "grafana_dashboard" "home" {
+  folder      = grafana_folder.homelab.uid
+  config_json = file("${path.module}/dashboards/home.json")
+}
+
+resource "grafana_organization_preferences" "main" {
+  home_dashboard_uid = grafana_dashboard.home.uid
+}

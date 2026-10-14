@@ -46,6 +46,9 @@ services:
       # series budget while saying nothing cAdvisor doesn't.
       - --collector.netdev.device-exclude=^(veth.*|br-.*|docker0)$$
       - --collector.netclass.ignored-devices=^(veth.*|br-.*|docker0)$$
+      # The default also skips /var/lib/docker/volumes, where the NFS volumes
+      # mount: the only view this host has of the NAS pool's capacity.
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|run/credentials/.+|sys|var/lib/docker/(containers|overlay2|plugins|buildkit)/.+|var/lib/containers/storage/.+)($$|/)
     network_mode: host
     pid: host
     volumes:
