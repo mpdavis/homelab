@@ -36,7 +36,7 @@ services:
       start_period: 20s
 
   authentik-server:
-    image: ghcr.io/goauthentik/server:2026.8.3
+    image: ghcr.io/goauthentik/server:2026.8.4
     restart: unless-stopped
     command: server
     environment: *authentik-env
@@ -49,7 +49,7 @@ services:
 
   # Runs background tasks and applies the blueprints on startup.
   authentik-worker:
-    image: ghcr.io/goauthentik/server:2026.8.3
+    image: ghcr.io/goauthentik/server:2026.8.4
     restart: unless-stopped
     command: worker
     environment: *authentik-env
