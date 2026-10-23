@@ -2,7 +2,7 @@ name: homepage
 
 services:
   homepage:
-    image: ghcr.io/gethomepage/homepage:v2.6.0
+    image: ghcr.io/gethomepage/homepage:v2.7.0
     restart: unless-stopped
     environment:
       HOMEPAGE_ALLOWED_HOSTS: home.mpdavis.com
