@@ -59,6 +59,16 @@
         "ghcr.io/listenarrs/listenarr"
       ],
       "versioning": "regex:^(?:v)?(?:(?<prerelease>canary)-)?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
+    },
+    {
+      "description": "WHY: ansible-lint runs on whatever Python setup-python installs, and ansible-core only supports the Python releases it was tested against — on 3.15, ansible-core 2.21 crashes ansible-lint (`module 'dataclasses' has no attribute '_is_type'`). The bump auto-merged anyway because lint-ansible is advisory, not required. WHEN TO REMOVE: once an ansible-core release lists 3.15 as supported; then raise or drop this cap.",
+      "matchDepNames": [
+        "python"
+      ],
+      "matchFileNames": [
+        ".github/workflows/lint-ansible.yml"
+      ],
+      "allowedVersions": "<3.15"
     }
   ]
 }
