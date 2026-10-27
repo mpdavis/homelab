@@ -8,3 +8,6 @@ local.md
 
 # Addresses for Tofu and Ansible; see network.example.yaml
 /network.yaml
+
+# Collections ansible-lint installs for itself
+ansible/.ansible/
