@@ -53,6 +53,7 @@ groups:
           description: >-
             {{ $labels.device }} at {{ $labels.mountpoint }} on {{ $labels.host }}
             has only {{ printf "%.1f" $value }}% free.
+          runbook_url: https://github.com/mpdavis/homelab/blob/main/docs/runbooks/disk-full.md
 
       - alert: HostMemoryLow
         expr: node_memory_MemAvailable_bytes{job="node"} / node_memory_MemTotal_bytes{job="node"} * 100 < 10
