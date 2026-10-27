@@ -20,3 +20,8 @@ docker_networks: []
 # Keeps a recently replaced image around, so rolling a stack back doesn't wait
 # on a pull.
 docker_prune_until: 168h
+
+# doco-cd prunes after every deploy, but not after updating itself: the old
+# instance is still running when it prunes, so its image is in use and every
+# Renovate bump leaves ~210MB behind. The timer catches those.
+docker_prune_schedule: daily

@@ -34,7 +34,8 @@ docker/             # Everything doco-cd deploys, plus the images it runs
   doco-cd/          # doco-cd deploy configs (one per host) + the doco-cd instance itself
   images/           # Container images built from this repo (see docker/images/CLAUDE.md)
 grafana-cloud/      # Alert rules synced into Grafana Cloud by CI
-docs/               # Design (design.md), host runbook (compose.md), devbox runbook (devbox.md)
+docs/               # Design (design.md), host runbook (compose.md), devbox runbook (devbox.md),
+                    # per-alert runbooks (runbooks/)
 ```
 
 Custom images (gridiron, ames-council-digest) live in their own repos —

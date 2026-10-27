@@ -49,6 +49,23 @@
     enabled: true
     state: started
 
+- name: Install the prune service and timer
+  ansible.builtin.template:
+    src: "docker-prune.{{ item }}.j2"
+    dest: "/etc/systemd/system/docker-prune.{{ item }}"
+    mode: "0644"
+  loop: [service, timer]
+  notify: Reload systemd
+
+- name: Flush the systemd reload before enabling the timer
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable the prune timer
+  ansible.builtin.systemd:
+    name: docker-prune.timer
+    enabled: true
+    state: started
+
 - name: Add users to the docker group
   ansible.builtin.user:
     name: "{{ item }}"
