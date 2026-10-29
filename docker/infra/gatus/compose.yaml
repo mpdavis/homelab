@@ -30,7 +30,6 @@ services:
     # dns-* checks cover the records themselves.
     extra_hosts:
       - audiobookshelf.mpdavis.com:10.0.1.56
-      - council.mpdavis.com:10.0.1.56
       - emby.mpdavis.com:10.0.1.56
       - iam.mpdavis.com:10.0.1.56
       - ntfy.mpdavis.com:10.0.1.56

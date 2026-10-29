@@ -15,7 +15,7 @@ Service health is public at [status.mpdavis.com](https://status.mpdavis.com).
 | Live TV | Dispatcharr, Teamarr, ECM |
 | AI | Ollama (GPU) with Open WebUI |
 | Documents | Paperless-ngx |
-| My own apps | Gridiron, Ames council digest |
+| My own apps | Gridiron |
 | Platform | Caddy, CrowdSec, Authentik, Homepage |
 | Monitoring | Gatus, ntfy, Grafana Alloy, node-exporter, cAdvisor |
 

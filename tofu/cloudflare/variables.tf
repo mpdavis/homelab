@@ -11,7 +11,6 @@ variable "records" {
     thumbs         = "public"
     seerr          = "public"
     audiobookshelf = "public"
-    council        = "public"
     emby           = "public"
     ntfy           = "public"
     status         = "public"

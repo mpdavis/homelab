@@ -42,17 +42,6 @@ audiobookshelf.mpdavis.com {
 	reverse_proxy audiobookshelf:3000
 }
 
-# /healthz answers only "ok". Serving it ahead of the auth check lets Gatus test
-# the app itself, which the Authentik redirect on every other path cannot.
-council.mpdavis.com {
-	import crowdsec
-	route {
-		reverse_proxy /healthz council:8080
-		import authentik
-		reverse_proxy council:8080
-	}
-}
-
 emby.mpdavis.com {
 	import crowdsec
 	reverse_proxy emby:8096

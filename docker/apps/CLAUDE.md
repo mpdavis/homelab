@@ -14,7 +14,7 @@ Services are grouped by what they do, not one stack each:
 | `ai` | ollama, open-webui |
 | `trading` | algo-trading: the LumiBot trader and its dashboard, on the Alpaca paper account |
 | `authentik` | the identity provider every forward-auth site and OIDC app uses |
-| `docs`, `civic`, `gridiron`, `homepage` | one app each |
+| `docs`, `gridiron`, `homepage` | one app each |
 | `proxy` | the host's Caddy instances, and CrowdSec watching the public one |
 | `monitoring` | the host's Grafana Cloud agent |
 
@@ -84,7 +84,7 @@ its stacks reference.
   so Gatus can check the app itself (see `prowlarr` in `Caddyfile.tailnet`).
 - **Scheduled jobs** use the image's own scheduler if it has one (recyclarr's
   `CRON_SCHEDULE`), else a service looping `run; sleep` — sleeping after each
-  run means runs can never overlap (see `docker/apps/civic`).
+  run means runs can never overlap.
 - **The GPU** is requested through CDI: a `deploy.resources.reservations.devices`
   entry with `driver: cdi` and `device_ids: [nvidia.com/gpu=all]`. Only the
   compose host has one.

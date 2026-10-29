@@ -93,7 +93,7 @@ project; services are grouped by what they do (`media`, `downloads`, `iptv`,
   from the image and chowns it, which the NAS refuses.
 
 Nothing is replicated. The NAS holds what matters most (media, documents,
-model weights, the council digest's state); local volumes rely on being
+model weights); local volumes rely on being
 rebuildable or on app-level backups.
 
 ## Networking

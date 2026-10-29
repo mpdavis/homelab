@@ -38,7 +38,7 @@ docs/               # Design (design.md), host runbook (compose.md), devbox runb
                     # per-alert runbooks (runbooks/)
 ```
 
-Custom images (gridiron, ames-council-digest) live in their own repos —
+Custom images (e.g. gridiron) live in their own repos —
 `mpdavis/<name>` — which publish `ghcr.io/mpdavis/<name>` from main; Renovate bumps
 the pinned tag here like any third-party image. Images with no source of their own
 are built from `docker/images/` instead — see `docker/images/CLAUDE.md`.
