@@ -53,7 +53,7 @@ services:
   # caddy-public enforces the bans. Only the public Caddy is watched: everything
   # reaching the tailnet one is already ours.
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.8.1
+    image: crowdsecurity/crowdsec:v1.8.2
     restart: unless-stopped
     labels:
       # For the CrowdSec dashboard in tofu/grafana; Alloy keeps only the
