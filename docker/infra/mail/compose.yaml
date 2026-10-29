@@ -9,6 +9,8 @@ services:
   smtp-relay:
     image: boky/postfix:v5.2.0-alpine
     restart: unless-stopped
+    cpus: 0.25
+    mem_limit: 128m
     environment:
       TZ: America/Chicago
       RELAYHOST: "[smtp.resend.com]:587"
