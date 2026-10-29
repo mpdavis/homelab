@@ -1,0 +1,36 @@
+name: mail
+
+# Outbound email relay for every host. Services hand mail to 10.0.1.58:587 with
+# no auth or TLS; this Postfix holds the provider's credentials and relays
+# upstream. Only this file, the secret in .doco-cd.yml and the records in
+# tofu/cloudflare (mail_records) name the provider, so swapping it touches
+# nothing else.
+services:
+  smtp-relay:
+    image: boky/postfix:v5.2.0-alpine
+    restart: unless-stopped
+    cpus: 0.25
+    mem_limit: 128m
+    environment:
+      TZ: America/Chicago
+      RELAYHOST: "[smtp.resend.com]:587"
+      RELAYHOST_USERNAME: resend
+      RELAYHOST_PASSWORD: ${SMTP_RELAY_PASSWORD:?resolved by doco-cd from external_secrets}
+      POSTFIX_smtp_tls_security_level: encrypt
+      # The provider only accepts senders on its verified domain, so refusing
+      # anything else here fails fast with a clear error instead of a bounce.
+      ALLOWED_SENDER_DOMAINS: notify.mpdavis.com
+      # The compose host, plus containers on either host (Docker bridges keep
+      # the source address). The image's default would let every LAN device
+      # relay.
+      POSTFIX_mynetworks: 127.0.0.0/8,172.16.0.0/12,10.0.1.55/32
+      # Resend's limit is 40MB; reject larger mail at submission, not upstream.
+      POSTFIX_message_size_limit: "41943040"
+    volumes:
+      # Mail queued while the provider is unreachable survives a recreate.
+      - spool:/var/spool/postfix
+    ports:
+      - 10.0.1.58:587:587
+
+volumes:
+  spool:

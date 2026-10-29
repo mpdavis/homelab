@@ -279,3 +279,10 @@ endpoints:
     group: internal
     url: https://sonarr.mpdavis.com/ping
     conditions: *internal-conditions
+  # --- outbound mail relay (docker/infra/mail) ---
+  # Proves the relay accepts connections, not that the provider delivers.
+  - name: smtp-relay
+    group: internal
+    url: "tcp://10.0.1.58:587"
+    conditions:
+      - "[CONNECTED] == true"

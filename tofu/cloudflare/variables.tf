@@ -34,3 +34,34 @@ variable "records" {
     birdnet        = "infra_tailnet"
   }
 }
+
+variable "mail_records" {
+  description = "Records the outbound mail provider needs to send as notify.mpdavis.com (docker/infra/mail). Keyed by a stable label; name is relative to the zone."
+  type = map(object({
+    name     = string
+    type     = string
+    content  = string
+    priority = optional(number)
+  }))
+  # Resend's, from its dashboard (Domains → notify.mpdavis.com). Swapping
+  # provider means replacing this map. On a subdomain so the root's MX and SPF
+  # stay Google's.
+  default = {
+    dkim = {
+      name    = "resend._domainkey.notify"
+      type    = "TXT"
+      content = "REPLACE_WITH_RESEND_DKIM_VALUE"
+    }
+    bounce-mx = {
+      name     = "send.notify"
+      type     = "MX"
+      content  = "feedback-smtp.us-east-1.amazonses.com"
+      priority = 10
+    }
+    bounce-spf = {
+      name    = "send.notify"
+      type    = "TXT"
+      content = "v=spf1 include:amazonses.com ~all"
+    }
+  }
+}

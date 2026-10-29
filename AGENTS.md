@@ -91,6 +91,14 @@ is public at `status.mpdavis.com` (no auth). Failing endpoints alert through Gra
 endpoint in `docker/infra/gatus/config.yaml` (correct group/conditions) *and* its `extra_hosts`
 line in `docker/infra/gatus/compose.yaml`.
 
+## Email
+
+Services send through the relay in `docker/infra/mail/`, never to a provider
+directly: SMTP at `10.0.1.58:587`, no auth, no TLS, from any address
+`@notify.mpdavis.com` (the relay refuses other sender domains). The relay holds
+the provider credentials; `docs/runbooks/email.md` covers testing it and
+swapping the provider.
+
 ## Networking
 
 - Exposure: a hostname is public or tailnet-only by which Caddyfile serves it

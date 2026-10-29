@@ -1,0 +1,4 @@
+external_secrets:
+  # The upstream provider's SMTP password: a Resend API key with sending
+  # access to notify.mpdavis.com only.
+  SMTP_RELAY_PASSWORD: 00000000-0000-0000-0000-000000000000
