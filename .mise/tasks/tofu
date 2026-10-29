@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#MISE description="Plan or apply the OpenTofu roots against the primary checkout"
+#USAGE arg "[action]" default="apply" help="plan only shows changes; apply shows them and asks before applying" {
+#USAGE   choices "plan" "apply"
+#USAGE }
+#USAGE arg "[root]" var=#true help="Roots to run, in order; all of them when omitted" {
+#USAGE   choices "proxmox" "cloudflare" "grafana"
+#USAGE }
+set -euo pipefail
+
+# State and terraform.tfvars exist only in the primary checkout, so even when this
+# runs from a worktree it plans against the primary checkout's config.
+primary=$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd)
+
+branch=$(git -C "$primary" branch --show-current)
+if [[ $branch != main ]]; then
+  echo "$primary is on '$branch'; switch it to main first" >&2
+  exit 1
+fi
+git -C "$primary" pull --ff-only --quiet
+
+read -ra roots <<<"${usage_root:-}"
+((${#roots[@]})) || roots=(proxmox cloudflare grafana)
+
+secret() { bws secret get "$1" -o json --color no | jq -r .value; }
+
+for root in "${roots[@]}"; do
+  # Assigned before export so a failed bws call stops the run under set -e.
+  case $root in
+    cloudflare)
+      CLOUDFLARE_API_TOKEN=$(secret 67c9d80b-ca8e-47b5-a2eb-b442005fab6a)
+      export CLOUDFLARE_API_TOKEN
+      ;;
+    grafana)
+      GRAFANA_AUTH=$(secret 0e847022-1d64-467a-9bf5-b4d000090360)
+      TF_VAR_ntfy_token=$(secret 47079c89-adab-4d19-8173-b48d01492747)
+      TF_VAR_sm_access_token=$(secret 7f40344d-a062-443b-95b2-b4e201086f88)
+      export GRAFANA_AUTH TF_VAR_ntfy_token TF_VAR_sm_access_token
+      ;;
+  esac
+
+  echo "==> tofu/$root"
+  # The lock file is git-ignored, so a Renovate bump to a provider constraint
+  # fails the plan until init upgrades.
+  tofu -chdir="$primary/tofu/$root" init -upgrade -input=false >/dev/null
+  tofu -chdir="$primary/tofu/$root" "${usage_action:?}"
+done
