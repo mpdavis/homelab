@@ -109,5 +109,6 @@ line in `docker/infra/gatus/compose.yaml`.
 
 - `ssh root@10.0.1.55` / `root@10.0.1.58`, then `docker` and `docker compose` for the hosts
 - `docker compose -p doco-cd logs doco-cd` for what doco-cd deployed or why it failed
-- `tofu` and `ansible-playbook` for `tofu/` and `ansible/`, run from the primary checkout
+- `tofu` and `ansible-playbook` for `tofu/` and `ansible/`, run from the primary checkout;
+  `mise tofu [plan|apply] [root...]` wraps the Tofu side (see `tofu/CLAUDE.md`)
 - `bws` for Bitwarden secrets (pass `--color no` when piping its JSON)

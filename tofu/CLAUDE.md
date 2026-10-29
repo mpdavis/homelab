@@ -19,6 +19,16 @@ tofu -chdir=~/git/homelab/tofu/cloudflare plan
 
 Pull that checkout first, or you plan against stale config.
 
+`mise tofu` does all of that — pulls the primary checkout, fetches the credentials
+below from `bws`, runs `init -upgrade`, then applies (showing the plan and asking
+first) — from the primary checkout or any worktree:
+
+```sh
+mise tofu                    # apply every root
+mise tofu plan               # plan every root
+mise tofu apply cloudflare   # one or more named roots
+```
+
 ## Addresses come from `network.yaml`
 
 `proxmox/` and `cloudflare/` read every IP — guests, Proxmox nodes, gateway,
