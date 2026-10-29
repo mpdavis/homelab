@@ -62,10 +62,6 @@
         icon: paperless-ngx.png
         href: https://paperless.mpdavis.com
         description: Document management & OCR
-    - Council Digest:
-        icon: mdi-gavel
-        href: https://council.mpdavis.com
-        description: Ames city council meeting digests
     - Gridiron:
         icon: mdi-football
         href: https://gridiron.mpdavis.com

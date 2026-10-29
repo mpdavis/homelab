@@ -127,12 +127,6 @@ endpoints:
     client: *auth-client
     headers: *auth-headers
     conditions: *auth-conditions
-  - name: council-digest
-    group: external-auth
-    url: https://council.mpdavis.com/
-    client: *auth-client
-    headers: *auth-headers
-    conditions: *auth-conditions
   - name: gridiron
     group: external-auth
     url: https://gridiron.mpdavis.com/
@@ -158,11 +152,6 @@ endpoints:
     group: dns
     url: "1.1.1.1"
     dns: {query-type: A, query-name: audiobookshelf.mpdavis.com}
-    conditions: *public-dns
-  - name: dns-council
-    group: dns
-    url: "1.1.1.1"
-    dns: {query-type: A, query-name: council.mpdavis.com}
     conditions: *public-dns
   - name: dns-emby
     group: dns
@@ -289,8 +278,4 @@ endpoints:
   - name: sonarr-app
     group: internal
     url: https://sonarr.mpdavis.com/ping
-    conditions: *internal-conditions
-  - name: council-digest-app
-    group: internal
-    url: https://council.mpdavis.com/healthz
     conditions: *internal-conditions

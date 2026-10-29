@@ -7,7 +7,7 @@ to `main` that touches `docker/images/`.
 ## When an image belongs here
 
 Only when it is a build recipe with no source of its own — a Dockerfile and
-nothing else. Anything with code (gridiron, ames-council-digest) gets its own
+nothing else. Anything with code (gridiron) gets its own
 `mpdavis/<name>` repo and publishes from there.
 
 `caddy-cloudflare` is here because the stock Caddy image ships no DNS providers,
