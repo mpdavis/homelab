@@ -23,3 +23,16 @@ resource "cloudflare_dns_record" "service" {
   proxied = false
   comment = "Managed by OpenTofu (${each.value})"
 }
+
+resource "cloudflare_dns_record" "mail" {
+  for_each = var.mail_records
+
+  zone_id  = var.zone_id
+  name     = "${each.value.name}.mpdavis.com"
+  type     = each.value.type
+  content  = each.value.content
+  priority = each.value.priority
+  ttl      = 1
+  proxied  = false
+  comment  = "Managed by OpenTofu (mail: ${each.key})"
+}

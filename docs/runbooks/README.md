@@ -8,6 +8,7 @@ links to it with a `runbook_url` annotation in `grafana-cloud/rules/`.
 | --- | --- |
 | [Disk filling up](disk-full.md) | `HostFilesystemEarlyWarning` |
 | [doco-cd deploys failing](doco-cd.md) | `DocoCdDeploymentFailed`, `DocoCdPollFailing` |
+| [Outbound email](email.md) | `GatusEndpointDown` (`smtp-relay`) |
 
 When an alert fires without a page, or a page was wrong, write or fix it while
 the fix is fresh. Keep a page to commands someone half-awake can paste; the
