@@ -79,16 +79,21 @@ groups:
           description: >-
             A deploy of {{ $labels.deployment }} on {{ $labels.host }} errored.
             `docker compose -p doco-cd logs doco-cd` on the host has the reason.
+          runbook_url: https://github.com/mpdavis/homelab/blob/main/docs/runbooks/doco-cd.md
 
       # Polls every 60s; a few misses are a GitHub blip, 15 minutes of them
-      # means nothing merged is reaching the host.
+      # means nothing merged is reaching the host. The counter also rises when
+      # a poll's deploy fails, so one broken stack retrying fires this too,
+      # alongside DocoCdDeploymentFailed.
       - alert: DocoCdPollFailing
         expr: rate(doco_cd_poll_errors_total[5m]) > 0
         for: 15m
         labels:
           severity: warning
         annotations:
-          summary: "doco-cd on {{ $labels.host }} cannot poll the repo"
+          summary: "doco-cd poll jobs failing on {{ $labels.host }}"
           description: >-
-            doco-cd on {{ $labels.host }} has been failing to poll
-            {{ $labels.repository }} for 15 minutes, so merges are not deploying.
+            doco-cd on {{ $labels.host }} has had failing poll jobs for
+            {{ $labels.repository }} for 15 minutes: either it cannot reach the
+            repo, or a stack's deploy keeps failing.
+          runbook_url: https://github.com/mpdavis/homelab/blob/main/docs/runbooks/doco-cd.md
