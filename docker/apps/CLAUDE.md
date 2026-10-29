@@ -73,7 +73,10 @@ its stacks reference.
   restarts a container that later goes unhealthy — so a check that is subtly
   wrong becomes a restart loop. Prefer the one the image ships
   (`docker inspect <image> --format '{{.Config.Healthcheck}}'`) over writing
-  one, and if you do write one, use a binary the image actually has.
+  one, and if you do write one, use a binary the image actually has. doco-cd
+  gives up after 180s; a service that takes longer to turn healthy (a long
+  `start_period`) needs `timeout:` in the stack's `.doco-cd.yml`, or every
+  deploy fails and recreates it mid-start.
 - **Volumes are named `<project>_<key>`,** so the stack a service lives in
   decides its volume names. Data copied in by hand has to go to that name.
 - **Service names are global on the `proxy` network.** A generic name (`web`,

@@ -41,8 +41,10 @@ systemctl list-timers docker-prune.timer
 journalctl -u docker-prune.service -n 20
 ```
 
-If the timer is missing, re-run `ansible-playbook playbooks/docker-host.yml
---limit <host>`.
+If the timer is missing, the host was configured before it existed: pull
+the primary checkout up to `main`, then re-run `ansible-playbook
+playbooks/docker-host.yml --limit <host>`. Running the service once by hand
+(`systemctl start docker-prune.service`) frees the space straight away.
 
 ## If cleanup is not enough
 
