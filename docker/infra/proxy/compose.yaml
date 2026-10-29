@@ -4,6 +4,8 @@ services:
   caddy-tailnet:
     image: ghcr.io/mpdavis/caddy-cloudflare:latest@sha256:c36d72e3f09176ab421a6979bd164de84d57540f6511337405095491150d051d
     restart: unless-stopped
+    cpus: 0.5
+    mem_limit: 128m
     ports:
       - 10.0.1.58:80:80
       - 10.0.1.58:443:443
