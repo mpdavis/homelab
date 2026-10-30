@@ -28,6 +28,39 @@ services:
       retries: 3
       start_period: 60s
 
+  # Registers each prompters/<name>.Modelfile as prompter-<name>. Modelfiles only
+  # take effect through `ollama create`, and doco-cd recreates this service when a
+  # mounted one changes, so a push is enough. A new Modelfile needs a mount here.
+  prompters:
+    image: ollama/ollama:0.40.13
+    restart: unless-stopped
+    init: true
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        for f in /prompters/*.Modelfile; do
+          name="prompter-$$(basename "$$f" .Modelfile)"
+          ollama create "$$name" -f "$$f"
+        done
+        touch /tmp/ready
+        exec sleep infinity
+    volumes:
+      - ./prompters/flux.Modelfile:/prompters/flux.Modelfile:ro
+      - ./prompters/krea2.Modelfile:/prompters/krea2.Modelfile:ro
+      - ./prompters/sdxl.Modelfile:/prompters/sdxl.Modelfile:ro
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+
   open-webui:
     image: ghcr.io/open-webui/open-webui:v0.12.5
     restart: unless-stopped
