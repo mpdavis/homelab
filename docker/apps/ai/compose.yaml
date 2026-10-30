@@ -52,6 +52,7 @@ services:
         exec sleep infinity
     volumes:
       - ./prompters/flux.Modelfile:/prompters/flux.Modelfile:ro
+      - ./prompters/krea2.Modelfile:/prompters/krea2.Modelfile:ro
       - ./prompters/sdxl.Modelfile:/prompters/sdxl.Modelfile:ro
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/ready"]
