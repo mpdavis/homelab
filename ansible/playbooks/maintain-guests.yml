@@ -17,7 +17,7 @@
         grafana_annotation_text: Guest patching (maintain-guests.yml)
 
 - name: Patch guests
-  hosts: all:!pve
+  hosts: lxc:vm
   serial: 1
   become: true
   roles:

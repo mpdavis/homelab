@@ -1,0 +1,15 @@
+---
+# Patches everything Renovate doesn't: BirdNET, then the Proxmox guests, then
+# the nodes. The nodes go last because their reboots restart every guest, so the
+# guests come back already patched. Run it from the Mac, not devbox.
+#
+#   ansible-playbook playbooks/maintain.yml
+
+- name: Maintain BirdNET
+  ansible.builtin.import_playbook: maintain-birdnet.yml
+
+- name: Maintain the Proxmox guests
+  ansible.builtin.import_playbook: maintain-guests.yml
+
+- name: Maintain the Proxmox nodes
+  ansible.builtin.import_playbook: maintain-pve.yml
