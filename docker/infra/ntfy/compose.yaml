@@ -7,6 +7,8 @@ services:
   ntfy:
     image: binwiederhier/ntfy:v2.36.0
     restart: unless-stopped
+    cpus: 0.5
+    mem_limit: 128m
     user: "1000:1000"
     command: ["serve"]
     read_only: true
