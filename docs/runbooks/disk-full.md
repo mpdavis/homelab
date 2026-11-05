@@ -3,7 +3,7 @@
 **Alert:** `HostFilesystemEarlyWarning` — a filesystem over 5G has been under
 20% free for 30 minutes (`grafana-cloud/rules/docker-hosts.yml`).
 
-The infra host's root disk is only 6.8G, so it is the one that trips this; the
+The infra host's root disk is 16G, so it is the one that trips this; the
 compose host has 128G.
 
 ## Find what is using it
