@@ -42,6 +42,7 @@ services:
       - home.mpdavis.com:10.0.1.57
       - listenarr.mpdavis.com:10.0.1.57
       - mousehole.mpdavis.com:10.0.1.57
+      - paperclip.mpdavis.com:10.0.1.57
       - paperless.mpdavis.com:10.0.1.57
       - podfetch.mpdavis.com:10.0.1.57
       - prowlarr.mpdavis.com:10.0.1.57

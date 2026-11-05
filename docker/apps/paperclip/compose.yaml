@@ -1,0 +1,53 @@
+name: paperclip
+
+services:
+  # The image starts as root only to remap its `node` user, then drops to it
+  # with gosu, so no `user:` here. Agents run inside this container.
+  paperclip:
+    # Upstream publishes no version tags, only latest/beta/sha-*.
+    image: ghcr.io/paperclipai/paperclip:latest@sha256:40f46940c4612ead131aebe6079cd4651f8cd1434af49f7c621887f4a452a62e
+    restart: unless-stopped
+    # Upstream's quickstart values: a backstop against leaked agent processes,
+    # and time for in-flight agent runs to settle on shutdown. Since
+    # v2026.1012.0 an old and a new container writing the same data corrupt
+    # each other, so the old one must be fully stopped before the new starts.
+    pids_limit: 2048
+    stop_grace_period: 90s
+    environment:
+      TZ: America/Chicago
+      PAPERCLIP_PUBLIC_URL: https://paperclip.mpdavis.com
+      # caddy-tailnet is the only hop in front.
+      TRUST_PROXY: "1"
+      # Agent API keys must be Paperclip secret refs, attached per agent,
+      # never plain env values.
+      PAPERCLIP_SECRETS_STRICT_MODE: "true"
+      PAPERCLIP_TELEMETRY_DISABLED: "1"
+      BETTER_AUTH_SECRET: ${PAPERCLIP_BETTER_AUTH_SECRET:?resolved by doco-cd from external_secrets}
+      PAPERCLIP_TOOL_ACTION_SIGNING_SECRET: ${PAPERCLIP_TOOL_ACTION_SIGNING_SECRET:?resolved by doco-cd from external_secrets}
+      # Encrypts every secret stored in Paperclip; a database restore is
+      # useless without the key that went with it.
+      PAPERCLIP_SECRETS_MASTER_KEY: ${PAPERCLIP_SECRETS_MASTER_KEY:?resolved by doco-cd from external_secrets}
+    volumes:
+      - data:/paperclip
+    # The image has no curl or wget. /api/health returns 503 when the
+    # embedded Postgres is unreachable.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/api/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    # Not on `proxy`: agents run here with permission prompts skipped, and
+    # `proxy` would put every other routed service in their reach. Only
+    # caddy-tailnet shares this network.
+    networks:
+      - paperclip
+
+volumes:
+  # Embedded Postgres, uploads, agent workspaces, and HOME (CLI logins).
+  # Local disk, not NFS, because it holds a database.
+  data:
+
+networks:
+  paperclip:
+    external: true
