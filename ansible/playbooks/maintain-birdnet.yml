@@ -1,0 +1,34 @@
+---
+# Patches the BirdNET-Pi: the OS, then BirdNET-Pi itself through its own
+# updater. Recording stops while it reboots onto a new kernel.
+#
+#   ansible-playbook playbooks/maintain-birdnet.yml
+
+- name: Start BirdNET maintenance
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Annotate Grafana
+      ansible.builtin.import_role:
+        name: grafana_annotation
+        tasks_from: start
+      vars:
+        grafana_annotation_tags: [maintenance, birdnet]
+        grafana_annotation_text: BirdNET patching (maintain-birdnet.yml)
+
+- name: Patch BirdNET
+  hosts: birdnet_pi
+  become: true
+  roles:
+    - apt_upgrade
+    - birdnet_pi
+    - kernel_reboot
+
+- name: Finish BirdNET maintenance
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Close the Grafana annotation
+      ansible.builtin.import_role:
+        name: grafana_annotation
+        tasks_from: finish

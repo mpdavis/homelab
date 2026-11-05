@@ -1,0 +1,40 @@
+---
+- name: Find the BirdNET-Pi checkout
+  ansible.builtin.find:
+    paths: /home
+    patterns: BirdNET-Pi
+    file_type: directory
+    depth: 2
+    recurse: true
+  register: birdnet_pi_checkout
+
+- name: Remember where BirdNET-Pi lives and who owns it
+  ansible.builtin.set_fact:
+    birdnet_pi_dir: "{{ birdnet_pi_checkout.files[0].path }}"
+    birdnet_pi_user: "{{ birdnet_pi_checkout.files[0].pw_name }}"
+
+# Ansible needs it to hand module files to the checkout's owner.
+- name: Install acl
+  ansible.builtin.apt:
+    name: acl
+
+# Fetching as root would leave root-owned objects in the owner's .git. The git
+# module can't fetch without also checking out, nor count commits.
+- name: Fetch BirdNET-Pi  # noqa: command-instead-of-module
+  ansible.builtin.command: git -C {{ birdnet_pi_dir }} fetch origin main
+  become_user: "{{ birdnet_pi_user }}"
+  changed_when: false
+
+- name: Count the commits BirdNET-Pi is behind  # noqa: command-instead-of-module
+  ansible.builtin.command: git -C {{ birdnet_pi_dir }} rev-list --count HEAD..origin/main
+  become_user: "{{ birdnet_pi_user }}"
+  register: birdnet_pi_behind
+  changed_when: false
+
+# BirdNET-Pi's own updater, the one its web UI runs: it resets the checkout to
+# origin/main and then migrates the host (services, packages, config), which a
+# plain git pull would skip. It drops to the checkout's owner itself.
+- name: Run the BirdNET-Pi updater
+  ansible.builtin.command: "{{ birdnet_pi_dir }}/scripts/update_birdnet.sh"
+  when: birdnet_pi_behind.stdout | int > 0
+  changed_when: true
