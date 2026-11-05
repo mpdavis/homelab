@@ -30,6 +30,7 @@ variable "records" {
     paperless      = "compose_tailnet"
     ai             = "compose_tailnet"
     trading        = "compose_tailnet"
+    paperclip      = "compose_tailnet"
     proxmox        = "infra_tailnet"
     birdnet        = "infra_tailnet"
   }

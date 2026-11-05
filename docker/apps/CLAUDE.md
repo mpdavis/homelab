@@ -14,7 +14,7 @@ Services are grouped by what they do, not one stack each:
 | `ai` | ollama, open-webui |
 | `trading` | algo-trading: the LumiBot trader and its dashboard, on the Alpaca paper account |
 | `authentik` | the identity provider every forward-auth site and OIDC app uses |
-| `docs`, `gridiron`, `homepage` | one app each |
+| `docs`, `gridiron`, `homepage`, `paperclip` | one app each |
 | `proxy` | the host's Caddy instances, and CrowdSec watching the public one |
 | `monitoring` | the host's Grafana Cloud agent |
 
@@ -44,6 +44,10 @@ Routed services join the external `proxy` network, and Caddy reaches them as
 `<service>:<port>`. Nothing publishes a LAN port for Caddy's benefit — the
 Ansible `docker` role creates the network, because stacks deploy in parallel
 and no stack can be relied on to create it first.
+
+The exception is Paperclip, whose agents run shell commands unattended: it gets
+its own `paperclip` network, shared only with `caddy-tailnet`, so they cannot
+reach the rest. The `docker` role creates that one too.
 
 ## Secrets
 

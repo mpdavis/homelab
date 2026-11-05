@@ -57,6 +57,10 @@
         icon: open-webui.png
         href: https://ai.mpdavis.com
         description: AI chat interface (Ollama)
+    - Paperclip:
+        icon: mdi-paperclip
+        href: https://paperclip.mpdavis.com
+        description: AI agent company control plane
 - Personal:
     - Paperless:
         icon: paperless-ngx.png
