@@ -2,3 +2,5 @@ external_secrets:
   # Alpaca paper account.
   ALPACA_PAPER_API_KEY: 411504cb-bb1d-44c2-9c15-b4de0139a13c
   ALPACA_PAPER_API_SECRET: d4f6a545-8a9d-4037-a085-b4de0139a179
+  # Unlocks the dashboard's controls.
+  TRADING_DASHBOARD_TOKEN: REPLACE-WITH-BITWARDEN-UUID
