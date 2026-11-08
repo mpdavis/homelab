@@ -23,6 +23,7 @@ network:
     devbox: 192.168.1.54
     apps: 192.168.1.55
     infra: 192.168.1.58
+    birdnet: 192.168.63.190
 
   # Extra addresses on the apps host, one per Caddy instance. They must stay
   # clear of any address the router or a guest might be handed.

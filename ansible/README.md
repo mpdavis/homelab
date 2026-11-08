@@ -29,6 +29,7 @@ a worktree, symlink the primary checkout's copy in first.
 | `gpu` | apps | Holds the passthrough GPU |
 | `tailscale_router` | tailscale-router | Tailscale subnet router for the LAN |
 | `development` | devbox | Always-on development host |
+| `birdnet_pi` | birdnet | BirdNET-Pi on a Raspberry Pi, outside Proxmox; reached through the subnet router |
 | `lxc` / `vm` | every guest, by type | Target platform roles with e.g. `docker:&vm` |
 
 ## Playbooks
@@ -44,6 +45,8 @@ Run from `ansible/`: `ansible-playbook playbooks/<playbook>.yml`.
 | `devbox.yml` | `development` | The development host; see `docs/devbox.md` |
 | `maintain-guests.yml` | every guest | Patches one guest at a time, reboots where an update asks, prunes Docker images |
 | `maintain-pve.yml` | `pve` | Patches one node at a time, reboots onto a new kernel and waits for its guests |
+| `maintain-birdnet.yml` | `birdnet_pi` | Patches the Pi, updates BirdNET-Pi with its own updater, reboots onto a new kernel |
+| `maintain.yml` | everything above | All three maintenance playbooks: BirdNET, then the guests, then the nodes |
 
 From bare Proxmox, in order (doco-cd then deploys every stack from `main`):
 
@@ -56,14 +59,22 @@ ansible-playbook playbooks/docker-host.yml
 
 ## Maintenance
 
-Ubuntu's unattended-upgrades already applies security patches to the guests
-daily, but it never reboots, and it leaves the NVIDIA driver alone (see
-`roles/gpu`). The maintenance playbooks cover the rest:
+Renovate keeps the container images current; these playbooks patch the hosts
+underneath them. Ubuntu's unattended-upgrades already applies security patches
+to the guests daily, but it never reboots, and it leaves the NVIDIA driver alone
+(see `roles/gpu`). The maintenance playbooks cover the rest:
 
 ```bash
-ansible-playbook playbooks/maintain-guests.yml
+ansible-playbook playbooks/maintain.yml           # everything, in a safe order
+ansible-playbook playbooks/maintain-guests.yml    # or one tier at a time
 ansible-playbook playbooks/maintain-pve.yml
+ansible-playbook playbooks/maintain-birdnet.yml
 ```
+
+BirdNET-Pi ships with SSH off. To bring the Pi under Ansible, enable it
+(`sudo raspi-config nonint do_ssh 0`), put your public key in
+`/root/.ssh/authorized_keys`, and give the Pi a DHCP reservation so its entry in
+`network.yaml` stays true.
 
 Both work through their hosts one at a time and stop at the first failure.
 Run them from the Mac, not devbox: devbox lives on pve1 and reboots during
