@@ -12,6 +12,7 @@ This page is the why. The how lives next to the code:
 | Proxmox guests, DNS records, alert routing | `tofu/CLAUDE.md` |
 | Images built from this repo | `docker/images/CLAUDE.md` |
 | The development host | `docs/devbox.md` |
+| Hob, the SRE agent: alert threads, investigation, PRs | `docs/sre-agent.md` |
 
 ## Goals
 
