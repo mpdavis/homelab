@@ -13,7 +13,7 @@ served from this host (ntfy, the status page) publishes its port on this
 host's LAN address, and `docker/apps/proxy/Caddyfile.public` proxies to it. The
 backend survives a compose-host outage; the public route does not.
 
-**Every service here sets `cpus` and `mem_limit`.** The host is a 1 vCPU / 1 GB
+**Every service here sets `cpus` and `mem_limit`.** The host is a 2 vCPU / 2 GB
 VM with no swap, so one runaway service would otherwise take Gatus and ntfy
 down with it. Size the memory limit at 3–4× the container's observed peak
 (`memory.peak` under `/sys/fs/cgroup/system.slice/docker-<id>.scope/`). doco-cd
