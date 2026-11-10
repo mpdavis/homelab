@@ -14,72 +14,84 @@ on its own.
 - One threaded, persistent space per alert — findings, follow-ups and the
   resolve all land in the same place
 - Being paged keeps working while either VM, or the whole homelab, is down
+  (once IRM pages; see Paging)
 - Persistent changes go through GitOps: the agent opens a PR, a human merges,
   doco-cd deploys
 - What the agent can break is bounded by the credentials it holds, not by
   instructions in its prompt
 - Self-hosted runtime; inference on the Anthropic API
 
-## Why ntfy goes
+## Paging
 
-ntfy messages are ephemeral and unthreaded, so there is nowhere to hang an
-investigation or a conversation. ntfy also has a reachability gap: Grafana
-Cloud reaches `ntfy.mpdavis.com` through `caddy-public` on the apps host, so an
-outage of the apps VM silences the alerts about it.
+ntfy stays the page for now. Its messages are ephemeral and unthreaded, so it
+cannot hold an investigation, and Grafana Cloud reaches it through
+`caddy-public` on the apps host, so an apps-VM outage silences the alerts about
+it. Both go away when IRM's escalation chain (below) takes over paging through
+the Grafana mobile app; that is deliberately a later step.
 
 ## Architecture
 
 ```text
-Grafana Cloud ──(native contact point)──► Discord #alerts-fallback
-      ▲                                   (no homelab dependency)
-      │ polls Alertmanager API (outbound only)
-┌─────┴──────────── infra VM (pve1) ───────────────────────────────┐
-│ hob-dispatcher ──► Discord forum: one post per alert group       │
-│      │  ▲            (bot gateway: outbound websocket)           │
-│      ▼  │ replies, approval buttons                              │
-│ hob-agent (Claude Agent SDK)                                     │
-│   reads: Grafana (read-only token), Gatus API, a clone of this   │
-│          repo                                                    │
-│   acts:  ssh hob@<host> → forced-command allowlist               │
-│          Proxmox API token (VM.PowerMgmt on the two VMs)         │
-│          GitHub App → branches and PRs                           │
-└──────────────────────────────────────────────────────────────────┘
+Grafana Alerting ──► ntfy                         (paging, for now)
+      │
+      └──► Grafana IRM ── alert group ──► outgoing webhooks ──► Discord forum
+           (grouping, state,              (open post; reply     #homelab-alerts
+            resolution notes)              on status change)        │
+                ▲                                                   │ bot gateway
+                │ resolution notes                                  │ (outbound)
+┌───────────────┴─────────── infra VM (pve1) ───────────────────────▼──┐
+│ hob (Claude Agent SDK + Discord bot)                                 │
+│   reads: Grafana (read-only token), Gatus API, a clone of this repo  │
+│   acts:  ssh hob@<host> → forced-command allowlist                   │
+│          Proxmox API token (VM.PowerMgmt on the two VMs)             │
+│          GitHub App → branches and PRs                               │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-It runs on the infra host for the same reason Gatus and ntfy do: it has to
+Hob runs on the infra host for the same reason Gatus and ntfy do: it has to
 work while the compose host is down. The code lives in its own repo,
 `mpdavis/hob`, publishing `ghcr.io/mpdavis/hob`; the stack lives in
 `docker/infra/hob/`.
 
-### Chat: Discord forum channel
+### Alert groups: Grafana IRM
 
-Each alert group (`alertname` + `host`, matching the Grafana grouping) becomes
-a forum post. Re-fires and resolves reply in the same post; tags carry state:
-`firing`, `investigating`, `needs-you`, `resolved`.
+Every alert also goes to a Grafana IRM integration (`tofu/grafana/irm.tf`).
+IRM owns what a hand-built dispatcher would have: grouping (`alertname` +
+`host`, from the notification policy), state (firing, acknowledged, resolved,
+silenced) and history. Its default route has no escalation chain yet, so it
+pages nobody.
 
-Discord sits outside the homelab, so paging survives any homelab outage, and
-the bot connects over an outbound websocket, so the chat side needs no inbound
-port. Zulip has the better threading model (a topic per alert) and is
-self-hostable, but it would be one more service that has to be up for you to
-be told that services are down.
+A re-fire after a resolve is a new alert group, so it gets a new post.
 
-### Intake: poll, don't receive
+### Threads: IRM webhooks into a Discord forum
 
-The dispatcher polls Grafana Cloud's Alertmanager API every 30s. A webhook
-would need a public endpoint, and every public endpoint today is
-`caddy-public` on the apps host — the gap that sinks ntfy. Polling needs no
-inbound path and costs at most 30s of latency.
+Two IRM outgoing webhooks, no homelab code:
 
-The dispatcher keys threads by alert-group fingerprint and keeps the mapping
-(thread ↔ group ↔ agent session) in SQLite on a named volume.
+- **Alert group created** posts to the forum's Discord webhook with
+  `thread_name` and `wait=true`. That opens a forum post and returns its first
+  message, whose `channel_id` is the post
+- **Status change** posts to the same webhook with
+  `thread_id={{ responses["<open webhook>"].channel_id }}`: IRM keeps every
+  webhook's response per alert group, so the acknowledge, resolve or re-fire
+  lands inside the original post
 
-### Fallback path
+The opening message carries an ``IRM alert group: `<id>` `` line, which is how
+Hob ties a post back to IRM.
 
-The dispatcher posts a heartbeat metric. A Grafana rule on a missing heartbeat
-routes through a native Discord contact point straight to `#alerts-fallback`,
-bypassing the homelab entirely. Critical alerts also go to that contact point
-until the dispatcher has proven itself; that duplication is removed once
-phase 1 has run for a while.
+Discord sits outside the homelab, so the threads survive any homelab outage.
+IRM's webhooks do not retry, so a Discord failure can lose a post or a reply;
+IRM stays the record. Forum tags need a bot-authenticated call, so Hob manages
+them, not the webhooks.
+
+### Intake: the forum is the queue
+
+Hob connects to Discord as a bot over the gateway, an outbound websocket. A
+new post in the forum is a new alert group to investigate; a human reply in a
+post is a follow-up. No public endpoint and no polling, so nothing depends on
+`caddy-public` or the apps host.
+
+When an investigation concludes, Hob writes it to the alert group as an IRM
+resolution note, so the record outlives the Discord thread.
 
 ### Agent runtime
 
@@ -94,8 +106,7 @@ starts with the `CLAUDE.md` files, `.claude/agents/diagnose-service.md` and
   asked for in the thread
 - **Debounce**: warnings wait 5 minutes before an investigation starts, so a
   flapping alert costs nothing; criticals start at once
-- **Spend**: a turn and cost cap per investigation, a daily cap in the
-  dispatcher, and a dedicated Anthropic workspace whose key has its own spend
+- **Spend**: a turn and cost cap per investigation, a daily cap in Hob, and a dedicated Anthropic workspace whose key has its own spend
   limit
 
 ## Identity
@@ -159,23 +170,26 @@ both of us can read and correct it, not in an opaque memory store.
 
 ## Phases
 
-1. **Discord replaces ntfy** — dispatcher, forum threads, the fallback contact
-   point and heartbeat rule. No agent. Retire ntfy at the end
-2. **Read-only agent** — T0 only; posts an investigation into each new thread
-   and answers replies
+1. **Alert threads** — IRM integration and the two Discord webhooks
+   (`tofu/grafana/irm.tf`). No homelab code
+2. **Read-only agent** — Hob as a Discord bot; T0 only; posts an investigation
+   into each new post, answers replies, writes IRM resolution notes
 3. **Pull requests** — the GitHub App; T3
 4. **Host actions** — `hob-action`, the Proxmox token, approval buttons; T1
    and T2
 5. **Proactive work** — a daily sweep (Gatus, disk trends, the doco-cd image
    leak, pending reboots, failing Renovate PRs, cert expiry) and a weekly
    summary post
+6. **Paging moves to IRM** — an escalation chain to the Grafana mobile app;
+   ntfy retires
 
 ## Decisions
 
 | Decision | Choice | Why |
 |---|---|---|
-| Chat | Discord forum | Outside the homelab; threads; good mobile push |
-| Intake | Poll Alertmanager API | No inbound path; no dependency on the apps host |
+| Alert state | Grafana IRM | Grouping, state and history off the shelf; free for one user |
+| Chat | Discord forum, fed by IRM webhooks | Outside the homelab; one thread per alert group; no code |
+| Intake | Hob watches the forum over the gateway | No inbound path; no dependency on the apps host |
 | Runtime | Claude Agent SDK on infra | Reuses repo docs and agents; survives apps outage |
 | GitHub identity | App without `workflows` | Scoped, short-lived, cannot reach CI secrets |
 | Host writes | SSH forced command | Allowlisted, auditable, Ansible-managed |
