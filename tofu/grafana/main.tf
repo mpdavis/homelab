@@ -24,6 +24,13 @@ resource "grafana_contact_point" "ntfy" {
     authorization_scheme      = "Bearer"
     authorization_credentials = var.ntfy_token
   }
+
+  # Every alert also opens an IRM alert group, which is what starts a Discord
+  # thread for Hob (irm.tf). ntfy stays the page until IRM's escalation takes
+  # that over.
+  oncall {
+    url = grafana_oncall_integration.homelab.link
+  }
 }
 
 # Replaces the stack's whole policy tree; nothing else routes alerts here.

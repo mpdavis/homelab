@@ -9,3 +9,9 @@ variable "sm_access_token" {
   type        = string
   sensitive   = true
 }
+
+variable "discord_alerts_webhook" {
+  description = "Discord webhook URL for the #homelab-alerts forum; set TF_VAR_discord_alerts_webhook, see CLAUDE.md."
+  type        = string
+  sensitive   = true
+}
