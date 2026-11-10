@@ -1,0 +1,5 @@
+---
+# The private half is in Bitwarden ("Hob - SSH Private Key") and reaches Hob
+# through docker/infra/hob/.doco-cd.yml.
+hob_access_public_key: >-
+  ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIERxyfE6X2BpdtvoqI3maO7LvSftwUprI8COrtn7UN8d hob@homelab

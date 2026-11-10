@@ -1,0 +1,31 @@
+---
+# Read-only host access for Hob, the SRE agent (docs/sre-agent.md). Its key can
+# run hob-action and nothing else: no shell, no forwarding, no PTY.
+
+# docker is root-equivalent for anyone who can run arbitrary docker commands;
+# hob can only reach it through hob-action's verbs. systemd-journal lets
+# journalctl read system units without sudo.
+- name: Create the hob user
+  ansible.builtin.user:
+    name: hob
+    system: true
+    shell: /bin/sh
+    password: "!"
+    groups: [docker, systemd-journal]
+    append: false
+    create_home: true
+
+- name: Install hob-action
+  ansible.builtin.template:
+    src: hob-action.sh.j2
+    dest: /usr/local/bin/hob-action
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Authorize Hob's key for hob-action only
+  ansible.posix.authorized_key:
+    user: hob
+    key: "{{ hob_access_public_key }}"
+    key_options: 'restrict,command="/usr/local/bin/hob-action"'
+    exclusive: true

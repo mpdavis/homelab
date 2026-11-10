@@ -1,0 +1,85 @@
+#!/bin/bash
+# {{ ansible_managed }}
+{% raw %}
+#
+# The forced command for Hob's SSH key (ansible/roles/hob_access). sshd runs
+# this instead of whatever Hob asked for, with the request in
+# SSH_ORIGINAL_COMMAND. Only the read-only verbs below run. The client side,
+# hob/hostcmd.py in mpdavis/hob, must agree with this file.
+set -euo pipefail
+
+fail() {
+  echo "hob-action: $*" >&2
+  exit 2
+}
+
+read -r -a words <<<"${SSH_ORIGINAL_COMMAND:-}"
+((${#words[@]})) || fail "no command"
+verb=${words[0]}
+args=("${words[@]:1}")
+
+# Nothing that reaches docker or journalctl may start with a dash or carry a
+# shell character; each argument is passed on as one word, never re-parsed.
+for arg in ${args[@]+"${args[@]}"}; do
+  [[ $arg =~ ^[A-Za-z0-9][A-Za-z0-9._:@+-]{0,127}$ ]] || fail "argument not allowed: $arg"
+done
+
+nargs() {
+  ((${#args[@]} >= $1 && ${#args[@]} <= $2)) || fail "usage: $verb $3"
+}
+
+case $verb in
+  ps)
+    nargs 0 0 ""
+    exec docker ps -a --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.RunningFor}}'
+    ;;
+  logs)
+    nargs 1 3 "container [since] [tail]"
+    tail=${args[2]:-200}
+    if ! [[ $tail =~ ^[0-9]+$ ]] || ((tail > 2000)); then
+      fail "tail must be a number up to 2000"
+    fi
+    opts=(--timestamps --tail "$tail")
+    if ((${#args[@]} >= 2)); then
+      since=${args[1]}
+      # docker takes Go durations (30m, 6h) or timestamps, but no days.
+      [[ $since =~ ^([0-9]+)d$ ]] && since="$((BASH_REMATCH[1] * 24))h"
+      opts+=(--since "$since")
+    fi
+    exec docker logs "${opts[@]}" -- "${args[0]}" 2>&1
+    ;;
+  inspect)
+    nargs 1 1 "container"
+    # Environment variables carry the secrets doco-cd injects; they must not
+    # leave the host.
+    docker inspect --type container -- "${args[0]}" |
+      python3 -c 'import json, sys
+d = json.load(sys.stdin)
+for c in d:
+    c.get("Config", {}).pop("Env", None)
+json.dump(d, sys.stdout, indent=1)'
+    ;;
+  df)
+    nargs 0 0 ""
+    exec df -h -x tmpfs -x overlay -x devtmpfs -x squashfs
+    ;;
+  journal)
+    nargs 1 2 "unit [since]"
+    opts=(--no-pager --lines 500 --unit "${args[0]}")
+    if ((${#args[@]} == 2)); then
+      since=${args[1]}
+      # 30m, 6h, 2d → journalctl's relative form; timestamps pass through.
+      if [[ $since =~ ^([0-9]+)([smhd])$ ]]; then
+        unit=${BASH_REMATCH[2]}
+        [[ $unit == m ]] && unit=min
+        since="-${BASH_REMATCH[1]}$unit"
+      fi
+      opts+=(--since "$since")
+    fi
+    exec journalctl "${opts[@]}"
+    ;;
+  *)
+    fail "unknown command: $verb (allowed: ps logs inspect df journal)"
+    ;;
+esac
+{% endraw %}
