@@ -40,8 +40,9 @@ docs/               # Design (design.md), host runbook (compose.md), devbox runb
 
 Custom images (e.g. gridiron) live in their own repos —
 `mpdavis/<name>` — which publish `ghcr.io/mpdavis/<name>` from main; Renovate bumps
-the pinned tag here like any third-party image. Images with no source of their own
-are built from `docker/images/` instead — see `docker/images/CLAUDE.md`.
+the pinned tag here like any third-party image. Images with no source of their own,
+and code that exists only to run this homelab (Hob), are built from `docker/images/`
+instead — see `docker/images/CLAUDE.md`.
 
 The `add-service` skill walks through everything a new service needs.
 

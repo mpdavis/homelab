@@ -6,9 +6,13 @@ to `main` that touches `docker/images/`.
 
 ## When an image belongs here
 
-Only when it is a build recipe with no source of its own — a Dockerfile and
-nothing else. Anything with code (gridiron) gets its own
-`mpdavis/<name>` repo and publishes from there.
+When it is a build recipe with no source of its own — a Dockerfile and
+nothing else — or when its code exists only to run this homelab. Anything with
+a life of its own (gridiron) gets its own `mpdavis/<name>` repo and publishes
+from there.
+
+`hob` is here because it is the homelab's SRE agent (`docs/sre-agent.md`): its
+code, its stack and the repo it maintains change together.
 
 `caddy-cloudflare` is here because the stock Caddy image ships no DNS providers,
 and DNS-01 is the only ACME challenge that works for hosts the internet cannot
