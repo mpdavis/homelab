@@ -1,0 +1,20 @@
+# Synced into the Grafana Cloud stack by .github/workflows/grafana-cloud.yml.
+# Hob (docker/infra/hob/) has no endpoint to probe, so it is watched through
+# the cAdvisor series for its container; cAdvisor reports only running ones.
+namespace: hob
+groups:
+  - name: hob
+    rules:
+      - alert: HobDown
+        expr: |
+          absent_over_time(container_memory_working_set_bytes{host="infra", container_label_com_docker_compose_project="hob"}[10m])
+        for: 5m
+        labels:
+          severity: warning
+          host: infra
+        annotations:
+          summary: "Hob is not running"
+          description: >-
+            No container from the hob stack has run on infra for 15 minutes,
+            so alerts are not being investigated. Check `docker compose -p hob
+            logs` on 10.0.1.58, and doco-cd's logs if the stack never deployed.
