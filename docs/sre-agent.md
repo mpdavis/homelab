@@ -47,7 +47,7 @@ Grafana Cloud ──(native contact point)──► Discord #alerts-fallback
 ```
 
 It runs on the infra host for the same reason Gatus and ntfy do: it has to
-work while the compose host is down. The code lives in its own private repo,
+work while the compose host is down. The code lives in its own repo,
 `mpdavis/hob`, publishing `ghcr.io/mpdavis/hob`; the stack lives in
 `docker/infra/hob/`.
 
