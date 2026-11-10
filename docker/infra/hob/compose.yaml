@@ -1,0 +1,51 @@
+name: hob
+
+# Hob, the SRE agent (docs/sre-agent.md). Watches the #homelab-alerts Discord
+# forum, which Grafana IRM fills (tofu/grafana/irm.tf), and investigates each
+# alert read-only. On this host so it can still look when the compose host is
+# down. Source and configuration: github.com/mpdavis/hob.
+services:
+  hob:
+    image: ghcr.io/mpdavis/hob:1.0.3
+    restart: unless-stopped
+    # Not yet measured: the Claude Code CLI runs beside Python only while an
+    # investigation is in flight. Resize to 3–4× the observed peak once it has
+    # handled a few alerts (docker/infra/CLAUDE.md).
+    cpus: 1
+    mem_limit: 1g
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+      # The SSH key and known_hosts are written here at start, never to /data.
+      - /run/hob:uid=1000,gid=1000,mode=0700
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?resolved by doco-cd from external_secrets}
+      HOB_DISCORD_TOKEN: ${HOB_DISCORD_TOKEN:?resolved by doco-cd from external_secrets}
+      HOB_DISCORD_FORUM_CHANNEL_ID: "1569839447523065996"
+      # Only these Discord users can start or steer an investigation. User IDs
+      # are public; gitleaks mistakes them for a Discord client ID.
+      HOB_DISCORD_ALLOWED_USER_IDS: "621353891329605653" # gitleaks:allow
+      HOB_GRAFANA_URL: https://luckyzeppelin876.grafana.net
+      HOB_GRAFANA_TOKEN: ${HOB_GRAFANA_TOKEN:?resolved by doco-cd from external_secrets}
+      # Gatus on this host directly, not status.mpdavis.com, which routes
+      # through the compose host's public Caddy.
+      HOB_GATUS_URL: http://10.0.1.58:8081
+      HOB_HOSTS: apps=10.0.1.55,infra=10.0.1.58
+      HOB_SSH_PRIVATE_KEY: ${HOB_SSH_PRIVATE_KEY:?resolved by doco-cd from external_secrets}
+      # Strict host key checking is on. A VM rebuild or cloud-init reinit
+      # regenerates these; refresh with `ssh-keyscan -t ed25519 <ip>`.
+      HOB_SSH_KNOWN_HOSTS: |
+        10.0.1.55 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB2FlI1o3A6CsUt5rTHTeJ9CO0fBoQHNqoVGy8uXaQJI
+        10.0.1.58 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHXSD1cTGxYJNGrqoMwYg6WBod+k4W/x1b71CtslIQHL
+    volumes:
+      # HOME: the homelab clone, thread-to-session state, the daily spend
+      # ledger and the agent's session transcripts, so replies to a thread
+      # still resume after a redeploy.
+      - data:/data
+
+volumes:
+  data:

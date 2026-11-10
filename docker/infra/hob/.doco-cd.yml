@@ -1,0 +1,8 @@
+external_secrets:
+  # Hob's own key, in its own Anthropic workspace with a spend limit.
+  ANTHROPIC_API_KEY: 033ebc28-0cf2-4623-8c2b-b4fe017794f3
+  HOB_DISCORD_TOKEN: 1a8ea560-7239-46fb-bd68-b4fe016474ba
+  # Viewer role: queries metrics and logs, cannot change anything.
+  HOB_GRAFANA_TOKEN: 7c66ce14-135a-4625-8b4b-b4fe017948b3
+  # Restricted on the hosts to hob-action (ansible/roles/hob_access).
+  HOB_SSH_PRIVATE_KEY: 8aec06e9-1a6f-4328-ae67-b4fe0179edc5
