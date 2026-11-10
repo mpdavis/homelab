@@ -104,11 +104,15 @@ variable "vms" {
     # survive pve2 maintenance. A VM, not an LXC: Docker in an LXC breaks on
     # runc/AppArmor (see the devbox).
     infra = {
-      vmid      = 206
-      node      = "pve1"
-      cores     = 1
-      memory    = 1024
-      disk_size = 8
+      vmid = 206
+      node = "pve1"
+      # Hob, the SRE agent (docker/infra/hob/), runs the Claude Code CLI next
+      # to Python while it investigates; 1 vCPU / 1G left ~300M free.
+      cores  = 2
+      memory = 2048
+      # 8 sat at 86%: images alone are ~3G, and every doco-cd self-update
+      # leaves ~210MB until the prune timer catches it.
+      disk_size = 16
       tags      = ["docker", "infra"]
     }
   }

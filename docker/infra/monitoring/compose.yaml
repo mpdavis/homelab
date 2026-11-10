@@ -7,6 +7,10 @@ services:
   alloy:
     image: grafana/alloy:v1.21.3
     restart: unless-stopped
+    # Twice its usual peak: replaying the WAL after an internet outage
+    # runs well above steady state.
+    cpus: 0.5
+    mem_limit: 384m
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
@@ -40,6 +44,8 @@ services:
   node-exporter:
     image: prom/node-exporter:v1.12.1
     restart: unless-stopped
+    cpus: 0.25
+    mem_limit: 64m
     command:
       - --path.rootfs=/host
       # Every container adds a veth; at ~20 series each they would eat the
@@ -57,6 +63,8 @@ services:
   cadvisor:
     image: ghcr.io/google/cadvisor:v0.60.6
     restart: unless-stopped
+    cpus: 0.25
+    mem_limit: 128m
     command:
       - --docker_only=true
       - --housekeeping_interval=30s
