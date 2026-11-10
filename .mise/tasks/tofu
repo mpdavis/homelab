@@ -35,7 +35,8 @@ for root in "${roots[@]}"; do
       GRAFANA_AUTH=$(secret 0e847022-1d64-467a-9bf5-b4d000090360)
       TF_VAR_ntfy_token=$(secret 47079c89-adab-4d19-8173-b48d01492747)
       TF_VAR_sm_access_token=$(secret 7f40344d-a062-443b-95b2-b4e201086f88)
-      export GRAFANA_AUTH TF_VAR_ntfy_token TF_VAR_sm_access_token
+      TF_VAR_discord_alerts_webhook=$(secret 66df5ddf-e586-4493-bf23-b4fe0170c326)
+      export GRAFANA_AUTH TF_VAR_ntfy_token TF_VAR_sm_access_token TF_VAR_discord_alerts_webhook
       ;;
   esac
 
