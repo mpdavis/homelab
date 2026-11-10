@@ -127,9 +127,12 @@ reaches a host without a human merge.
 
 ### Secrets
 
-Its own Bitwarden machine account, holding only its own secrets: the Anthropic
-key, the GitHub App private key, the Discord bot token, a read-only Grafana
-token and the Proxmox API token. It cannot read any other stack's secrets.
+Hob's credentials are its own: the Anthropic key, the Discord bot token, a
+read-only Grafana token, its SSH key, and later the GitHub App private key and
+the Proxmox API token. They live in Bitwarden like any stack's secrets, and
+doco-cd injects them into the `hob` stack at deploy time through
+`docker/infra/hob/.doco-cd.yml`. Hob holds no Bitwarden token, so it cannot
+read any other stack's secrets.
 
 ## Host access
 
