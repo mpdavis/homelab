@@ -1,0 +1,12 @@
+---
+# Gives Hob, the SRE agent, read-only access to the Docker hosts through the
+# hob-action forced command (docs/sre-agent.md). Also part of docker-host.yml;
+# this runs just that, without the Bitwarden prompt.
+#
+#   ansible-playbook playbooks/hob-access.yml
+
+- name: Hob access
+  hosts: docker
+  become: true
+  roles:
+    - hob_access
