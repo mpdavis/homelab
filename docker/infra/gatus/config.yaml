@@ -283,6 +283,9 @@ endpoints:
   # Proves the relay accepts connections, not that the provider delivers.
   - name: smtp-relay
     group: internal
+    # The relay has never deployed: its secret is a placeholder UUID. Re-enable
+    # with the fix (#1028).
+    enabled: false
     url: "tcp://10.0.1.58:587"
     conditions:
       - "[CONNECTED] == true"
