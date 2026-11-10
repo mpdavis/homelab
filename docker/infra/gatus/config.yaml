@@ -65,12 +65,6 @@ endpoints:
     group: external-open
     url: https://proxmox.mpdavis.com/
     conditions: *open-conditions
-  # The UI shell is served without a login; /api/health also fails when the
-  # embedded Postgres is down.
-  - name: paperclip
-    group: external-open
-    url: https://paperclip.mpdavis.com/api/health
-    conditions: *open-conditions
   # --- Authentik forward-auth protected: healthy == 302 to the auth
   # portal (iam.mpdavis.com). `Accept: text/html` exercises the real
   # user-facing browser redirect path.
@@ -243,11 +237,6 @@ endpoints:
     group: dns
     url: "1.1.1.1"
     dns: {query-type: A, query-name: trading.mpdavis.com}
-    conditions: *compose-tailnet-dns
-  - name: dns-paperclip
-    group: dns
-    url: "1.1.1.1"
-    dns: {query-type: A, query-name: paperclip.mpdavis.com}
     conditions: *compose-tailnet-dns
   - name: dns-proxmox
     group: dns

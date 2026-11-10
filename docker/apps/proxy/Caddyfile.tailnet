@@ -121,8 +121,3 @@ ai.mpdavis.com {
 		reverse_proxy open-webui:8080
 	}
 }
-
-# Its own login; it has no OIDC, so no forward auth either.
-paperclip.mpdavis.com {
-	reverse_proxy paperclip:3100
-}

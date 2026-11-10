@@ -18,7 +18,6 @@ services:
       - caddy-tailnet-data:/data
     networks:
       - proxy
-      - paperclip
     healthcheck:
       test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:2019/config/"]
       interval: 30s
@@ -95,7 +94,4 @@ volumes:
 
 networks:
   proxy:
-    external: true
-  # Paperclip's own network, kept off `proxy` (see docker/apps/paperclip/).
-  paperclip:
     external: true
