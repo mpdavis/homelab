@@ -1,6 +1,6 @@
-# SRE Agent
+# Hob
 
-An agent that picks up homelab alerts, investigates them, talks them through
+Hob is the SRE agent: it picks up homelab alerts, investigates them, talks them through
 in a per-alert thread, and proposes fixes as pull requests. It runs as its own
 persona: none of Michael's credentials, no merge rights, and host access only
 through an allowlist.
@@ -34,13 +34,13 @@ Grafana Cloud ──(native contact point)──► Discord #alerts-fallback
       ▲                                   (no homelab dependency)
       │ polls Alertmanager API (outbound only)
 ┌─────┴──────────── infra VM (pve1) ───────────────────────────────┐
-│ sre-dispatcher ──► Discord forum: one post per alert group       │
+│ hob-dispatcher ──► Discord forum: one post per alert group       │
 │      │  ▲            (bot gateway: outbound websocket)           │
 │      ▼  │ replies, approval buttons                              │
-│ sre-agent (Claude Agent SDK)                                     │
+│ hob-agent (Claude Agent SDK)                                     │
 │   reads: Grafana (read-only token), Gatus API, a clone of this   │
 │          repo                                                    │
-│   acts:  ssh sre@<host> → forced-command allowlist               │
+│   acts:  ssh hob@<host> → forced-command allowlist               │
 │          Proxmox API token (VM.PowerMgmt on the two VMs)         │
 │          GitHub App → branches and PRs                           │
 └──────────────────────────────────────────────────────────────────┘
@@ -48,8 +48,8 @@ Grafana Cloud ──(native contact point)──► Discord #alerts-fallback
 
 It runs on the infra host for the same reason Gatus and ntfy do: it has to
 work while the compose host is down. The code lives in its own repo,
-`mpdavis/homelab-sre`, publishing `ghcr.io/mpdavis/homelab-sre`; the stack
-lives in `docker/infra/sre/`.
+`mpdavis/hob`, publishing `ghcr.io/mpdavis/hob`; the stack
+lives in `docker/infra/hob/`.
 
 ### Chat: Discord forum channel
 
@@ -102,9 +102,9 @@ starts with the `CLAUDE.md` files, `.claude/agents/diagnose-service.md` and
 
 ### GitHub: an App, not a user
 
-A GitHub App installed on this repo only, with `contents: write` and
+A GitHub App, `hob-homelab`, installed on this repo only, with `contents: write` and
 `pull_requests: write`. Its tokens are short-lived and its commits show as
-`homelab-sre[bot]`.
+`hob-homelab[bot]`.
 
 It is **not** granted `workflows: write`. Without it GitHub rejects any push
 that touches `.github/workflows/`, which closes the obvious escalation: a
@@ -131,13 +131,13 @@ Autonomy is tiered, and each tier is enforced by what the agent can call:
 | T2 disruptive | restart doco-cd, reboot a VM | approval button |
 | T3 config | anything persistent | PR; a human merges |
 
-Host commands go over SSH as a user `sre` whose `authorized_keys` entry is
-`command="/usr/local/bin/sre-action",restrict`. `sre-action` accepts only
+Host commands go over SSH as a user `hob` whose `authorized_keys` entry is
+`command="/usr/local/bin/hob-action",restrict`. `hob-action` accepts only
 allowlisted verbs and arguments, and is installed by its own Ansible role.
 
 - No docker-socket-proxy with write access: container create is root
   on the host, and a proxy cannot allow restart without it
-- `sre-action inspect` drops `Config.Env`. doco-cd injects secrets as
+- `hob-action inspect` drops `Config.Env`. doco-cd injects secrets as
   environment variables; without the filter every one of them would land in
   the agent's context and in API requests
 - VM reboots go through a Proxmox API token whose role grants `VM.PowerMgmt`
@@ -164,7 +164,7 @@ both of us can read and correct it, not in an opaque memory store.
 2. **Read-only agent** — T0 only; posts an investigation into each new thread
    and answers replies
 3. **Pull requests** — the GitHub App; T3
-4. **Host actions** — `sre-action`, the Proxmox token, approval buttons; T1
+4. **Host actions** — `hob-action`, the Proxmox token, approval buttons; T1
    and T2
 5. **Proactive work** — a daily sweep (Gatus, disk trends, the doco-cd image
    leak, pending reboots, failing Renovate PRs, cert expiry) and a weekly
