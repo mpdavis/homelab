@@ -3,7 +3,7 @@ name: ai
 services:
   # Only Open WebUI talks to it, so it stays off the proxy network.
   ollama:
-    image: ollama/ollama:0.40.15
+    image: ollama/ollama:0.40.16
     restart: unless-stopped
     environment:
       TZ: America/Chicago
@@ -32,7 +32,7 @@ services:
   # take effect through `ollama create`, and doco-cd recreates this service when a
   # mounted one changes, so a push is enough. A new Modelfile needs a mount here.
   prompters:
-    image: ollama/ollama:0.40.15
+    image: ollama/ollama:0.40.16
     restart: unless-stopped
     init: true
     depends_on:
