@@ -47,16 +47,9 @@ Grafana Cloud ──(native contact point)──► Discord #alerts-fallback
 ```
 
 It runs on the infra host for the same reason Gatus and ntfy do: it has to
-work while the compose host is down. The code lives in
-`docker/images/hob/`, published as `ghcr.io/mpdavis/hob`; the stack lives in
-`docker/infra/hob/`.
-
-Keeping the code in this repo means one GitHub App installation covers
-everything Hob can change, and a change to Hob and to its stack can land in
-one PR. It also means Hob can open PRs against its own code and prompt. Those
-get the same human merge as everything else, and what Hob may do on a host
-stays in the Ansible-managed `hob-action` allowlist, which a merge does not
-change until the playbook is run by hand.
+work while the compose host is down. The code lives in its own repo,
+`mpdavis/hob`, publishing `ghcr.io/mpdavis/hob`; the stack
+lives in `docker/infra/hob/`.
 
 ### Chat: Discord forum channel
 
