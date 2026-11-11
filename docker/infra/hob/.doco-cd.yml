@@ -6,3 +6,6 @@ external_secrets:
   HOB_GRAFANA_TOKEN: 7c66ce14-135a-4625-8b4b-b4fe017948b3
   # Restricted on the hosts to hob-action (ansible/roles/hob_access).
   HOB_SSH_PRIVATE_KEY: 8aec06e9-1a6f-4328-ae67-b4fe0179edc5
+  # The hob-homelab GitHub App: contents and pull_requests write on this repo
+  # only, no workflows, not a ruleset bypass actor. It can open PRs, not merge.
+  HOB_GITHUB_APP_KEY: 0c620ad4-9212-4d69-8d42-b4ff01132eda
