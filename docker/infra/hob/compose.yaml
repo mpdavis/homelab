@@ -6,7 +6,7 @@ name: hob
 # down. Source and configuration: github.com/mpdavis/hob.
 services:
   hob:
-    image: ghcr.io/mpdavis/hob:1.0.3
+    image: ghcr.io/mpdavis/hob:1.0.5
     restart: unless-stopped
     # Not yet measured: the Claude Code CLI runs beside Python only while an
     # investigation is in flight. Resize to 3–4× the observed peak once it has
