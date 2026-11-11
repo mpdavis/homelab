@@ -36,6 +36,9 @@ services:
       HOB_GATUS_URL: http://10.0.1.58:8081
       HOB_HOSTS: apps=10.0.1.55,infra=10.0.1.58
       HOB_SSH_PRIVATE_KEY: ${HOB_SSH_PRIVATE_KEY:?resolved by doco-cd from external_secrets}
+      HOB_GITHUB_APP_ID: "5715450"
+      HOB_GITHUB_INSTALLATION_ID: "180950470"
+      HOB_GITHUB_APP_KEY: ${HOB_GITHUB_APP_KEY:?resolved by doco-cd from external_secrets}
       # Strict host key checking is on. A VM rebuild or cloud-init reinit
       # regenerates these; refresh with `ssh-keyscan -t ed25519 <ip>`.
       HOB_SSH_KNOWN_HOSTS: |
