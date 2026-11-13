@@ -9,7 +9,7 @@ name: doco-cd
 
 services:
   doco-cd:
-    image: ghcr.io/kimdre/doco-cd:0.133.2
+    image: ghcr.io/kimdre/doco-cd:0.134.0
     restart: unless-stopped
     environment:
       TZ: America/Chicago
