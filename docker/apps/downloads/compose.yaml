@@ -282,7 +282,7 @@ services:
       - proxy
 
   podfetch:
-    image: samuel19982/podfetch:v5.2.3
+    image: samuel19982/podfetch:v5.3.0
     restart: unless-stopped
     # The owner of the files it already has on the NFS share.
     user: "1000:1000"
