@@ -7,8 +7,9 @@ name: trading
 # The kalshi-* services run ghcr.io/mpdavis/kalshi-trader (source in
 # mpdavis/kalshi-trader) against the Kalshi production API. kalshi-live places
 # real orders (tagged `lip-`; it never touches orders placed by hand). The
-# recorder and the shadow engine only read market data, and the control plane's
-# one write is its kill switch.
+# recorder only reads market data, and the control plane's one write is its
+# kill switch. The shadow engine (`kalshi-trader run` without --live) is
+# paused; it last ran here as kalshi-shadow, see #1061 to bring it back.
 x-alpaca: &alpaca
   TZ: America/Chicago
   ALPACA_API_KEY: ${ALPACA_PAPER_API_KEY:?resolved by doco-cd from external_secrets}
@@ -118,37 +119,8 @@ services:
       retries: 3
       start_period: 5m
 
-  # The full strategy with no orders: logs what it would quote and simulates
-  # fills from the trade tape, under the same limits a live run would use.
-  kalshi-shadow:
-    <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.5
-    restart: unless-stopped
-    init: true
-    command:
-      - run
-      - --top=50
-      - --max-volume=100
-      - --max-books=800
-      - --db=/data/shadow.sqlite
-    environment:
-      <<: *kalshi
-    volumes:
-      - kalshi:/data
-    tmpfs:
-      - /tmp:size=64m
-    cpus: 1
-    mem_limit: 1g
-    healthcheck:
-      test: ["CMD", "kalshi-trader", "health", "--db", "/data/shadow.sqlite"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 5m
-
-  # REAL ORDERS. Quotes the same scan as kalshi-shadow (keep the scan flags in
-  # sync) with resting bids capped at half the cash balance read at startup,
-  # less fills since. On a kill-switch trip it writes /data/live.sqlite.halted
+  # REAL ORDERS. Quotes the top 50 quiet LIP programs with resting bids capped
+  # at half the cash balance read at startup, less fills since. On a kill-switch trip it writes /data/live.sqlite.halted
   # and exits 0, so `on-failure` leaves it down: review, delete the halt file,
   # then start it again. Stopping it (SIGTERM) cancels every resting bot order.
   kalshi-live:
@@ -222,8 +194,8 @@ volumes:
   # any SPY position that is not today's trade.
   # Not `data`: QuantDinger's old trading_data volume still holds its files.
   state:
-  # SQLite databases for the recorder (lip.sqlite), shadow engine
-  # (shadow.sqlite) and live engine (live.sqlite, plus live.sqlite.halted after
+  # SQLite databases for the recorder (lip.sqlite), the paused shadow engine
+  # (shadow.sqlite, history only) and live engine (live.sqlite, plus live.sqlite.halted after
   # a kill-switch trip). Losing it loses research history only; nothing in it is
   # needed to trade.
   kalshi:
