@@ -70,6 +70,10 @@
         icon: mdi-chart-line
         href: https://trading.mpdavis.com
         description: LumiBot strategies on the Alpaca paper account
+    - Kalshi LIP:
+        icon: mdi-scale-balance
+        href: https://kalshi.mpdavis.com
+        description: Kalshi liquidity-incentive recorder, shadow engine & kill switch
 - Infrastructure:
     - Authentik:
         icon: authentik.png
