@@ -33,6 +33,16 @@ services:
         "client_id": "2637be93cafb37442b1abb9bd89330fe",
         "secret": "${PAPERLESS_OIDC_CLIENT_SECRET:?resolved by doco-cd from external_secrets}",
         "settings": {"server_url": "https://iam.mpdavis.com/application/o/paperless/.well-known/openid-configuration"}}]}}
+      # Suggestions and document chat, using Ollama in the ai stack. qwen2.5:7b
+      # is what the prompters use, so it is usually already loaded in the 6 GB of
+      # VRAM; a second generation model would evict it.
+      PAPERLESS_AI_ENABLED: "true"
+      PAPERLESS_AI_LLM_BACKEND: ollama
+      PAPERLESS_AI_LLM_ENDPOINT: http://ollama:11434
+      PAPERLESS_AI_LLM_MODEL: qwen2.5:7b
+      # Embeddings run on the CPU in this container, keeping the GPU for the
+      # LLM. The model downloads into the data volume on first use.
+      PAPERLESS_AI_LLM_EMBEDDING_BACKEND: huggingface
     # The server-side OIDC calls must use the issuer's public hostname, which
     # would otherwise resolve to the router. Pinning it to the public Caddy
     # avoids depending on NAT hairpin.

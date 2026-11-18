@@ -1,7 +1,7 @@
 name: ai
 
 services:
-  # Only Open WebUI talks to it, so it stays off the proxy network.
+  # On proxy so Paperless in the docs stack can reach it.
   ollama:
     image: ollama/ollama:0.40.16
     restart: unless-stopped
@@ -14,6 +14,9 @@ services:
             - driver: cdi
               device_ids: [nvidia.com/gpu=all]
               capabilities: [gpu]
+    networks:
+      - default
+      - proxy
     volumes:
       - type: volume
         source: models
