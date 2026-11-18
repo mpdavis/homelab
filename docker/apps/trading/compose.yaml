@@ -119,10 +119,13 @@ services:
       retries: 3
       start_period: 5m
 
-  # REAL ORDERS. Quotes the top 50 quiet LIP programs with resting bids capped
-  # at half the cash balance read at startup, less fills since. On a kill-switch trip it writes /data/live.sqlite.halted
-  # and exits 0, so `on-failure` leaves it down: review, delete the halt file,
-  # then start it again. Stopping it (SIGTERM) cancels every resting bot order.
+  # REAL ORDERS. Quotes the top 50 LIP programs, bidding at the reference price
+  # behind the existing queue (no volume cap: the queue ahead absorbs sells), with
+  # resting bids capped at half the cash balance read at startup, less fills since.
+  # The per-market cap equals --max-price x --size, so any allowed price fits.
+  # On a kill-switch trip it writes /data/live.sqlite.halted and exits 0, so
+  # `on-failure` leaves it down: review, delete the halt file, then start it
+  # again. Stopping it (SIGTERM) cancels every resting bot order.
   kalshi-live:
     <<: *hardening
     image: ghcr.io/mpdavis/kalshi-trader:1.0.11
@@ -133,11 +136,10 @@ services:
       - run
       - --live
       - --top=50
-      - --max-volume=100
-      - --max-books=800
+      - --max-books=1500
       - --size=100
       - --max-price=0.15
-      - --max-market-collateral=5
+      - --max-market-collateral=15
       - --max-cash-fraction=0.5
       - --max-daily-fill-cost=5
       - --db=/data/live.sqlite
