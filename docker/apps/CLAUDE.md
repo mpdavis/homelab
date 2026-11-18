@@ -12,7 +12,7 @@ Services are grouped by what they do, not one stack each:
 | `downloads` | what acquires: qbittorrent (with gluetun, mousehole and pf-watchdog), prowlarr, sonarr, radarr, unpackerr, recyclarr, podfetch, listenarr, seerr |
 | `iptv` | dispatcharr, teamarr, ecm, game-thumbs |
 | `ai` | ollama, open-webui, and prompters (Modelfiles that turn an idea into a prompt for a given image model) |
-| `trading` | algo-trading: the LumiBot trader and its dashboard, on the Alpaca paper account |
+| `trading` | algo-trading: the LumiBot trader and its dashboard, on the Alpaca paper account; kalshi-trader: the Kalshi LIP recorder, shadow engine and control plane |
 | `authentik` | the identity provider every forward-auth site and OIDC app uses |
 | `docs`, `gridiron`, `homepage` | one app each |
 | `proxy` | the host's Caddy instances, and CrowdSec watching the public one |

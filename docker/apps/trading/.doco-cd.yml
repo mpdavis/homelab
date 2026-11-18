@@ -1,4 +1,10 @@
+# The Kalshi services' first heartbeat follows a 2-3 min startup scan.
+timeout: 600
 external_secrets:
   # Alpaca paper account.
   ALPACA_PAPER_API_KEY: 411504cb-bb1d-44c2-9c15-b4de0139a13c
   ALPACA_PAPER_API_SECRET: d4f6a545-8a9d-4037-a085-b4de0139a179
+  # Kalshi production API key (read market data; the control plane's kill
+  # switch can cancel orders). KALSHI_PRIVATE_KEY is the PEM itself.
+  KALSHI_API_KEY_ID: 00000000-0000-0000-0000-000000000000
+  KALSHI_PRIVATE_KEY: 00000000-0000-0000-0000-000000000000

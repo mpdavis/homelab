@@ -113,6 +113,16 @@ trading.mpdavis.com {
 	}
 }
 
+# /healthz ahead of auth for Gatus; it returns only {"ok": true}. The rest
+# shows the Kalshi account and has a kill switch, so it is behind Authentik.
+kalshi.mpdavis.com {
+	route {
+		reverse_proxy /healthz kalshi-ui:8080
+		import authentik
+		reverse_proxy kalshi-ui:8080
+	}
+}
+
 # /health ahead of auth for Gatus, like /ping on prowlarr.
 ai.mpdavis.com {
 	route {

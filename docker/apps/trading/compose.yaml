@@ -1,14 +1,25 @@
 name: trading
 
-# Both services run ghcr.io/mpdavis/algo-trading (source in mpdavis/algo-trading),
-# against the Alpaca paper account. Strategies keep their state in the shared
-# volume, one directory each; the dashboard only reads it.
+# trader and trading-dashboard run ghcr.io/mpdavis/algo-trading (source in
+# mpdavis/algo-trading), against the Alpaca paper account. Strategies keep their
+# state in the shared volume, one directory each; the dashboard only reads it.
+#
+# The kalshi-* services run ghcr.io/mpdavis/kalshi-trader (source in
+# mpdavis/kalshi-trader) against the Kalshi production API. None of them places
+# orders: the recorder and the shadow engine only read market data, and the
+# control plane's one write is its kill switch.
 x-alpaca: &alpaca
   TZ: America/Chicago
   ALPACA_API_KEY: ${ALPACA_PAPER_API_KEY:?resolved by doco-cd from external_secrets}
   ALPACA_API_SECRET: ${ALPACA_PAPER_API_SECRET:?resolved by doco-cd from external_secrets}
   ALPACA_IS_PAPER: "true"
   STRATEGIES: pairs,orb,selloff
+
+x-kalshi: &kalshi
+  TZ: America/Chicago
+  KALSHI_ENV: prod
+  KALSHI_API_KEY_ID: ${KALSHI_API_KEY_ID:?resolved by doco-cd from external_secrets}
+  KALSHI_PRIVATE_KEY: ${KALSHI_PRIVATE_KEY:?resolved by doco-cd from external_secrets}
 
 x-hardening: &hardening
   read_only: true
@@ -76,12 +87,106 @@ services:
       - default
       - proxy
 
+  # Order books and trades of the 300 most promising quiet incentive programs,
+  # re-scanned hourly. Writes only changes, so quiet books cost almost nothing.
+  kalshi-recorder:
+    <<: *hardening
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.3
+    restart: unless-stopped
+    init: true
+    command:
+      - record
+      - --top=300
+      - --max-volume=100
+      - --max-books=1500
+      - --db=/data/lip.sqlite
+    environment:
+      <<: *kalshi
+    volumes:
+      - kalshi:/data
+    tmpfs:
+      - /tmp:size=64m
+    cpus: 1
+    mem_limit: 1g
+    # The first heartbeat comes after the startup scan of ~1,500 order books
+    # (2-3 min), hence the long start_period and the timeout in .doco-cd.yml.
+    healthcheck:
+      test: ["CMD", "kalshi-trader", "health", "--db", "/data/lip.sqlite"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 5m
+
+  # The full strategy with no orders: logs what it would quote and simulates
+  # fills from the trade tape, under the same limits a live run would use.
+  kalshi-shadow:
+    <<: *hardening
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.3
+    restart: unless-stopped
+    init: true
+    command:
+      - run
+      - --top=50
+      - --max-volume=100
+      - --max-books=800
+      - --db=/data/shadow.sqlite
+    environment:
+      <<: *kalshi
+    volumes:
+      - kalshi:/data
+    tmpfs:
+      - /tmp:size=64m
+    cpus: 1
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "kalshi-trader", "health", "--db", "/data/shadow.sqlite"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 5m
+
+  # Control plane at kalshi.mpdavis.com, behind Authentik. Reads the other two
+  # services' databases; its kill switch writes /data/live.sqlite.halted and
+  # cancels resting bot orders, which is why it mounts the volume read-write.
+  kalshi-ui:
+    <<: *hardening
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.3
+    restart: unless-stopped
+    init: true
+    command:
+      - ui
+      - --host=0.0.0.0
+      - --port=8080
+      - --data-dir=/data
+    environment:
+      <<: *kalshi
+    volumes:
+      - kalshi:/data
+    tmpfs:
+      - /tmp:size=64m
+    cpus: 0.5
+    mem_limit: 512m
+    healthcheck:
+      # The slim image has no curl or wget.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=5)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - default
+      - proxy
+
 volumes:
   # One directory per strategy (state and heartbeat). Losing it is recoverable:
   # pairs and selloff re-adopt open positions from the account, and orb closes
   # any SPY position that is not today's trade.
   # Not `data`: QuantDinger's old trading_data volume still holds its files.
   state:
+  # SQLite databases for the recorder (lip.sqlite) and shadow engine
+  # (shadow.sqlite). Losing it loses research history only; nothing in it is
+  # needed to trade.
+  kalshi:
 
 networks:
   proxy:
