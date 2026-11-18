@@ -5,9 +5,10 @@ name: trading
 # state in the shared volume, one directory each; the dashboard only reads it.
 #
 # The kalshi-* services run ghcr.io/mpdavis/kalshi-trader (source in
-# mpdavis/kalshi-trader) against the Kalshi production API. None of them places
-# orders: the recorder and the shadow engine only read market data, and the
-# control plane's one write is its kill switch.
+# mpdavis/kalshi-trader) against the Kalshi production API. kalshi-live places
+# real orders (tagged `lip-`; it never touches orders placed by hand). The
+# recorder and the shadow engine only read market data, and the control plane's
+# one write is its kill switch.
 x-alpaca: &alpaca
   TZ: America/Chicago
   ALPACA_API_KEY: ${ALPACA_PAPER_API_KEY:?resolved by doco-cd from external_secrets}
@@ -145,6 +146,44 @@ services:
       retries: 3
       start_period: 5m
 
+  # REAL ORDERS. Quotes the same scan as kalshi-shadow (keep the scan flags in
+  # sync) with resting bids capped at half the cash balance read at startup,
+  # less fills since. On a kill-switch trip it writes /data/live.sqlite.halted
+  # and exits 0, so `on-failure` leaves it down: review, delete the halt file,
+  # then start it again. Stopping it (SIGTERM) cancels every resting bot order.
+  kalshi-live:
+    <<: *hardening
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.5
+    restart: on-failure:5
+    init: true
+    stop_grace_period: 30s
+    command:
+      - run
+      - --live
+      - --top=50
+      - --max-volume=100
+      - --max-books=800
+      - --size=100
+      - --max-price=0.15
+      - --max-market-collateral=5
+      - --max-cash-fraction=0.5
+      - --max-daily-fill-cost=5
+      - --db=/data/live.sqlite
+    environment:
+      <<: *kalshi
+    volumes:
+      - kalshi:/data
+    tmpfs:
+      - /tmp:size=64m
+    cpus: 1
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "kalshi-trader", "health", "--db", "/data/live.sqlite"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 5m
+
   # Control plane at kalshi.mpdavis.com, behind Authentik. Reads the other two
   # services' databases; its kill switch writes /data/live.sqlite.halted and
   # cancels resting bot orders, which is why it mounts the volume read-write.
@@ -183,8 +222,9 @@ volumes:
   # any SPY position that is not today's trade.
   # Not `data`: QuantDinger's old trading_data volume still holds its files.
   state:
-  # SQLite databases for the recorder (lip.sqlite) and shadow engine
-  # (shadow.sqlite). Losing it loses research history only; nothing in it is
+  # SQLite databases for the recorder (lip.sqlite), shadow engine
+  # (shadow.sqlite) and live engine (live.sqlite, plus live.sqlite.halted after
+  # a kill-switch trip). Losing it loses research history only; nothing in it is
   # needed to trade.
   kalshi:
 
