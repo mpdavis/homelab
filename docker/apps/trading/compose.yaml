@@ -91,7 +91,7 @@ services:
   # re-scanned hourly. Writes only changes, so quiet books cost almost nothing.
   kalshi-recorder:
     <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.3
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.5
     restart: unless-stopped
     init: true
     command:
@@ -121,7 +121,7 @@ services:
   # fills from the trade tape, under the same limits a live run would use.
   kalshi-shadow:
     <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.3
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.5
     restart: unless-stopped
     init: true
     command:
@@ -150,7 +150,7 @@ services:
   # cancels resting bot orders, which is why it mounts the volume read-write.
   kalshi-ui:
     <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.3
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.5
     restart: unless-stopped
     init: true
     command:
