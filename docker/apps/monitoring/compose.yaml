@@ -59,7 +59,7 @@ services:
       - /:/host:ro,rslave
 
   cadvisor:
-    image: ghcr.io/google/cadvisor:v0.61.0
+    image: ghcr.io/google/cadvisor:v0.61.1
     restart: unless-stopped
     command:
       - --docker_only=true

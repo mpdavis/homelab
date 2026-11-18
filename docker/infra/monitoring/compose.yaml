@@ -61,7 +61,7 @@ services:
       - /:/host:ro,rslave
 
   cadvisor:
-    image: ghcr.io/google/cadvisor:v0.61.0
+    image: ghcr.io/google/cadvisor:v0.61.1
     restart: unless-stopped
     cpus: 0.25
     mem_limit: 128m
