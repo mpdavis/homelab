@@ -42,7 +42,7 @@ services:
   # Host network, or it reports the container's network interfaces instead of
   # the host's.
   node-exporter:
-    image: prom/node-exporter:v1.12.1
+    image: prom/node-exporter:v1.13.1
     restart: unless-stopped
     cpus: 0.25
     mem_limit: 64m
