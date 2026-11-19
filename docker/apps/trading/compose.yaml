@@ -138,11 +138,13 @@ services:
       - --live
       - --top=50
       - --max-books=1500
-      - --size=100
-      - --max-price=0.15
-      - --max-market-collateral=15
+      # $250 wallet: 250 contracts per quote, capped at 10c so one fill costs
+      # at most $25; the daily fill cap allows ~2 worst-case fills.
+      - --size=250
+      - --max-price=0.10
+      - --max-market-collateral=25
       - --max-cash-fraction=0.8
-      - --max-daily-fill-cost=10
+      - --max-daily-fill-cost=50
       # Unattended: automatic kills clear after 30 min (daily cap at UTC
       # midnight, UI kills wait for a human); re-scan every 2h; skip sides
       # whose expected sweep cost beats the reward (observed sweeps, floored by
