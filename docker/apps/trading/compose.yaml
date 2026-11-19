@@ -93,7 +93,7 @@ services:
   # re-scanned hourly. Writes only changes, so quiet books cost almost nothing.
   kalshi-recorder:
     <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.14
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.16
     restart: unless-stopped
     init: true
     command:
@@ -123,12 +123,13 @@ services:
   # behind the existing queue (no volume cap: the queue ahead absorbs sells), with
   # resting bids capped at half the cash balance read at startup, less fills since.
   # The per-market cap equals --max-price x --size, so any allowed price fits.
-  # On a kill-switch trip it writes /data/live.sqlite.halted and exits 0, so
-  # `on-failure` leaves it down: review, delete the halt file, then start it
-  # again. Stopping it (SIGTERM) cancels every resting bot order.
+  # On a kill-switch trip it cancels everything, writes /data/live.sqlite.halted
+  # and idles with no orders (still heartbeating, shown as "halted" in the UI).
+  # Review, then press Resume trading in kalshi-ui: it deletes the halt file and
+  # the engine starts over. Stopping it (SIGTERM) cancels every resting bot order.
   kalshi-live:
     <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.14
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.16
     restart: on-failure:5
     init: true
     stop_grace_period: 30s
@@ -163,7 +164,7 @@ services:
   # cancels resting bot orders, which is why it mounts the volume read-write.
   kalshi-ui:
     <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.14
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.16
     restart: unless-stopped
     init: true
     command:
