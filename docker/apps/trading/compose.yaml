@@ -159,8 +159,8 @@ services:
       retries: 3
       start_period: 5m
 
-  # Control plane at kalshi.mpdavis.com, behind Authentik. Reads the other two
-  # services' databases; its kill switch writes /data/live.sqlite.halted and
+  # Control plane at kalshi.mpdavis.com (tailnet-only, no forward auth). Reads
+  # the other services' databases; its kill switch writes /data/live.sqlite.halted and
   # cancels resting bot orders, which is why it mounts the volume read-write.
   kalshi-ui:
     <<: *hardening

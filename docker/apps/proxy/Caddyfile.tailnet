@@ -113,14 +113,11 @@ trading.mpdavis.com {
 	}
 }
 
-# /healthz ahead of auth for Gatus; it returns only {"ok": true}. The rest
-# shows the Kalshi account and has a kill switch, so it is behind Authentik.
+# No forward auth: tailnet-only, and Claude Code polls its JSON API
+# (/api/state) directly. The kill/resume POSTs keep the app's own guards
+# (JSON only, same origin, typed confirmation).
 kalshi.mpdavis.com {
-	route {
-		reverse_proxy /healthz kalshi-ui:8080
-		import authentik
-		reverse_proxy kalshi-ui:8080
-	}
+	reverse_proxy kalshi-ui:8080
 }
 
 # /health ahead of auth for Gatus, like /ping on prowlarr.
