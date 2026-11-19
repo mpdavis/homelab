@@ -56,6 +56,11 @@ endpoints:
     # deny-all, so it's a clean 200 liveness signal.
     url: https://ntfy.mpdavis.com/v1/health
     conditions: *open-conditions
+  # Tailnet-only, no forward auth (see Caddyfile.tailnet).
+  - name: kalshi-ui
+    group: external-open
+    url: https://kalshi.mpdavis.com/
+    conditions: *open-conditions
   # LAN hosts outside Docker, served by this host's Caddy.
   - name: birdnet
     group: external-open
@@ -82,12 +87,6 @@ endpoints:
   - name: trading-dashboard
     group: external-auth
     url: https://trading.mpdavis.com/
-    client: *auth-client
-    headers: *auth-headers
-    conditions: *auth-conditions
-  - name: kalshi-ui
-    group: external-auth
-    url: https://kalshi.mpdavis.com/
     client: *auth-client
     headers: *auth-headers
     conditions: *auth-conditions
