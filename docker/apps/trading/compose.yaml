@@ -93,7 +93,7 @@ services:
   # re-scanned hourly. Writes only changes, so quiet books cost almost nothing.
   kalshi-recorder:
     <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.31
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.33
     restart: unless-stopped
     init: true
     command:
@@ -129,7 +129,7 @@ services:
   # the engine starts over. Stopping it (SIGTERM) cancels every resting bot order.
   kalshi-live:
     <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.31
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.33
     restart: on-failure:5
     init: true
     stop_grace_period: 30s
@@ -145,16 +145,16 @@ services:
       - --max-daily-fill-cost=10
       # Unattended: automatic kills clear after 30 min (daily cap at UTC
       # midnight, UI kills wait for a human); re-scan every 2h; skip sides
-      # whose recent sell sweeps would cost more than the reward, sides whose
-      # price moved >= 1c either way over 48h, and markets trading >= 10x/week
-      # (walk-forward study: those get swept ~80-97% of weeks vs ~30%). Contracts the bot gets filled on are
+      # whose expected sweep cost beats the reward (observed sweeps, floored by
+      # measured base rates for busy/moving markets: --hazard-prior), and
+      # sides whose price slid >= 1c over 48h. Contracts the bot gets filled on are
       # sold back into the bid 30 min later (reduce-only IoC) to free the cash.
       - --auto-resume-minutes=30
       - --replan-minutes=120
       - --fill-cooldown-minutes=240
       - --tape-days=7
-      - --max-drift=0.01
-      - --max-trades-per-week=10
+      - --hazard-prior
+      - --max-slide=0.01
       - --offload-after-minutes=30
       - --db=/data/live.sqlite
     environment:
@@ -177,7 +177,7 @@ services:
   # cancels resting bot orders, which is why it mounts the volume read-write.
   kalshi-ui:
     <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.31
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.33
     restart: unless-stopped
     init: true
     command:
