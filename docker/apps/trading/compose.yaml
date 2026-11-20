@@ -119,9 +119,11 @@ services:
       retries: 3
       start_period: 5m
 
-  # REAL ORDERS. Quotes the top 50 LIP programs, bidding at the reference price
+  # REAL ORDERS. Quotes the top 120 LIP programs, bidding at the reference price
   # behind the existing queue (no volume cap: the queue ahead absorbs sells), with
   # resting bids capped at half the cash balance read at startup, less fills since.
+  # 120, not 50: cheap 1c programs earn far more per dollar, and a 50-market
+  # cut dropped most of them before the allocator, which ranks by edge per $.
   # The per-market cap equals --max-price x --size, so any allowed price fits.
   # On a kill-switch trip it cancels everything, writes /data/live.sqlite.halted
   # and idles with no orders (still heartbeating, shown as "halted" in the UI).
@@ -136,7 +138,7 @@ services:
     command:
       - run
       - --live
-      - --top=50
+      - --top=120
       - --max-books=1500
       # $250 wallet: 250 contracts per quote, capped at 10c so one fill costs
       # at most $25; the daily fill cap allows ~2 worst-case fills.
