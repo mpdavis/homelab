@@ -138,6 +138,8 @@ services:
       - --live
       - --top=50
       - --max-books=1500
+      # AAA publishes gas prices mid-day, so the losing buckets get swept before settlement.
+      - --exclude-prefixes=KXAAAGAS
       # $250 wallet: 250 contracts per quote, capped at 10c so one fill costs
       # at most $25; the daily fill cap allows ~2 worst-case fills.
       - --size=250
