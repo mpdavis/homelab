@@ -141,12 +141,12 @@ services:
       # AAA publishes gas prices mid-day, so the losing buckets get swept before settlement.
       - --exclude-prefixes=KXAAAGAS
       # $250 wallet: 250 contracts per quote, capped at 10c so one fill costs
-      # at most $25; the daily fill cap allows ~2 worst-case fills.
+      # at most $25; the $70 daily fill cap allows 2 worst-case fills.
       - --size=250
       - --max-price=0.10
       - --max-market-collateral=25
       - --max-cash-fraction=0.8
-      - --max-daily-fill-cost=50
+      - --max-daily-fill-cost=70
       # Unattended: automatic kills clear after 30 min (daily cap at UTC
       # midnight, UI kills wait for a human); re-scan every 2h; skip sides
       # whose expected sweep cost beats the reward (observed sweeps, floored by
