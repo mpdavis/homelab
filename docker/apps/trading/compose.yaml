@@ -142,12 +142,12 @@ services:
       - --exclude-prefixes=KXAAAGAS
       # 250 contracts per quote, capped at 3c so one fill costs at most $7.50 (1-3c
       # quotes earned ~0.6 $/day per $ resting vs ~0.07 at 5-10c, and the 5-10c fills
-      # caused most losses); the $70 daily fill cap allows 9 worst-case fills.
+      # caused most losses); the $85 daily fill cap allows 11 worst-case fills.
       - --size=250
       - --max-price=0.03
       - --max-market-collateral=7.5
       - --max-cash-fraction=0.8
-      - --max-daily-fill-cost=70
+      - --max-daily-fill-cost=85
       # Weekly data-release markets (token usage, Truth Social posts, nominations,
       # model share) get swept as their outcome firms up in the last ~3 days before
       # close; Nov 20-21 losses on those were ~$58.
