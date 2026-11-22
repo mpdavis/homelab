@@ -122,7 +122,8 @@ services:
   # REAL ORDERS. Quotes the top 50 LIP programs, bidding at the reference price
   # behind the existing queue (no volume cap: the queue ahead absorbs sells), with
   # resting bids capped at half the cash balance read at startup, less fills since.
-  # The per-market cap equals --max-price x --size, so any allowed price fits.
+  # Each side quotes whichever of --sizes fits the per-market and per-event caps
+  # with the best edge, so 1000 contracts only fit at 1.5c or less.
   # On a kill-switch trip it cancels everything, writes /data/live.sqlite.halted
   # and idles with no orders (still heartbeating, shown as "halted" in the UI).
   # Review, then press Resume trading in kalshi-ui: it deletes the halt file and
@@ -145,14 +146,22 @@ services:
       # TRUTHSOCIAL, TOKENUSE, HORMUZWEEKLY, TRUMPNUMSTATES, APRPOTUS, KEVCOUNT), NVDACEO
       # (heavily traded), and AAA gas (mid-day price release).
       - --exclude-prefixes=KXAAAGAS,KXACTBLUETOP,KXGOOGSHARE,KXANTHSHARE,KXDEEPSHARE,KXLLM1,KXTRUMPPHOTO,KXTRUTHSOCIAL,KXTOKENUSE,KXHORMUZWEEKLY,KXTRUMPNUMSTATES,KXAPRPOTUS,KXKEVCOUNT,KXNVDACEO
-      # 250 contracts per quote, capped at 3c so one fill costs at most $7.50 (1-3c
-      # quotes earned ~0.6 $/day per $ resting vs ~0.07 at 5-10c, and the 5-10c fills
-      # caused most losses); the $85 daily fill cap allows 11 worst-case fills.
+      # Sizes are chosen per side by edge (--sizes supersedes --size). Bids are capped at
+      # 3c: 1-3c quotes earned ~0.6 $/day per $ resting vs ~0.07 at 5-10c, and the 5-10c
+      # fills caused most losses. The worst single fill is $15 (1000 x 1.5c or 500 x 3c),
+      # $20 per event, so the $85 daily fill cap allows 5 worst-case fills. Replay on
+      # 11-22 books: 11 sides, $117.50 resting, ~$36/day est. reward vs ~$15/day
+      # modelled fill cost (was 3 sides, $22.50, $10/day).
       - --size=250
+      - --sizes=250,500,1000
       - --max-price=0.03
-      - --max-market-collateral=7.5
+      - --max-market-collateral=15
+      - --max-event-collateral=20
       - --max-cash-fraction=0.8
       - --max-daily-fill-cost=85
+      # 1500 contracts filled within 15s trip the kill switch; the default, 3 x the
+      # largest size (3000), is too loose.
+      - --group-limit=1500
       # Weekly data-release markets (token usage, Truth Social posts, nominations,
       # model share) get swept as their outcome firms up in the last ~3 days before
       # close; Nov 20-21 losses on those were ~$58.
