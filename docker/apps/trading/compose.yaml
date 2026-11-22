@@ -137,9 +137,14 @@ services:
       - run
       - --live
       - --top=50
-      - --max-books=1500
-      # AAA publishes gas prices mid-day, so the losing buckets get swept before settlement.
-      - --exclude-prefixes=KXAAAGAS
+      # The 4000 richest eligible books (of ~7800 on 2026-11-21): the 1500 cut fell at a
+      # $14-26/day pool and hid the quiet monthly alt-data and long-dated programs.
+      - --max-books=4000
+      # Series whose previous weeks were swept at 1-3c far more often than their reward
+      # pays for (sibling-event study 2026-11-21: ACTBLUETOP, AI-share, LLM1, TRUMPPHOTO,
+      # TRUTHSOCIAL, TOKENUSE, HORMUZWEEKLY, TRUMPNUMSTATES, APRPOTUS, KEVCOUNT), NVDACEO
+      # (heavily traded), and AAA gas (mid-day price release).
+      - --exclude-prefixes=KXAAAGAS,KXACTBLUETOP,KXGOOGSHARE,KXANTHSHARE,KXDEEPSHARE,KXLLM1,KXTRUMPPHOTO,KXTRUTHSOCIAL,KXTOKENUSE,KXHORMUZWEEKLY,KXTRUMPNUMSTATES,KXAPRPOTUS,KXKEVCOUNT,KXNVDACEO
       # 250 contracts per quote, capped at 3c so one fill costs at most $7.50 (1-3c
       # quotes earned ~0.6 $/day per $ resting vs ~0.07 at 5-10c, and the 5-10c fills
       # caused most losses); the $85 daily fill cap allows 11 worst-case fills.
