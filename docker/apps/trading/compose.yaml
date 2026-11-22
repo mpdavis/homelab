@@ -157,14 +157,21 @@ services:
       # model share) get swept as their outcome firms up in the last ~3 days before
       # close; Nov 20-21 losses on those were ~$58.
       - --min-hours=72
+      # Estimates track payouts ($2.94 paid vs $2.95 est; 11-21 programs paid as
+      # estimated), so a 1.5 margin on the projection lets in programs the 2x margin
+      # dropped (research 11-21: about +$6.60/day est on +$50 collateral).
+      - --payout-margin=1.5
+      # Other LIP bots stack the planned levels within minutes (11-22: 8 positive-edge
+      # sides at 08:49, 1 still quotable by 09:50), so re-plan hourly. Each replan is
+      # ~3.5 min of no quotes at 4000 books.
+      - --replan-minutes=60
       # Unattended: automatic kills clear after 30 min (daily cap at UTC
-      # midnight, UI kills wait for a human); re-scan every 2h; skip sides
-      # whose expected sweep cost beats the reward (observed sweeps, floored by
-      # measured base rates for busy/moving markets: --hazard-prior), and
-      # sides whose price slid >= 1c over 48h. Contracts the bot gets filled on are
-      # sold back into the bid 30 min later (reduce-only IoC) to free the cash.
+      # midnight, UI kills wait for a human); skip sides whose expected sweep
+      # cost beats the reward (observed sweeps, floored by measured base rates
+      # for busy/moving markets: --hazard-prior), and sides whose price slid
+      # >= 1c over 48h. Contracts the bot gets filled on are sold back into the
+      # bid 30 min later (reduce-only IoC) to free the cash.
       - --auto-resume-minutes=30
-      - --replan-minutes=120
       - --fill-cooldown-minutes=240
       - --tape-days=7
       - --hazard-prior
