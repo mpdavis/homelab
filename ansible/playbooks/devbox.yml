@@ -4,6 +4,8 @@
 #
 #   tofu -chdir=tofu/proxmox apply
 #   ansible-playbook playbooks/devbox.yml
+#
+# Upgrading Orca alone: ansible-playbook playbooks/orca-server.yml
 
 - name: Configure the development host
   hosts: development
@@ -39,3 +41,6 @@
         docker_users:
           - "{{ devbox_user }}"
     - tailscale
+
+- name: Run the Orca server
+  ansible.builtin.import_playbook: orca-server.yml

@@ -42,6 +42,7 @@ Run from `ansible/`: `ansible-playbook playbooks/<playbook>.yml`.
 | `docker-host.yml` | `docker` | Docker, service IPs, and the doco-cd instance; see `docs/compose.md` |
 | `tailscale-router.yml` | `tailscale_router` | The subnet router (prompts for an auth key) |
 | `devbox.yml` | `development` | The development host; see `docs/devbox.md` |
+| `orca-server.yml` | `development` | The Orca server alone, without `devbox.yml`'s credential prompts; `devbox.yml` imports it |
 | `maintain-guests.yml` | every guest | Patches one guest at a time, reboots where an update asks, prunes Docker images |
 | `maintain-pve.yml` | `pve` | Patches one node at a time, reboots onto a new kernel and waits for its guests |
 
@@ -88,6 +89,7 @@ Every guest play starts with `common`; the rest are applied by group.
 | `doco_cd` | docker hosts | Bitwarden token and doco-cd's first start; doco-cd updates itself after that |
 | `tailscale` | tailscale-router, devbox | tailscaled and first `tailscale up` |
 | `devbox` | devbox | User, shell, tooling, repos for the development host |
+| `orca_server` | devbox | Headless Orca server (`orca-ide serve`) as a systemd user service |
 | `apt_upgrade` | maintenance | dist-upgrade, autoremove, autoclean |
 | `reboot_required` | maintenance, guests | Reboots when `/var/run/reboot-required` exists |
 | `pve_reboot` | maintenance, `pve` | Reboots onto a newer kernel, gated on quorum, then waits for the node's guests |

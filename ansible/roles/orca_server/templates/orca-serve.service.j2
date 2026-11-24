@@ -1,0 +1,30 @@
+# Managed by Ansible (roles/orca_server) — edits here are overwritten.
+#
+# Mirrors what `orca-ide serve service install` renders, so `orca-ide serve
+# service status` and `orca-ide pair` recognise it as this profile's service.
+
+[Unit]
+Description=Orca server (orca serve --supervise)
+# Backstop for the supervisor, which retries on its own and exits 0 after 6
+# failures in 15 minutes.
+StartLimitIntervalSec=900
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# --no-pairing keeps live pairing links out of the journal; pair with
+# `orca-ide pair`. --refuse-public: every client is on the LAN or tailnet.
+ExecStart={{ orca_server_install_dir }}/bin/orca-ide serve --supervise --no-pairing --port {{ orca_server_port }} --refuse-public
+Environment=PATH={{ __orca_server_home }}/.local/share/mise/shims:{{ __orca_server_home }}/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# The user manager can resolve a different default profile than an SSH shell,
+# which would leave `orca-ide pair` talking to a server that is not running.
+Environment=ORCA_USER_DATA_PATH={{ __orca_server_home }}/.config/orca
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=90
+# Stop only the supervisor; the terminal daemon it started keeps agent
+# sessions alive across restarts and upgrades.
+KillMode=process
+
+[Install]
+WantedBy=default.target

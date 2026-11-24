@@ -1,0 +1,123 @@
+---
+# Orca's headless runtime (orcad), so the Orca desktop and mobile apps attach to
+# projects, terminals and agents that live here. Runbook: docs/devbox.md.
+
+# Ansible's become does not open a login session, so `systemctl --user` needs
+# XDG_RUNTIME_DIR, which needs the uid.
+- name: Look up the Orca user
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ orca_server_user }}"
+
+# The user manager, and with it this service and every Orca terminal's scope,
+# otherwise stops at the last logout and never starts at boot.
+- name: Enable lingering so the service runs without a login
+  ansible.builtin.command: "loginctl enable-linger {{ orca_server_user }}"
+  args:
+    creates: "/var/lib/systemd/linger/{{ orca_server_user }}"
+
+- name: Create the systemd user unit directory
+  ansible.builtin.file:
+    path: "{{ __orca_server_home }}/{{ item }}"
+    state: directory
+    owner: "{{ orca_server_user }}"
+    group: "{{ orca_server_user }}"
+    mode: "0755"
+  loop:
+    - .config
+    - .config/systemd
+    - .config/systemd/user
+
+- name: Install the orca-serve unit
+  ansible.builtin.template:
+    src: orca-serve.service.j2
+    dest: "{{ __orca_server_home }}/.config/systemd/user/orca-serve.service"
+    owner: "{{ orca_server_user }}"
+    group: "{{ orca_server_user }}"
+    mode: "0644"
+  notify: Restart orca-serve
+
+- name: Read the installed Orca server version
+  ansible.builtin.command: "{{ orca_server_install_dir }}/bin/orca-ide --version"
+  become_user: "{{ orca_server_user }}"
+  register: orca_server_installed
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+# Upstream's update procedure is stop, replace the directory, start. Unpacking
+# over a live install would leave the old release's files behind.
+- name: Install the Orca server release
+  when: orca_server_installed.stdout | default('') | trim != orca_server_version | regex_replace('^v', '')
+  block:
+    - name: Download the Orca server release
+      ansible.builtin.get_url:
+        url: "{{ __orca_server_release_url }}/orca-server-linux-x64.tar.gz"
+        dest: "/tmp/orca-server-{{ orca_server_version }}.tar.gz"
+        # Matched against the asset name in the URL, not the dest name.
+        checksum: "sha256:{{ __orca_server_release_url }}/orca-server-sha256sums.txt"
+        mode: "0644"
+      register: orca_server_download
+      until: orca_server_download is success
+      retries: 3
+      delay: 5
+
+    - name: Stop the Orca server
+      ansible.builtin.systemd_service:
+        name: orca-serve
+        scope: user
+        state: stopped
+        daemon_reload: true
+      become_user: "{{ orca_server_user }}"
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ __orca_server_uid }}"
+
+    - name: Remove the previous Orca server release
+      ansible.builtin.file:
+        path: "{{ orca_server_install_dir }}"
+        state: absent
+
+    - name: Create the Orca server directory
+      ansible.builtin.file:
+        path: "{{ orca_server_install_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Unpack the Orca server release
+      ansible.builtin.unarchive:
+        src: "/tmp/orca-server-{{ orca_server_version }}.tar.gz"
+        dest: "{{ orca_server_install_dir }}"
+        remote_src: true
+        extra_opts:
+          - --strip-components=1
+
+    - name: Remove the downloaded archive
+      ansible.builtin.file:
+        path: "/tmp/orca-server-{{ orca_server_version }}.tar.gz"
+        state: absent
+
+# The launcher resolves its own symlink to find the bundled Node.
+- name: Put orca-ide on PATH
+  ansible.builtin.file:
+    src: "{{ orca_server_install_dir }}/bin/orca-ide"
+    dest: /usr/local/bin/orca-ide
+    state: link
+
+# A supervisor that gave up after a crash loop refuses every later start of the
+# same build until this is gone. `orca-ide serve service install` clears it on
+# each install; doing the same here makes re-running the playbook the recovery.
+- name: Clear the supervisor's crash-loop brake
+  ansible.builtin.file:
+    path: "{{ __orca_server_home }}/.config/orca/serve-supervisor-brake.json"
+    state: absent
+
+- name: Enable and start orca-serve
+  ansible.builtin.systemd_service:
+    name: orca-serve
+    scope: user
+    enabled: true
+    state: started
+    daemon_reload: true
+  become_user: "{{ orca_server_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ __orca_server_uid }}"

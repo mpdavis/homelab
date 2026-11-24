@@ -3,8 +3,10 @@
 `devbox` is an LXC container on pve1 (`10.0.1.54`, vmid 204) that exists to be
 the machine your code lives on. Coding agents run there rather than on a laptop,
 and [herdr](https://herdr.dev) attaches to it over SSH — from a laptop, a phone,
-or anything else that can hold a terminal. Close the lid and the agents keep
-working; reattach later and the panes are where you left them.
+or anything else that can hold a terminal. It is also a headless
+[Orca](#orca) server that the Orca desktop and mobile apps connect to. Close the
+lid and the agents keep working; reattach later and the panes are where you left
+them.
 
 The rationale for running it as its own host is in
 [design.md](design.md#development-host). This file is the runbook.
@@ -175,6 +177,90 @@ Two things about the daemon worth knowing, because both are silent when wrong:
   on its own does not.
 - Upgrades are manual (`moshi-hook update`). There is no public source repo for
   Renovate to track, so nothing bumps it for you.
+
+## Orca
+
+[Orca](https://orca.dev) runs here as a headless server, so the Orca desktop
+app on the laptop and Orca Mobile on the phone open the same projects,
+worktrees, terminals and agents. These keep running when both clients are
+closed. `playbooks/orca-server.yml` (the `orca_server` role, which `devbox.yml`
+imports) installs Orca's server-only build to `/opt/orca-server`. It runs as
+the `orca-serve` systemd user service on port 6768.
+
+On Linux the CLI is `orca-ide`, because GNOME's screen reader owns `orca`.
+Inside Orca's own terminals, plain `orca` works too.
+
+Orca terminals start the user's zsh, so agents launched from Orca get
+`/etc/profile.d/devbox.sh` like any SSH shell: the Claude token, mise shims and
+`gh`. No `orca-ide account add` is needed.
+
+### Pairing
+
+The service runs with `--no-pairing` so that live pairing links never reach
+the journal. Pair from a shell on the box instead. Every link is a credential:
+whoever holds it gets a terminal on this host.
+
+Use the LAN address. At home it is reached directly, and away from home it is
+reached through the subnet router. It also does not depend on the devbox's own
+tailnet node, which gets a new `100.x` address whenever it is re-registered.
+
+**Laptop.** In one step, without the link ever reaching the screen:
+
+```bash
+orca environment add --name devbox --pairing-code \
+  "$(ssh michael@10.0.1.54 orca-ide pair --address 10.0.1.54 --json | jq -r .result.pairingUrl)"
+orca host name --environment devbox   # → devbox (linux)
+```
+
+Or run `orca-ide pair --address 10.0.1.54` on the box and paste the link into
+**Settings → Remote Orca Servers → Add Server**.
+
+**Phone.** Run this on the box, then scan the QR code from Orca Mobile →
+**Pair**:
+
+```bash
+ssh -t michael@10.0.1.54 orca-ide pair --mobile --address 10.0.1.54
+```
+
+### Projects
+
+Orca only shows repos it has been told about. Register any clone in `~/git`
+from the box, or from the laptop with `--environment devbox`:
+
+```bash
+orca-ide repo add --path ~/git/<repo>
+```
+
+### Upgrading
+
+Renovate bumps `orca_server_version` in
+`ansible/roles/orca_server/defaults/main.yml`. Patch bumps auto-merge, but
+nothing applies them. The server-only build has no updater, and paired clients
+cannot update it, so you run this by hand:
+
+```bash
+cd ansible
+ansible-playbook playbooks/orca-server.yml
+```
+
+Do this when the desktop app reports an incompatible protocol version. The
+role stops the service, replaces `/opt/orca-server`, and starts it again. Open
+terminals and the agents in them survive this: the unit uses
+`KillMode=process`, so the terminal daemon outlives the server.
+
+### Useful commands
+
+```bash
+orca-ide serve service status       # live/exited, and why the supervisor gave up if it did
+journalctl --user -u orca-serve -f  # server log
+orca-ide status                     # runtime readiness
+orca-ide terminal list              # what is running
+```
+
+**The supervisor gave up.** After six failures in fifteen minutes it exits
+cleanly, and systemd leaves it stopped. Find the cause in the journal, then
+re-run `playbooks/orca-server.yml`. The role clears the crash-loop brake, as
+`orca-ide serve service install` would, and starts the service again.
 
 ## Adding a repo
 
