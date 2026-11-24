@@ -3,7 +3,7 @@ name: ai
 services:
   # On proxy so Paperless in the docs stack can reach it.
   ollama:
-    image: ollama/ollama:0.40.17
+    image: ollama/ollama:0.40.18
     restart: unless-stopped
     environment:
       TZ: America/Chicago
@@ -35,7 +35,7 @@ services:
   # take effect through `ollama create`, and doco-cd recreates this service when a
   # mounted one changes, so a push is enough. A new Modelfile needs a mount here.
   prompters:
-    image: ollama/ollama:0.40.17
+    image: ollama/ollama:0.40.18
     restart: unless-stopped
     init: true
     depends_on:
