@@ -7,9 +7,9 @@ name: trading
 # The kalshi-* services run ghcr.io/mpdavis/kalshi-trader (source in
 # mpdavis/kalshi-trader) against the Kalshi production API. kalshi-live places
 # real orders (tagged `lip-`; it never touches orders placed by hand). The
-# recorder only reads market data, and the control plane's one write is its
-# kill switch. The shadow engine (`kalshi-trader run` without --live) is
-# paused; it last ran here as kalshi-shadow, see #1061 to bring it back.
+# recorder only reads market data, and the control plane writes only its kill
+# switch and settings overrides. The shadow engine (`kalshi-trader run` without
+# --live) is paused; it last ran here as kalshi-shadow, see #1061 to bring it back.
 x-alpaca: &alpaca
   TZ: America/Chicago
   ALPACA_API_KEY: ${ALPACA_PAPER_API_KEY:?resolved by doco-cd from external_secrets}
@@ -204,8 +204,9 @@ services:
       start_period: 5m
 
   # Control plane at kalshi.mpdavis.com (tailnet-only, no forward auth). Reads
-  # the other services' databases; its kill switch writes /data/live.sqlite.halted and
-  # cancels resting bot orders, which is why it mounts the volume read-write.
+  # the other services' databases. It mounts the volume read-write for its two writes:
+  # the kill switch writes /data/live.sqlite.halted and cancels resting bot orders, and
+  # settings edits write overrides to /data/settings.sqlite.
   kalshi-ui:
     <<: *hardening
     image: ghcr.io/mpdavis/kalshi-trader:1.0.86
@@ -218,6 +219,13 @@ services:
       - --data-dir=/data
     environment:
       <<: *kalshi
+      # Settings editing from the control plane (kalshi-trader settings plan, phase e). Writes
+      # need a named token; only each token's SHA-256 is here. Rights: loosen = any change
+      # inside the KALSHI_GUARD_* bounds (resting ≤ 80% cash, fill ≤ $15, daily cap ≤ 40% equity).
+      KALSHI_UI_SETTINGS_EDIT: "on"
+      KALSHI_UI_EDIT_TOKENS: "operator:f81dc134441373a157e46b22dd63266a9920636194c329e3aa3a62e9c62e14b1:loosen"
+      # Until KALSHI_UI_FORWARDED_ALLOW_IPS is set (from `docker network inspect proxy`), kalshi-ui
+      # trusts no proxy for X-Forwarded-For: logs show the proxy's address, the client's claim beside it.
     volumes:
       - kalshi:/data
     tmpfs:
