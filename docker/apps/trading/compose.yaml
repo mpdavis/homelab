@@ -223,7 +223,7 @@ services:
       # need a named token; only each token's SHA-256 is here. Rights: loosen = any change
       # inside the KALSHI_GUARD_* bounds (resting ≤ 80% cash, fill ≤ $15, daily cap ≤ 40% equity).
       KALSHI_UI_SETTINGS_EDIT: "on"
-      KALSHI_UI_EDIT_TOKENS: "operator:f81dc134441373a157e46b22dd63266a9920636194c329e3aa3a62e9c62e14b1:loosen"
+      KALSHI_UI_EDIT_TOKENS: "owner:b3fbf41416ede331338a0842acf7b4e4ffd583a7376bf1fe5ad90a7152178787:loosen,operator:f81dc134441373a157e46b22dd63266a9920636194c329e3aa3a62e9c62e14b1:loosen"
       # Until KALSHI_UI_FORWARDED_ALLOW_IPS is set (from `docker network inspect proxy`), kalshi-ui
       # trusts no proxy for X-Forwarded-For: logs show the proxy's address, the client's claim beside it.
     volumes:
