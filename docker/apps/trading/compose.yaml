@@ -93,7 +93,7 @@ services:
   # re-scanned hourly. Writes only changes, so quiet books cost almost nothing.
   kalshi-recorder:
     <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.121
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.126
     restart: unless-stopped
     init: true
     command:
@@ -130,7 +130,7 @@ services:
   # the engine starts over. Stopping it (SIGTERM) cancels every resting bot order.
   kalshi-live:
     <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.121
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.126
     restart: on-failure:5
     init: true
     stop_grace_period: 30s
@@ -209,7 +209,7 @@ services:
   # settings edits write overrides to /data/settings.sqlite.
   kalshi-ui:
     <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.121
+    image: ghcr.io/mpdavis/kalshi-trader:1.0.126
     restart: unless-stopped
     init: true
     command:
