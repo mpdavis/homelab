@@ -1,0 +1,4 @@
+---
+__orca_server_uid: "{{ ansible_facts.getent_passwd[orca_server_user][1] }}"
+__orca_server_home: "{{ ansible_facts.getent_passwd[orca_server_user][4] }}"
+__orca_server_release_url: "https://github.com/stablyai/orca/releases/download/{{ orca_server_version }}"

@@ -1,0 +1,14 @@
+---
+# Required: the account Orca runs as. Its home holds Orca's state, and its PATH
+# and credentials are what agents launched from Orca get.
+orca_server_user: ~
+
+# The server-only build has no updater, and paired clients cannot update it.
+# renovate: datasource=github-releases depName=stablyai/orca
+orca_server_version: "v1.4.273"
+
+orca_server_install_dir: /opt/orca-server
+
+# Fixed so pairing links stay valid: unpinned, serve moves off 6768 whenever
+# something else holds it.
+orca_server_port: 6768

@@ -1,0 +1,15 @@
+---
+# The Orca server on the development host. devbox.yml imports this, so first
+# provisioning includes it; run it alone to upgrade Orca, which skips
+# devbox.yml's credential prompts. See docs/devbox.md.
+#
+#   ansible-playbook playbooks/orca-server.yml
+
+- name: Run the Orca server on the development host
+  hosts: development
+  become: true
+  roles:
+    - role: orca_server
+      vars:
+        # devbox_user; that role's defaults are not loaded in this play.
+        orca_server_user: michael

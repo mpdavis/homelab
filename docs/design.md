@@ -236,6 +236,9 @@ is the correction.
   covers clones and pushes with no per-host deploy key.
 - **Agent CLIs pinned** (`claude`, `opencode`) in `roles/devbox/defaults`, with
   Renovate tracking them the same way it tracks image tags.
+- **Orca server** (`roles/orca_server`) as a systemd user service, so the Orca
+  desktop and mobile apps share one set of sessions that outlives every client.
+  Paired over the LAN address, which the subnet router carries off-site.
 
 ### Capacity note
 

@@ -1,0 +1,10 @@
+---
+- name: Restart orca-serve
+  ansible.builtin.systemd_service:
+    name: orca-serve
+    scope: user
+    state: restarted
+    daemon_reload: true
+  become_user: "{{ orca_server_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ __orca_server_uid }}"
