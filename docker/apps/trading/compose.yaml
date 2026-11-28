@@ -4,24 +4,16 @@ name: trading
 # mpdavis/algo-trading), against the Alpaca paper account. Strategies keep their
 # state in the shared volume, one directory each; the dashboard only reads it.
 #
-# The kalshi-* services run ghcr.io/mpdavis/kalshi-trader (source in
-# mpdavis/kalshi-trader) against the Kalshi production API. kalshi-live places
-# real orders (tagged `lip-`; it never touches orders placed by hand). The
-# recorder only reads market data, and the control plane writes only its kill
-# switch and settings overrides. The shadow engine (`kalshi-trader run` without
-# --live) is paused; it last ran here as kalshi-shadow, see #1061 to bring it back.
+# The kalshi-* services (mpdavis/kalshi-trader) are on the infra host for now,
+# in docker/infra/kalshi/, while this host is down; and the recorder and the
+# paused shadow engine (#1061) are off. Their volume, trading_kalshi, is still
+# on this host. Revert that move to bring them back here.
 x-alpaca: &alpaca
   TZ: America/Chicago
   ALPACA_API_KEY: ${ALPACA_PAPER_API_KEY:?resolved by doco-cd from external_secrets}
   ALPACA_API_SECRET: ${ALPACA_PAPER_API_SECRET:?resolved by doco-cd from external_secrets}
   ALPACA_IS_PAPER: "true"
   STRATEGIES: pairs,orb,selloff
-
-x-kalshi: &kalshi
-  TZ: America/Chicago
-  KALSHI_ENV: prod
-  KALSHI_API_KEY_ID: ${KALSHI_API_KEY_ID:?resolved by doco-cd from external_secrets}
-  KALSHI_PRIVATE_KEY: ${KALSHI_PRIVATE_KEY:?resolved by doco-cd from external_secrets}
 
 x-hardening: &hardening
   read_only: true
@@ -89,171 +81,12 @@ services:
       - default
       - proxy
 
-  # Order books and trades of the 300 most promising quiet incentive programs,
-  # re-scanned hourly. Writes only changes, so quiet books cost almost nothing.
-  kalshi-recorder:
-    <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.145
-    restart: unless-stopped
-    init: true
-    command:
-      - record
-      - --top=300
-      - --max-volume=100
-      - --max-books=1500
-      - --db=/data/lip.sqlite
-    environment:
-      <<: *kalshi
-    volumes:
-      - kalshi:/data
-    tmpfs:
-      - /tmp:size=64m
-    cpus: 1
-    mem_limit: 1g
-    # The first heartbeat comes after the startup scan of ~1,500 order books
-    # (2-3 min), hence the long start_period and the timeout in .doco-cd.yml.
-    healthcheck:
-      test: ["CMD", "kalshi-trader", "health", "--db", "/data/lip.sqlite"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 5m
-
-  # REAL ORDERS. Quotes the top 50 LIP programs, bidding at the reference price
-  # behind the existing queue (no volume cap: the queue ahead absorbs sells), with
-  # resting bids capped at half the cash balance read at startup, less fills since.
-  # Each side quotes whichever of --sizes fits the per-market and per-event caps
-  # with the best edge, so 1000 contracts only fit at 1.5c or less.
-  # On a kill-switch trip it cancels everything, writes /data/live.sqlite.halted
-  # and idles with no orders (still heartbeating, shown as "halted" in the UI).
-  # Review, then press Resume trading in kalshi-ui: it deletes the halt file and
-  # the engine starts over. Stopping it (SIGTERM) cancels every resting bot order.
-  kalshi-live:
-    <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.145
-    restart: on-failure:5
-    init: true
-    stop_grace_period: 30s
-    command:
-      - run
-      - --live
-      - --top=50
-      # The 4000 richest eligible books (of ~7800 on 2026-11-21): the 1500 cut fell at a
-      # $14-26/day pool and hid the quiet monthly alt-data and long-dated programs.
-      - --max-books=4000
-      # Series whose previous weeks were swept at 1-3c far more often than their reward
-      # pays for (sibling-event study 2026-11-21: ACTBLUETOP, AI-share, LLM1, TRUMPPHOTO,
-      # TRUTHSOCIAL, TOKENUSE, HORMUZWEEKLY, TRUMPNUMSTATES, APRPOTUS, KEVCOUNT), NVDACEO
-      # (heavily traded), and AAA gas (mid-day price release).
-      - --exclude-prefixes=KXAAAGAS,KXACTBLUETOP,KXGOOGSHARE,KXANTHSHARE,KXDEEPSHARE,KXLLM1,KXTRUMPPHOTO,KXTRUTHSOCIAL,KXTOKENUSE,KXHORMUZWEEKLY,KXTRUMPNUMSTATES,KXAPRPOTUS,KXKEVCOUNT,KXNVDACEO
-      # Sizes are chosen per side by edge (--sizes supersedes --size). Bids are capped at
-      # 3c: 1-3c quotes earned ~0.6 $/day per $ resting vs ~0.07 at 5-10c, and the 5-10c
-      # fills caused most losses. The worst single fill is $15 (1000 x 1.5c or 500 x 3c),
-      # $20 per event, so the $85 daily fill cap allows 5 worst-case fills. Replay on
-      # 11-22 books: 11 sides, $117.50 resting, ~$36/day est. reward vs ~$15/day
-      # modelled fill cost (was 3 sides, $22.50, $10/day).
-      - --size=250
-      - --sizes=250,500,1000
-      - --max-price=0.03
-      - --max-market-collateral=15
-      - --max-event-collateral=20
-      - --max-cash-fraction=0.8
-      - --max-daily-fill-cost=85
-      # 1500 contracts filled within 15s trip the kill switch; the default, 3 x the
-      # largest size (3000), is too loose.
-      - --group-limit=1500
-      # Weekly data-release markets (token usage, Truth Social posts, nominations,
-      # model share) get swept as their outcome firms up in the last ~3 days before
-      # close; Nov 20-21 losses on those were ~$58.
-      - --min-hours=72
-      # Estimates track payouts ($2.94 paid vs $2.95 est; 11-21 programs paid as
-      # estimated), so a 1.5 margin on the projection lets in programs the 2x margin
-      # dropped (research 11-21: about +$6.60/day est on +$50 collateral).
-      - --payout-margin=1.5
-      # Other LIP bots stack the planned levels within minutes (11-22: 8 positive-edge
-      # sides at 08:49, 1 still quotable by 09:50), so re-plan hourly. Each replan is
-      # ~3.5 min of no quotes at 4000 books.
-      - --replan-minutes=60
-      # Unattended: automatic kills clear after 30 min (daily cap at UTC
-      # midnight, UI kills wait for a human); skip sides whose expected sweep
-      # cost beats the reward (observed sweeps, floored by measured base rates
-      # for busy/moving markets: --hazard-prior), and sides whose price slid
-      # >= 1c over 48h. Contracts the bot gets filled on are sold back into the
-      # bid 30 min later (reduce-only IoC) to free the cash.
-      - --auto-resume-minutes=30
-      - --fill-cooldown-minutes=240
-      - --tape-days=7
-      - --hazard-prior
-      - --min-sweep=200
-      - --max-slide=0.01
-      - --offload-after-minutes=30
-      - --db=/data/live.sqlite
-    environment:
-      <<: *kalshi
-    volumes:
-      - kalshi:/data
-    tmpfs:
-      - /tmp:size=64m
-    cpus: 1
-    mem_limit: 1g
-    healthcheck:
-      test: ["CMD", "kalshi-trader", "health", "--db", "/data/live.sqlite"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 5m
-
-  # Control plane at kalshi.mpdavis.com (tailnet-only, no forward auth). Reads
-  # the other services' databases. It mounts the volume read-write for its two writes:
-  # the kill switch writes /data/live.sqlite.halted and cancels resting bot orders, and
-  # settings edits write overrides to /data/settings.sqlite.
-  kalshi-ui:
-    <<: *hardening
-    image: ghcr.io/mpdavis/kalshi-trader:1.0.145
-    restart: unless-stopped
-    init: true
-    command:
-      - ui
-      - --host=0.0.0.0
-      - --port=8080
-      - --data-dir=/data
-    environment:
-      <<: *kalshi
-      # Settings editing from the control plane (kalshi-trader settings plan, phase e). Writes
-      # need a named token; only each token's SHA-256 is here. Rights: loosen = any change
-      # inside the KALSHI_GUARD_* bounds (resting ≤ 80% cash, fill ≤ $15, daily cap ≤ 40% equity).
-      KALSHI_UI_SETTINGS_EDIT: "on"
-      KALSHI_UI_EDIT_TOKENS: "owner:b3fbf41416ede331338a0842acf7b4e4ffd583a7376bf1fe5ad90a7152178787:loosen,operator:f81dc134441373a157e46b22dd63266a9920636194c329e3aa3a62e9c62e14b1:loosen"
-      # Until KALSHI_UI_FORWARDED_ALLOW_IPS is set (from `docker network inspect proxy`), kalshi-ui
-      # trusts no proxy for X-Forwarded-For: logs show the proxy's address, the client's claim beside it.
-    volumes:
-      - kalshi:/data
-    tmpfs:
-      - /tmp:size=64m
-    cpus: 0.5
-    mem_limit: 512m
-    healthcheck:
-      # The slim image has no curl or wget.
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=5)"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - default
-      - proxy
-
 volumes:
   # One directory per strategy (state and heartbeat). Losing it is recoverable:
   # pairs and selloff re-adopt open positions from the account, and orb closes
   # any SPY position that is not today's trade.
   # Not `data`: QuantDinger's old trading_data volume still holds its files.
   state:
-  # SQLite databases for the recorder (lip.sqlite), the paused shadow engine
-  # (shadow.sqlite, history only) and live engine (live.sqlite, plus live.sqlite.halted after
-  # a kill-switch trip). Losing it loses research history only; nothing in it is
-  # needed to trade.
-  kalshi:
 
 networks:
   proxy:

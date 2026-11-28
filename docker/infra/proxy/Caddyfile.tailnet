@@ -16,3 +16,8 @@ proxmox.mpdavis.com {
 birdnet.mpdavis.com {
 	reverse_proxy 10.0.63.190:80
 }
+
+# Stop-gap: docker/infra/kalshi/ while the compose host is down.
+kalshi.mpdavis.com {
+	reverse_proxy kalshi-ui:8080
+}
