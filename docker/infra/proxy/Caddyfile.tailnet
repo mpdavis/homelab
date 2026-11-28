@@ -16,3 +16,11 @@ proxmox.mpdavis.com {
 birdnet.mpdavis.com {
 	reverse_proxy 10.0.63.190:80
 }
+
+# Stop-gap: docker/infra/kalshi/ while the compose host is down. No forward
+# auth: tailnet-only, and Claude Code polls its JSON API (/api/state) directly.
+# The kill/resume POSTs keep the app's own guards (JSON only, same origin,
+# typed confirmation).
+kalshi.mpdavis.com {
+	reverse_proxy kalshi-ui:8080
+}

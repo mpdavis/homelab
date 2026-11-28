@@ -113,13 +113,6 @@ trading.mpdavis.com {
 	}
 }
 
-# No forward auth: tailnet-only, and Claude Code polls its JSON API
-# (/api/state) directly. The kill/resume POSTs keep the app's own guards
-# (JSON only, same origin, typed confirmation).
-kalshi.mpdavis.com {
-	reverse_proxy kalshi-ui:8080
-}
-
 # /health ahead of auth for Gatus, like /ping on prowlarr.
 ai.mpdavis.com {
 	route {

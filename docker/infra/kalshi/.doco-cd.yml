@@ -1,0 +1,7 @@
+# kalshi-live's first heartbeat follows a 2-3 min startup scan.
+timeout: 600
+external_secrets:
+  # Kalshi production API key (market data, and kalshi-live's orders; the
+  # control plane's kill switch can cancel them). KALSHI_PRIVATE_KEY is the PEM itself.
+  KALSHI_API_KEY_ID: ae1f3a89-ffe7-4e63-a440-b50601527a4f
+  KALSHI_PRIVATE_KEY: 6702cd73-0c40-4c84-824f-b50601527aad
